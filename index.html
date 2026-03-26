@@ -81,6 +81,7 @@
   <div class="device-wrap">
     <div class="device"><div id="screen" style="position:relative"><div id="loading"><div class="spinner"></div>Loading simulator&hellip;</div></div></div>
     <div class="device-label">480 &times; 800 &middot; Click to interact</div>
+    <button class="btn btn-test" id="restart-btn" style="width:auto;padding:10px 24px;margin-top:4px;font-size:13px;" onclick="restartSim()">&#x1F504; Restart Simulator</button>
   </div>
   <div class="side">
     <div class="card">
@@ -121,6 +122,19 @@ try {
 } catch(e) {
   document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">Error: '+e.message+'</p>';
 }
+
+function restartSim() {
+  const btn = document.getElementById('restart-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Restarting...';
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('loading').innerHTML = '<div class="spinner"></div>Restarting simulator…';
+  fetch('https://postiz.clavastack.com/restart/sim1', { method: 'POST' })
+    .then(r => r.json())
+    .then(() => { btn.textContent = '✅ Restarted — reconnecting...'; setTimeout(() => location.reload(), 3000); })
+    .catch(() => { btn.textContent = '❌ Failed — try again'; btn.disabled = false; });
+}
+window.restartSim = restartSim;
 </script>
 </body>
 </html>
