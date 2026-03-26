@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Specter 3 Testing | ClavaStack</title>
+  <style>
+    :root {
+      --specter-dark: #04070B;
+      --specter-dark-secondary: #1E2734;
+      --specter-dark-accent: #0C1A27;
+      --specter-light: #FCFCFC;
+      --specter-light-secondary: #D1D5DB;
+      --specter-primary: #1F99E5;
+      --specter-coral: #FF7A7A;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--specter-dark); color: var(--specter-light); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+    header { background: var(--specter-dark-accent); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--specter-dark-secondary); }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-left img { height: 32px; }
+    .header-left .sep { color: var(--specter-light-secondary); opacity: 0.3; font-size: 18px; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .nav-link { color: var(--specter-light-secondary); text-decoration: none; font-size: 13px; }
+    .nav-link:hover { color: var(--specter-primary); }
+    .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--specter-light-secondary); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #f44; }
+    .dot.on { background: #4c5; }
+    .hero { text-align: center; padding: 24px 20px 12px; }
+    .hero h1 { color: var(--specter-coral); font-size: 22px; margin-bottom: 6px; }
+    .hero p { color: var(--specter-light-secondary); font-size: 14px; }
+    .main { display: flex; gap: 20px; padding: 0 20px 30px; max-width: 1200px; margin: 0 auto; align-items: flex-start; justify-content: center; }
+    .device-wrap { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .device { background: var(--specter-dark-secondary); border: 2px solid #333; border-radius: 14px; padding: 12px 8px; box-shadow: 0 6px 24px rgba(0,0,0,.5); position: relative; }
+    .device::before { content: 'SPECTER 3 TESTING'; position: absolute; top: 2px; left: 50%; transform: translateX(-50%); font-size: 7px; letter-spacing: 2px; color: var(--specter-coral); font-weight: 600; }
+    #screen { width: 480px; height: 800px; overflow: hidden; border-radius: 4px; background: #000; }
+    .device-label { color: var(--specter-light-secondary); font-size: 11px; }
+    /* Feedback Panel */
+    .feedback { max-width: 380px; flex: 1; display: flex; flex-direction: column; gap: 12px; padding-top: 8px; }
+    .panel { background: var(--specter-dark-secondary); border-radius: 10px; padding: 16px; }
+    .panel h2 { color: var(--specter-primary); font-size: 15px; margin-bottom: 10px; }
+    .screen-display { background: var(--specter-dark); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,.08); margin-bottom: 10px; }
+    .screen-label { font-size: 11px; color: var(--specter-light-secondary); }
+    .screen-name { font-size: 16px; color: var(--specter-primary); font-weight: 600; }
+    label { font-size: 12px; color: var(--specter-light-secondary); display: block; margin-bottom: 4px; }
+    textarea { width: 100%; padding: 10px; background: var(--specter-dark); border: 1px solid #333; border-radius: 6px; color: var(--specter-light); font-size: 13px; font-family: inherit; resize: vertical; min-height: 70px; }
+    textarea:focus { border-color: var(--specter-primary); outline: none; }
+    .btn { display: block; width: 100%; padding: 10px; border-radius: 9999px; font-size: 13px; font-weight: 600; text-decoration: none; text-align: center; transition: all .2s; border: none; cursor: pointer; }
+    .btn-add { background: var(--specter-primary); color: #fff; }
+    .btn-add:hover { background: #1680c0; }
+    .btn-row { display: flex; gap: 8px; }
+    .btn-sm { padding: 8px 14px; font-size: 12px; border-radius: 9999px; border: none; cursor: pointer; font-weight: 600; }
+    .btn-dl { background: var(--specter-dark); color: var(--specter-primary); border: 1px solid var(--specter-primary); }
+    .btn-clear { background: var(--specter-dark); color: var(--specter-coral); border: 1px solid var(--specter-coral); }
+    .entries { max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+    .entry { background: var(--specter-dark); border: 1px solid rgba(255,255,255,.06); border-radius: 6px; padding: 10px; position: relative; }
+    .entry-screen { color: var(--specter-primary); font-weight: 600; font-size: 12px; margin-bottom: 3px; }
+    .entry-text { color: var(--specter-light-secondary); font-size: 12px; white-space: pre-wrap; }
+    .entry-del { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #666; cursor: pointer; font-size: 14px; }
+    .entry-del:hover { color: var(--specter-coral); }
+    .empty { color: #555; font-size: 12px; text-align: center; padding: 20px 0; font-style: italic; }
+    #loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: var(--specter-light-secondary); font-size: 14px; gap: 12px; z-index: 10; }
+    .spinner { width: 28px; height: 28px; border: 3px solid #333; border-top-color: var(--specter-primary); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    footer { background: var(--specter-dark-secondary); text-align: center; padding: 16px; color: var(--specter-light-secondary); font-size: 11px; }
+    footer a { color: var(--specter-primary); text-decoration: none; }
+    @media (max-width: 960px) { .main { flex-direction: column; align-items: center; } .feedback { max-width: 500px; width: 100%; } }
+    @media (max-width: 520px) { #screen { width: 320px; height: 533px; } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <img src="../assets/clavastack-logo.png" alt="ClavaStack">
+    <span class="sep">&times;</span>
+    <img src="../assets/specter-logo.png" alt="Specter">
+  </div>
+  <div class="header-right">
+    <a href="/" class="nav-link">&larr; Specter DIY</a>
+    <a href="https://clavastack.com" class="nav-link">Shop</a>
+    <div class="status"><div class="dot" id="dot"></div><span id="st">Connecting&hellip;</span></div>
+  </div>
+</header>
+<div class="hero">
+  <h1>&#x1F9EA; Specter 3 Testing</h1>
+  <p>Test the new Specter 3 firmware. Give feedback on each screen below.</p>
+</div>
+<div class="main">
+  <div class="device-wrap">
+    <div class="device"><div id="screen" style="position:relative"><div id="loading"><div class="spinner"></div>Loading simulator&hellip;</div></div></div>
+    <div class="device-label">480 &times; 800 &middot; Click to interact</div>
+  </div>
+  <div class="feedback">
+    <div class="panel">
+      <h2>&#x1F4DD; Feedback</h2>
+      <div class="screen-display">
+        <div class="screen-label">Current Screen</div>
+        <div class="screen-name" id="screenName">Connecting...</div>
+      </div>
+      <label>Your feedback</label>
+      <textarea id="fbText" placeholder="What do you think about this screen?"></textarea>
+      <div style="height:8px"></div>
+      <button class="btn btn-add" onclick="addFeedback()">+ Add Feedback</button>
+    </div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h2>Entries (<span id="count">0</span>)</h2>
+        <div class="btn-row">
+          <button class="btn-sm btn-dl" onclick="downloadMd()">&#x2B07; .md</button>
+          <button class="btn-sm btn-clear" onclick="clearAll()">&#x1F5D1; Clear</button>
+        </div>
+      </div>
+      <div class="entries" id="entries"><div class="empty">No feedback yet.</div></div>
+    </div>
+  </div>
+</div>
+<footer>
+  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="https://github.com/maggo83/specter-playground">Playground GitHub</a></p>
+</footer>
+<script type="module">
+import RFB from 'https://postiz.clavastack.com/simulator-novnc/core/rfb.js';
+const url = `wss://postiz.clavastack.com/playground-ws`;
+try {
+  const rfb = new RFB(document.getElementById('screen'), url);
+  rfb.scaleViewport = false;
+  rfb.resizeSession = false;
+  rfb.viewOnly = false;
+  rfb.qualityLevel = 6;
+  rfb.compressionLevel = 2;
+  rfb.addEventListener('connect', () => {
+    document.getElementById('dot').classList.add('on');
+    document.getElementById('st').textContent = 'Connected';
+    document.getElementById('loading').style.display = 'none';
+  });
+  rfb.addEventListener('disconnect', () => {
+    document.getElementById('dot').classList.remove('on');
+    document.getElementById('st').textContent = 'Disconnected';
+    document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">Simulator offline</p>';
+    document.getElementById('loading').style.display = 'flex';
+  });
+} catch(e) {
+  document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">'+e.message+'</p>';
+}
+
+// Screen name polling (from screen-api if available, otherwise manual)
+let currentScreen = 'Unknown';
+document.getElementById('screenName').textContent = 'Main Menu';
+
+// Feedback system
+let entries = JSON.parse(localStorage.getItem('specter3Feedback') || '[]');
+
+function render() {
+  const el = document.getElementById('entries');
+  const c = document.getElementById('count');
+  c.textContent = entries.length;
+  if (!entries.length) { el.innerHTML = '<div class="empty">No feedback yet.</div>'; return; }
+  el.innerHTML = entries.map((e,i) => `<div class="entry"><button class="entry-del" onclick="delEntry(${i})">&times;</button><div class="entry-screen">${esc(e.screen)}</div><div class="entry-text">${esc(e.text)}</div></div>`).join('');
+}
+
+window.addFeedback = function() {
+  const screen = document.getElementById('screenName').textContent.trim();
+  const text = document.getElementById('fbText').value.trim();
+  if (!text) { alert('Please write some feedback.'); return; }
+  entries.push({ screen, text, time: new Date().toISOString() });
+  localStorage.setItem('specter3Feedback', JSON.stringify(entries));
+  document.getElementById('fbText').value = '';
+  render();
+};
+
+window.delEntry = function(i) {
+  entries.splice(i, 1);
+  localStorage.setItem('specter3Feedback', JSON.stringify(entries));
+  render();
+};
+
+window.clearAll = function() {
+  if (!entries.length) return;
+  if (!confirm('Delete all feedback?')) return;
+  entries = [];
+  localStorage.setItem('specter3Feedback', JSON.stringify(entries));
+  render();
+};
+
+window.downloadMd = function() {
+  if (!entries.length) { alert('No feedback to download.'); return; }
+  let md = '# Specter 3 Testing Feedback\n\n';
+  md += `_Created: ${new Date().toLocaleString()}_\n\n`;
+  entries.forEach(e => { md += `## ${e.screen}\n\n${e.text}\n\n`; });
+  md += '\n---\n\n# Screen Reference\n\n';
+  md += '```\nMAIN MENU\n├── Generate → Generate Seedphrase\n├── Import Seed → SmartCard / QR / Keyboard / Flash\n├── Settings → Security / Interfaces / Storage / Language\n└── Help → Guided Tour\n```\n';
+  const b = new Blob([md], {type:'text/markdown'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = 'specter3-feedback.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+};
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+render();
+</script>
+</body>
+</html>

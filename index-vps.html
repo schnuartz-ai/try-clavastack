@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Specter DIY — Try Before You Buy | ClavaStack</title>
-  <meta name="description" content="Try the Specter DIY Bitcoin Hardware Wallet in your browser.">
+  <meta name="description" content="Try the Specter DIY Bitcoin Hardware Wallet in your browser. Open-source, air-gapped, self-custody.">
+  <meta property="og:title" content="Specter DIY — Try Before You Buy">
+  <meta property="og:description" content="Interactive simulator of the Specter DIY Bitcoin Hardware Wallet. Try it free.">
+  <meta property="og:url" content="https://try.clavastack.com">
+  <meta property="og:type" content="website">
   <style>
     :root {
       --specter-dark: #04070B;
@@ -16,8 +20,22 @@
       --specter-coral: #FF7A7A;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--specter-dark); color: var(--specter-light); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
-    header { background: var(--specter-dark-accent); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--specter-dark-secondary); }
+    body {
+      background: var(--specter-dark);
+      color: var(--specter-light);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    header {
+      background: var(--specter-dark-accent);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--specter-dark-secondary);
+    }
     .header-left { display: flex; align-items: center; gap: 14px; }
     .header-left img { height: 32px; }
     .header-left .sep { color: var(--specter-light-secondary); opacity: 0.3; font-size: 18px; }
@@ -27,15 +45,34 @@
     .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--specter-light-secondary); }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: #f44; }
     .dot.on { background: #4c5; }
+
+    /* HERO */
     .hero { text-align: center; padding: 32px 20px 16px; }
     .hero h1 { color: var(--specter-primary); font-size: 26px; margin-bottom: 8px; }
     .hero p { color: var(--specter-light-secondary); font-size: 15px; max-width: 560px; margin: 0 auto; line-height: 1.5; }
-    .main { display: flex; gap: 24px; padding: 0 20px 40px; max-width: 1100px; margin: 0 auto; align-items: flex-start; justify-content: center; }
+
+    /* MAIN */
+    .main {
+      display: flex; gap: 24px; padding: 0 20px 40px;
+      max-width: 1100px; margin: 0 auto;
+      align-items: flex-start; justify-content: center;
+    }
+
+    /* DEVICE */
     .device-wrap { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    .device { background: var(--specter-dark-secondary); border: 2px solid #333; border-radius: 14px; padding: 14px 8px; box-shadow: 0 6px 24px rgba(0,0,0,.5); position: relative; }
-    .device::before { content: 'SPECTER DIY'; position: absolute; top: 3px; left: 50%; transform: translateX(-50%); font-size: 8px; letter-spacing: 2px; color: #555; font-weight: 600; }
+    .device {
+      background: var(--specter-dark-secondary); border: 2px solid #333;
+      border-radius: 14px; padding: 14px 8px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.5); position: relative;
+    }
+    .device::before {
+      content: 'SPECTER DIY'; position: absolute; top: 3px; left: 50%;
+      transform: translateX(-50%); font-size: 8px; letter-spacing: 2px; color: #555; font-weight: 600;
+    }
     #screen { width: 480px; height: 800px; overflow: hidden; border-radius: 4px; background: #000; }
     .device-label { color: var(--specter-light-secondary); font-size: 11px; }
+
+    /* SIDEBAR */
     .side { max-width: 340px; display: flex; flex-direction: column; gap: 16px; padding-top: 12px; }
     .card { background: var(--specter-dark-secondary); border-radius: 10px; padding: 20px; }
     .card h2 { color: var(--specter-primary); font-size: 16px; margin-bottom: 10px; }
@@ -43,54 +80,80 @@
     .card ul { list-style: none; padding: 0; }
     .card li { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
     .card li:last-child { border: none; }
-    .card li::before { content: '\2192 '; color: var(--specter-primary); }
+    .card li::before { content: '→ '; color: var(--specter-primary); }
     .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .badge { background: var(--specter-dark); padding: 6px 12px; border-radius: 6px; font-size: 11px; color: var(--specter-light-secondary); border: 1px solid rgba(255,255,255,.06); }
-    .btn { display: block; width: 100%; padding: 14px; border-radius: 9999px; font-size: 15px; font-weight: 600; text-decoration: none; text-align: center; transition: all .2s; border: none; cursor: pointer; }
+    .badge {
+      background: var(--specter-dark); padding: 6px 12px; border-radius: 6px;
+      font-size: 11px; color: var(--specter-light-secondary);
+      border: 1px solid rgba(255,255,255,.06);
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: block; width: 100%; padding: 14px; border-radius: 9999px;
+      font-size: 15px; font-weight: 600; text-decoration: none; text-align: center;
+      transition: all .2s; border: none; cursor: pointer;
+    }
     .btn-buy { background: var(--specter-primary); color: #fff; }
     .btn-buy:hover { background: #1680c0; box-shadow: 0 4px 16px rgba(31,153,229,.3); }
-    .btn-test { background: transparent; color: var(--specter-coral); border: 2px solid var(--specter-coral); margin-top: 8px; }
-    .btn-test:hover { background: rgba(255,122,122,.08); }
+    .btn-pg { background: transparent; color: var(--specter-coral); border: 2px solid var(--specter-coral); }
+    .btn-pg:hover { background: rgba(255,122,122,.08); }
+
+    /* FOOTER */
     footer { background: var(--specter-dark-secondary); text-align: center; padding: 20px; color: var(--specter-light-secondary); font-size: 12px; }
     footer a { color: var(--specter-primary); text-decoration: none; }
-    #loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: var(--specter-light-secondary); font-size: 14px; gap: 12px; z-index: 10; }
+
+    /* LOADING */
+    #loading {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; background: #000; color: var(--specter-light-secondary);
+      font-size: 14px; gap: 12px; z-index: 10;
+    }
     .spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: var(--specter-primary); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
     @media (max-width: 960px) { .main { flex-direction: column; align-items: center; } .side { max-width: 500px; width: 100%; } }
     @media (max-width: 520px) { #screen { width: 320px; height: 533px; } }
   </style>
 </head>
 <body>
+
 <header>
   <div class="header-left">
     <img src="assets/clavastack-logo.png" alt="ClavaStack">
-    <span class="sep">&times;</span>
+    <span class="sep">×</span>
     <img src="assets/specter-logo.png" alt="Specter">
   </div>
   <div class="header-right">
-    <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3 Testing</a>
     <a href="https://clavastack.com" class="nav-link">Shop</a>
-    <div class="status"><div class="dot" id="dot"></div><span id="st">Connecting&hellip;</span></div>
+    <div class="status"><div class="dot" id="dot"></div><span id="st">Connecting…</span></div>
   </div>
 </header>
+
 <div class="hero">
-  <h1>Try the Specter DIY &mdash; in your browser</h1>
+  <h1>Try the Specter DIY — in your browser</h1>
   <p>Explore the open-source Bitcoin hardware wallet before you buy. Click around, navigate menus, and see how self-custody feels.</p>
 </div>
+
 <div class="main">
   <div class="device-wrap">
-    <div class="device"><div id="screen" style="position:relative"><div id="loading"><div class="spinner"></div>Loading simulator&hellip;</div></div></div>
-    <div class="device-label">480 &times; 800 &middot; Click to interact</div>
+    <div class="device">
+      <div id="screen" style="position:relative;">
+        <div id="loading"><div class="spinner"></div>Loading simulator…</div>
+      </div>
+    </div>
+    <div class="device-label">480 × 800 · Click to interact</div>
   </div>
+
   <div class="side">
     <div class="card">
       <h2>What is Specter DIY?</h2>
       <p>An open-source, air-gapped Bitcoin hardware wallet. Build it yourself or buy pre-assembled from ClavaStack.</p>
       <div class="badges">
-        <span class="badge">&#x1F513; Open Source</span>
-        <span class="badge">&#x20BF; Bitcoin Only</span>
-        <span class="badge">&#x1F1E9;&#x1F1EA; From Germany</span>
-        <span class="badge">&#x2708;&#xFE0F; Air-gapped</span>
+        <span class="badge">🔓 Open Source</span>
+        <span class="badge">₿ Bitcoin Only</span>
+        <span class="badge">🇩🇪 From Germany</span>
+        <span class="badge">✈️ Air-gapped</span>
       </div>
     </div>
     <div class="card">
@@ -103,37 +166,48 @@
         <li>Explore the full wallet UI</li>
       </ul>
     </div>
-    <a href="https://clavastack.com" class="btn btn-buy">&#x1F6D2; Buy Now &mdash; ClavaStack.com</a>
-    <a href="/specter3-testing/" class="btn btn-test">&#x1F9EA; Specter 3 Testing Version</a>
+    <a href="https://clavastack.com" class="btn btn-buy">🛒 Buy Now — ClavaStack.com</a>
   </div>
 </div>
+
 <footer>
-  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; Specter DIY is open-source &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a></p>
+  <p>© 2026 <a href="https://clavastack.com">ClavaStack</a> · Specter DIY is open-source · <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a></p>
 </footer>
+
 <script type="module">
-import RFB from 'https://postiz.clavastack.com/simulator-novnc/core/rfb.js';
-const url = `wss://postiz.clavastack.com/simulator-ws`;
+// noVNC loaded from the VPS via postiz.clavastack.com proxy
+const NOVNC_BASE = '/novnc';
+const WS_URL = 'wss://try.clavastack.com/websockify';
+
+// Dynamically import RFB from the VPS
+const { default: RFB } = await import(NOVNC_BASE + '/core/rfb.js');
+
+const loading = document.getElementById('loading');
+
 try {
-  const rfb = new RFB(document.getElementById('screen'), url);
+  const rfb = new RFB(document.getElementById('screen'), WS_URL);
   rfb.scaleViewport = false;
   rfb.resizeSession = false;
   rfb.viewOnly = false;
   rfb.qualityLevel = 6;
   rfb.compressionLevel = 2;
+
   rfb.addEventListener('connect', () => {
     document.getElementById('dot').classList.add('on');
     document.getElementById('st').textContent = 'Connected';
-    document.getElementById('loading').style.display = 'none';
+    loading.style.display = 'none';
   });
-  rfb.addEventListener('disconnect', () => {
+
+  rfb.addEventListener('disconnect', (e) => {
     document.getElementById('dot').classList.remove('on');
     document.getElementById('st').textContent = 'Disconnected';
-    document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">Simulator offline</p><p style="margin-top:8px">Please try again in a moment.</p>';
-    document.getElementById('loading').style.display = 'flex';
+    loading.innerHTML = '<div style="text-align:center;padding:20px;"><p style="color:#FF7A7A;font-size:16px;">Simulator offline</p><p style="margin-top:8px;">The simulator server may be restarting. Please try again in a minute.</p></div>';
+    loading.style.display = 'flex';
   });
 } catch(e) {
-  document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">Error: '+e.message+'</p>';
+  loading.innerHTML = '<p style="color:#FF7A7A;">Failed to connect: ' + e.message + '</p>';
 }
 </script>
+
 </body>
 </html>
