@@ -12,6 +12,9 @@ restart_sim1() {
     sleep 2
     
     cd ~/specter-diy
+    # Clear saved state so demo starts fresh (no PIN lock-out)
+    rm -rf ./fs/
+    
     Xvfb :99 -screen 0 480x800x24 -ac &
     sleep 1
     DISPLAY=:99 ./bin/micropython_unix run_simulator.py &
@@ -31,6 +34,7 @@ restart_sim2() {
     sleep 2
     
     cd ~/specter-playground
+    
     Xvfb :100 -screen 0 480x800x24 -ac &
     sleep 1
     DISPLAY=:100 ./bin/micropython_unix scenarios/mockui_fw/main.py &
