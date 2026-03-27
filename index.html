@@ -34,7 +34,7 @@
     .device-wrap { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
     .device { background: var(--specter-dark-secondary); border: 2px solid #333; border-radius: 14px; padding: 14px 8px; box-shadow: 0 6px 24px rgba(0,0,0,.5); position: relative; }
     .device::before { content: 'SPECTER DIY'; position: absolute; top: 3px; left: 50%; transform: translateX(-50%); font-size: 8px; letter-spacing: 2px; color: #555; font-weight: 600; }
-    #screen { width: 480px; height: 800px; overflow: hidden; border-radius: 4px; background: #000; }
+    #screen { width: 480px; height: 800px; overflow: hidden; border-radius: 4px; background: #000; touch-action: none; pointer-events: auto; user-select: none; -webkit-user-select: none; }
     .device-label { color: var(--specter-light-secondary); font-size: 11px; }
     .side { max-width: 340px; display: flex; flex-direction: column; gap: 16px; padding-top: 12px; }
     .card { background: var(--specter-dark-secondary); border-radius: 10px; padding: 20px; }
@@ -46,7 +46,7 @@
     .card li::before { content: '\2192 '; color: var(--specter-primary); }
     .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .badge { background: var(--specter-dark); padding: 6px 12px; border-radius: 6px; font-size: 11px; color: var(--specter-light-secondary); border: 1px solid rgba(255,255,255,.06); }
-    .btn { display: block; width: 100%; padding: 14px; border-radius: 9999px; font-size: 15px; font-weight: 600; text-decoration: none; text-align: center; transition: all .2s; border: none; cursor: pointer; }
+    .btn { display: block; width: 100%; padding: 14px; border-radius: 9999px; font-size: 15px; font-weight: 600; text-decoration: none; text-align: center; transition: all .2s; border: none; cursor: pointer; min-height: 44px; }
     .btn-buy { background: var(--specter-primary); color: #fff; }
     .btn-buy:hover { background: #1680c0; box-shadow: 0 4px 16px rgba(31,153,229,.3); }
     .btn-test { background: transparent; color: var(--specter-coral); border: 2px solid var(--specter-coral); margin-top: 8px; }
@@ -58,6 +58,30 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (max-width: 960px) { .main { flex-direction: column; align-items: center; } .side { max-width: 500px; width: 100%; } }
     @media (max-width: 520px) { #screen { width: 320px; height: 533px; } }
+    @media (max-width: 480px) {
+      header { padding: 10px 12px; }
+      .nav-link { display: none; }
+      .header-left img { height: 26px; }
+      .hero { padding: 20px 12px 10px; }
+      .hero h1 { font-size: 20px; }
+      .hero p { font-size: 13px; }
+      .main { padding: 0 10px 30px; gap: 16px; }
+      #screen { width: 280px; height: 467px; }
+      .btn { font-size: 14px; padding: 13px; }
+      .card { padding: 16px; }
+    }
+    @media (max-width: 380px) {
+      header { padding: 8px 10px; }
+      .header-left { gap: 8px; }
+      .header-left img { height: 22px; }
+      .hero h1 { font-size: 17px; }
+      .hero p { font-size: 12px; }
+      .main { padding: 0 8px 24px; }
+      #screen { width: 240px; height: 400px; }
+      .device { padding: 10px 6px; }
+      .btn { font-size: 13px; min-height: 44px; }
+      .status span { display: none; }
+    }
   </style>
 </head>
 <body>

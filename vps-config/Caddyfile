@@ -1,0 +1,61 @@
+postiz.clavastack.com {
+    @restart path /restart/*
+    handle @restart {
+        reverse_proxy localhost:8095
+    }
+    @simws path /simulator-ws
+    handle @simws {
+        uri strip_prefix /simulator-ws
+        reverse_proxy localhost:6080
+    }
+    @pgws path /playground-ws
+    handle @pgws {
+        uri strip_prefix /playground-ws
+        reverse_proxy localhost:6081
+    }
+    handle_path /simulator-novnc/* {
+        root * /usr/share/novnc
+        file_server
+        header Access-Control-Allow-Origin "*"
+    }
+    handle /tiktok*.txt {
+        root * /var/www/postiz-legal
+        file_server
+    }
+    handle /tos {
+        rewrite * /tos.html
+        root * /var/www/postiz-legal
+        file_server
+    }
+    handle /privacy {
+        rewrite * /privacy.html
+        root * /var/www/postiz-legal
+        file_server
+    }
+    handle {
+        reverse_proxy localhost:4007
+    }
+}
+
+try.clavastack.com {
+    @ws1 path /websockify
+    handle @ws1 {
+        uri strip_prefix /websockify
+        reverse_proxy localhost:6080
+    }
+    @ws2 path /playground-ws
+    handle @ws2 {
+        uri strip_prefix /playground-ws
+        reverse_proxy localhost:6081
+    }
+    handle_path /novnc/* {
+        root * /usr/share/novnc
+        file_server
+        header Access-Control-Allow-Origin "*"
+    }
+    handle {
+        root * /var/www/try-clavastack
+        file_server
+        encode gzip
+    }
+}
