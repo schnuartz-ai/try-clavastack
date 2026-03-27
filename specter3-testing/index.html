@@ -65,19 +65,26 @@
     footer { background: var(--specter-dark-secondary); text-align: center; padding: 16px; color: var(--specter-light-secondary); font-size: 11px; }
     footer a { color: var(--specter-primary); text-decoration: none; }
     @media (max-width: 960px) { .main { flex-direction: column; align-items: center; } .feedback { max-width: 500px; width: 100%; } }
-    @media (max-width: 520px) { #screen { width: 320px; height: 533px; } }
-    @media (max-width: 480px) {
-      header { padding: 10px 12px; }
-      .nav-link { display: none; }
-      .header-left img { height: 26px; }
-      .hero { padding: 16px 12px 8px; }
+    @media (max-width: 768px) { .hero { padding: 12px 10px 8px; } .device { padding: 10px 6px; } }
+    @media (max-width: 500px) {
+      #screen { width: 100vw !important; height: 70vh !important; }
+      .hero { padding: 12px 8px 8px; }
       .hero h1 { font-size: 18px; }
       .hero p { font-size: 13px; }
-      .main { padding: 0 10px 24px; gap: 14px; }
-      #screen { width: 280px; height: 467px; }
-      .btn { font-size: 13px; }
-      .panel { padding: 14px; }
-      textarea { font-size: 14px; }
+      .device { border: none; padding: 4px; }
+      .device-label { display: none; }
+      .device::before { font-size: 5px; top: 1px; }
+      #restart-btn { width: 100% !important; margin: 8px 0; padding: 14px !important; font-size: 15px !important; }
+      .main { padding: 0 4px 16px; }
+      .feedback { padding: 8px; }
+      .panel { padding: 12px; }
+      .panel h2 { font-size: 14px; }
+      .btn { min-height: 48px; }
+      .btn-row { flex-wrap: wrap; }
+      .btn-sm { flex: 1; min-height: 48px; justify-content: center; }
+      .entries { max-height: 200px; }
+      .header-left img { height: 24px; }
+      .header-right { gap: 8px; }
     }
     @media (max-width: 380px) {
       header { padding: 8px 10px; }
@@ -86,10 +93,7 @@
       .hero h1 { font-size: 15px; }
       .hero p { font-size: 12px; }
       .main { padding: 0 8px 20px; }
-      #screen { width: 240px; height: 400px; }
       .device { padding: 10px 6px; }
-      .btn-row { flex-wrap: wrap; }
-      .btn-sm { flex: 1; justify-content: center; }
       .status span { display: none; }
     }
   </style>
@@ -162,8 +166,8 @@ import RFB from 'https://postiz.clavastack.com/simulator-novnc/core/rfb.js';
 const url = `wss://postiz.clavastack.com/playground-ws`;
 try {
   const rfb = new RFB(document.getElementById('screen'), url);
-  rfb.scaleViewport = false;
-  rfb.resizeSession = false;
+  rfb.scaleViewport = true;
+  rfb.resizeSession = true;
   rfb.viewOnly = false;
   rfb.qualityLevel = 6;
   rfb.compressionLevel = 2;
