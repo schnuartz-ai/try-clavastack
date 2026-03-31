@@ -162,12 +162,11 @@
   <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="https://github.com/maggo83/specter-playground">Playground GitHub</a></p>
 </footer>
 <script type="module">
-import RFB from 'https://postiz.clavastack.com/simulator-novnc/core/rfb.js';
+import RFB from '/novnc/core/rfb.js';
 const url = `wss://postiz.clavastack.com/playground-ws`;
 try {
   const rfb = new RFB(document.getElementById('screen'), url);
   rfb.scaleViewport = true;
-  rfb.resizeSession = false;
   rfb.viewOnly = false;
   rfb.qualityLevel = 6;
   rfb.compressionLevel = 2;

@@ -207,7 +207,7 @@
 </footer>
 
 <script type="module">
-import RFB from 'https://postiz.clavastack.com/simulator-novnc/core/rfb.js';
+import RFB from '/novnc/core/rfb.js';
 
 const url = `wss://postiz.clavastack.com/simulator-ws`;
 let rfb;
@@ -215,7 +215,6 @@ let rfb;
 try {
   rfb = new RFB(document.getElementById('screen-overlay'), url);
   rfb.scaleViewport = true;
-  rfb.resizeSession = false;
   rfb.viewOnly = false;
   rfb.qualityLevel = 6;
   rfb.compressionLevel = 2;

@@ -133,12 +133,11 @@
   <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; Specter DIY is open-source &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a></p>
 </footer>
 <script type="module">
-import RFB from 'https://postiz.clavastack.com/simulator-novnc/core/rfb.js';
+import RFB from '/novnc/core/rfb.js';
 const url = `wss://postiz.clavastack.com/simulator-ws`;
 try {
   const rfb = new RFB(document.getElementById('screen'), url);
   rfb.scaleViewport = true;
-  rfb.resizeSession = false;
   rfb.viewOnly = false;
   rfb.qualityLevel = 6;
   rfb.compressionLevel = 2;
