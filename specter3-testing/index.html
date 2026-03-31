@@ -167,7 +167,7 @@ const url = `wss://postiz.clavastack.com/playground-ws`;
 try {
   const rfb = new RFB(document.getElementById('screen'), url);
   rfb.scaleViewport = true;
-  rfb.resizeSession = true;
+  rfb.resizeSession = false;
   rfb.viewOnly = false;
   rfb.qualityLevel = 6;
   rfb.compressionLevel = 2;

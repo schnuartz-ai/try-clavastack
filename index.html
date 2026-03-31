@@ -138,7 +138,7 @@ const url = `wss://postiz.clavastack.com/simulator-ws`;
 try {
   const rfb = new RFB(document.getElementById('screen'), url);
   rfb.scaleViewport = true;
-  rfb.resizeSession = true;
+  rfb.resizeSession = false;
   rfb.viewOnly = false;
   rfb.qualityLevel = 6;
   rfb.compressionLevel = 2;
@@ -163,10 +163,11 @@ function restartSim() {
   btn.textContent = '⏳ Restarting...';
   document.getElementById('loading').style.display = 'flex';
   document.getElementById('loading').innerHTML = '<div class="spinner"></div>Restarting simulator…';
-  fetch('https://postiz.clavastack.com/restart/sim1', { method: 'POST' })
-    .then(r => r.json())
-    .then(() => { btn.textContent = '✅ Restarted — reconnecting...'; setTimeout(() => location.reload(), 3000); })
-    .catch(() => { btn.textContent = '❌ Failed — try again'; btn.disabled = false; });
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), 35000);
+  fetch('https://postiz.clavastack.com/restart/sim1', { method: 'POST', signal: ctrl.signal }).catch(() => {});
+  btn.textContent = '⏳ Restarting (~30s)...';
+  setTimeout(() => { btn.textContent = '✅ Reloading...'; setTimeout(() => location.reload(), 2000); }, 30000);
 }
 window.restartSim = restartSim;
 </script>
