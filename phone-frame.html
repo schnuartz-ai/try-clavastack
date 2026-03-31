@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Specter DIY Simulator — Phone View | ClavaStack</title>
+  <meta name="description" content="Try the Specter DIY Bitcoin Hardware Wallet in your browser — phone view.">
+  <style>
+    :root {
+      --specter-dark: #04070B;
+      --specter-dark-secondary: #1E2734;
+      --specter-dark-accent: #0C1A27;
+      --specter-light: #FCFCFC;
+      --specter-light-secondary: #D1D5DB;
+      --specter-primary: #1F99E5;
+      --specter-coral: #FF7A7A;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--specter-dark);
+      color: var(--specter-light);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    header {
+      background: var(--specter-dark-accent);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--specter-dark-secondary);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left img { height: 24px; }
+    .header-left .sep { color: var(--specter-light-secondary); opacity: 0.3; font-size: 16px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .nav-link { color: var(--specter-light-secondary); text-decoration: none; font-size: 12px; }
+    .nav-link:hover { color: var(--specter-primary); }
+
+    /* Status dot */
+    .status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--specter-light-secondary); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #f44; }
+    .dot.on { background: #4c5; }
+
+    /* Phone container */
+    .page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 12px 24px;
+      gap: 12px;
+    }
+
+    .phone-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    /* The noVNC screen sits UNDER the mockup image */
+    #screen-overlay {
+      position: absolute;
+      /* Screen area within the mockup image (4169x4344):
+         Based on analysis: left~11%, top~14%, width~77%, height~69% */
+      left: 11.5%;
+      top: 14.5%;
+      width: 76%;
+      height: 68.5%;
+      z-index: 1;
+      overflow: hidden;
+      background: #000;
+      border-radius: 4px;
+    }
+
+    /* Mockup image on top — pointer-events: none so clicks go through */
+    .phone-mockup {
+      position: relative;
+      width: 100%;
+      display: block;
+      z-index: 2;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Loading overlay inside the screen */
+    #loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: var(--specter-light-secondary);
+      font-size: 13px;
+      gap: 10px;
+      z-index: 10;
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #333;
+      border-top-color: var(--specter-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Restart button */
+    .restart-btn {
+      display: block;
+      width: 100%;
+      max-width: 380px;
+      padding: 14px;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      background: transparent;
+      color: var(--specter-coral);
+      border: 2px solid var(--specter-coral);
+      cursor: pointer;
+      min-height: 48px;
+      transition: background 0.2s;
+    }
+    .restart-btn:hover, .restart-btn:active {
+      background: rgba(255,122,122,.1);
+    }
+    .restart-btn:disabled {
+      opacity: 0.5;
+    }
+
+    /* Status card */
+    .status-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--specter-dark-secondary);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--specter-light-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .status-card a { color: var(--specter-primary); text-decoration: none; font-size: 12px; }
+
+    footer {
+      text-align: center;
+      padding: 16px;
+      color: var(--specter-light-secondary);
+      font-size: 11px;
+    }
+    footer a { color: var(--specter-primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <img src="assets/clavastack-logo.png" alt="ClavaStack">
+    <span class="sep">&times;</span>
+    <img src="assets/specter-logo.png" alt="Specter">
+  </div>
+  <div class="header-right">
+    <a href="/" class="nav-link">&#x2190; Normal View</a>
+    <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3</a>
+    <div class="status">
+      <div class="dot" id="dot"></div>
+      <span id="st">Connecting&hellip;</span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- Phone mockup with noVNC inside -->
+  <div class="phone-wrapper">
+    <!-- noVNC goes here (z-index 1, below mockup) -->
+    <div id="screen-overlay">
+      <div id="loading">
+        <div class="spinner"></div>
+        <span>Loading simulator&hellip;</span>
+      </div>
+    </div>
+    <!-- Device frame on top (pointer-events: none) -->
+    <img src="assets/phone-mockup.png" class="phone-mockup" alt="Specter DIY Device">
+  </div>
+
+  <!-- Restart button -->
+  <button class="restart-btn" id="restart-btn" onclick="restartSim()">
+    &#x1F504; Restart Simulator
+  </button>
+
+  <!-- Status -->
+  <div class="status-card">
+    <span>&#x20BF; Bitcoin Only &nbsp;&#x1F513; Open Source &nbsp;&#x2708;&#xFE0F; Air-gapped</span>
+    <a href="https://clavastack.com">Buy &rarr;</a>
+  </div>
+
+</div>
+
+<footer>
+  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a></p>
+</footer>
+
+<script type="module">
+import RFB from 'https://postiz.clavastack.com/simulator-novnc/core/rfb.js';
+
+const url = `wss://postiz.clavastack.com/simulator-ws`;
+let rfb;
+
+try {
+  rfb = new RFB(document.getElementById('screen-overlay'), url);
+  rfb.scaleViewport = true;
+  rfb.resizeSession = true;
+  rfb.viewOnly = false;
+  rfb.qualityLevel = 6;
+  rfb.compressionLevel = 2;
+
+  rfb.addEventListener('connect', () => {
+    document.getElementById('dot').classList.add('on');
+    document.getElementById('st').textContent = 'Connected';
+    document.getElementById('loading').style.display = 'none';
+  });
+
+  rfb.addEventListener('disconnect', () => {
+    document.getElementById('dot').classList.remove('on');
+    document.getElementById('st').textContent = 'Disconnected';
+    const loading = document.getElementById('loading');
+    loading.style.display = 'flex';
+    loading.innerHTML = '<p style="color:#FF7A7A;text-align:center">Simulator offline<br><small>Click Restart to reconnect</small></p>';
+  });
+} catch(e) {
+  document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">Error: ' + e.message + '</p>';
+}
+
+function restartSim() {
+  const btn = document.getElementById('restart-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Restarting...';
+  const loading = document.getElementById('loading');
+  loading.style.display = 'flex';
+  loading.innerHTML = '<div class="spinner"></div><span>Restarting simulator…</span>';
+  fetch('https://postiz.clavastack.com/restart/sim1', { method: 'POST' })
+    .then(r => r.json())
+    .then(() => {
+      btn.textContent = '✅ Restarted — reconnecting...';
+      setTimeout(() => location.reload(), 4000);
+    })
+    .catch(() => {
+      btn.textContent = '❌ Failed — try again';
+      btn.disabled = false;
+    });
+}
+window.restartSim = restartSim;
+</script>
+
+</body>
+</html>
