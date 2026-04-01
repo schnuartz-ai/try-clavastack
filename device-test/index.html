@@ -52,11 +52,29 @@
       gap: 14px;
     }
 
+    @media (max-width: 600px) {
+      .page {
+        padding: 8px 8px 32px;
+        gap: 10px;
+      }
+    }
+
     .phone-wrapper {
       position: relative;
       width: 100%;
-      /* On mobile: fill most of the viewport width so device looks device-sized */
-      max-width: min(380px, 92vw);
+      /* Desktop: max 420px. Mobile: fill the full viewport height so device feels life-size */
+      max-width: 420px;
+    }
+
+    /* On mobile: make device fill the screen height (minus header) */
+    @media (max-width: 600px) {
+      .phone-wrapper {
+        /* Mockup ratio: 1280x1204 ≈ 1.06:1 (almost square) */
+        /* Fill viewport height → width = height * (1280/1204) */
+        height: calc(100svh - 56px);
+        width: calc((100svh - 56px) * (1280 / 1204));
+        max-width: 98vw;
+      }
     }
 
     /* CTA section */
@@ -261,21 +279,21 @@
 
   <!-- CTA Section -->
   <div class="cta-section">
-    <p class="cta-headline">Ready to own yours?</p>
-    <p class="cta-sub">The Specter DIY is the most transparent Bitcoin hardware wallet you can buy — pre-built and ready to use.</p>
+    <p class="cta-headline">The hardware wallet built for real life.</p>
+    <p class="cta-sub">Pre-assembled by ClavaStack — ready to use out of the box.</p>
 
     <ul class="cta-benefits">
       <li>
+        <span class="icon">📱</span>
+        <div><strong>Smartphone-sized touchscreen</strong>No button-mashing. Enter your passphrase fast, verify transactions at a glance — big screen, full control.</div>
+      </li>
+      <li>
         <span class="icon">🔒</span>
-        <div><strong>100% air-gapped &amp; open source</strong>No USB connection, no closed firmware — verify every line of code yourself.</div>
+        <div><strong>100% air-gapped &amp; open source</strong>Zero USB. Zero closed firmware. Every line of code is public — your keys never leave the device.</div>
       </li>
       <li>
-        <span class="icon">⚡</span>
-        <div><strong>Bitcoin only — no distractions</strong>Designed exclusively for Bitcoin self-custody. No altcoin bloat, no compromises.</div>
-      </li>
-      <li>
-        <span class="icon">📦</span>
-        <div><strong>Pre-assembled by ClavaStack</strong>Ships ready to use — no soldering, no setup headaches. Just secure your coins.</div>
+        <span class="icon">👨‍👩‍👧</span>
+        <div><strong>Family Hardware Wallet</strong>Each family member gets their own Smartcard, Seedphrase &amp; PIN — one device, total separation.</div>
       </li>
     </ul>
 
