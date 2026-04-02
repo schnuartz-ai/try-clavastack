@@ -149,12 +149,13 @@
     /* The noVNC screen sits UNDER the mockup image */
     #screen-overlay {
       position: absolute;
-      /* Screen area within cropped mockup (479x905):
-         x=62..426 (12.9%), y=115..796 (12.7%/75.2%) */
-      left: 12.9%;
-      top: 12.7%;
-      width: 76.0%;
-      height: 75.2%;
+      /* Screen cutout in cropped mockup (479x905):
+         Transparent area: x=3..475, y=168..755
+         Center column scan: top=165, bottom=758 */
+      left: 0.6%;
+      top: 18.6%;
+      width: 98.5%;
+      height: 64.9%;
       z-index: 1;
       overflow: hidden;
       background: #000;
