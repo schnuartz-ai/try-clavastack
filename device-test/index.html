@@ -54,7 +54,7 @@
 
     @media (max-width: 600px) {
       .page {
-        padding: 8px 8px 32px;
+        padding: 8px 4px 32px;
         gap: 10px;
       }
     }
@@ -62,18 +62,13 @@
     .phone-wrapper {
       position: relative;
       width: 100%;
-      /* Desktop: max 420px. Mobile: fill the full viewport height so device feels life-size */
       max-width: 420px;
     }
 
-    /* On mobile: make device fill the screen height (minus header) */
+    /* On mobile: simply make the wrapper wider so the device appears larger */
     @media (max-width: 600px) {
       .phone-wrapper {
-        /* Mockup ratio: 1280x1204 ≈ 1.06:1 (almost square) */
-        /* Fill viewport height → width = height * (1280/1204) */
-        height: calc(100svh - 56px);
-        width: calc((100svh - 56px) * (1280 / 1204));
-        max-width: 98vw;
+        max-width: 96vw;
       }
     }
 
