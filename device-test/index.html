@@ -62,13 +62,22 @@
     .phone-wrapper {
       position: relative;
       width: 100%;
-      max-width: 420px;
+      max-width: 380px;
     }
 
-    /* On mobile: simply make the wrapper wider so the device appears larger */
+    /* On mobile: fill full viewport height so device is life-size.
+       Mockup is portrait (479x905 = 0.529 ratio), so width = height * 0.529 */
     @media (max-width: 600px) {
       .phone-wrapper {
+        height: calc(100svh - 54px);
+        width: calc((100svh - 54px) * 0.529);
         max-width: 96vw;
+        /* If width exceeds viewport, constrain by width instead */
+      }
+      .phone-wrapper .phone-mockup {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
       }
     }
 
@@ -140,13 +149,12 @@
     /* The noVNC screen sits UNDER the mockup image */
     #screen-overlay {
       position: absolute;
-      /* Screen area within the mockup image (1280x1204):
-         Safe inset (5% horizontal, 3% vertical padding from frame edge)
-         to prevent mockup frame from covering simulator content */
-      left: 35.7%;
-      top: 23.7%;
-      width: 28.4%;
-      height: 56.6%;
+      /* Screen area within cropped mockup (479x905):
+         x=62..426 (12.9%), y=115..796 (12.7%/75.2%) */
+      left: 12.9%;
+      top: 12.7%;
+      width: 76.0%;
+      height: 75.2%;
       z-index: 1;
       overflow: hidden;
       background: #000;
