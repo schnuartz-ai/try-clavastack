@@ -163,7 +163,7 @@
 </footer>
 <script type="module">
 import RFB from '/novnc/core/rfb.js';
-const url = `wss://postiz.clavastack.com/playground-ws`;
+const url = `wss://YOUR-DOMAIN.COM/playground-ws`;
 try {
   const rfb = new RFB(document.getElementById('screen'), url);
   rfb.scaleViewport = true;
@@ -251,7 +251,7 @@ function restartSim() {
   btn.textContent = '⏳ Restarting...';
   document.getElementById('loading').style.display = 'flex';
   document.getElementById('loading').innerHTML = '<div class="spinner"></div>Restarting simulator…';
-  fetch('https://postiz.clavastack.com/restart/sim2', { method: 'POST' })
+  fetch('https://YOUR-DOMAIN.COM/restart/sim2', { method: 'POST' })
     .then(r => r.json())
     .then(() => { btn.textContent = '✅ Restarted — reconnecting...'; setTimeout(() => location.reload(), 3000); })
     .catch(() => { btn.textContent = '❌ Failed — try again'; btn.disabled = false; });

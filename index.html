@@ -134,7 +134,7 @@
 </footer>
 <script type="module">
 import RFB from '/novnc/core/rfb.js';
-const url = `wss://postiz.clavastack.com/simulator-ws`;
+const url = `wss://YOUR-DOMAIN.COM/simulator-ws`;
 try {
   const rfb = new RFB(document.getElementById('screen'), url);
   rfb.scaleViewport = true;
@@ -164,7 +164,7 @@ function restartSim() {
   document.getElementById('loading').innerHTML = '<div class="spinner"></div>Restarting simulator…';
   const ctrl = new AbortController();
   setTimeout(() => ctrl.abort(), 35000);
-  fetch('https://postiz.clavastack.com/restart/sim1', { method: 'POST', signal: ctrl.signal }).catch(() => {});
+  fetch('https://YOUR-DOMAIN.COM/restart/sim1', { method: 'POST', signal: ctrl.signal }).catch(() => {});
   btn.textContent = '⏳ Restarting (~30s)...';
   setTimeout(() => { btn.textContent = '✅ Reloading...'; setTimeout(() => location.reload(), 2000); }, 30000);
 }

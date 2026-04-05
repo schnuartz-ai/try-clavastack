@@ -1,4 +1,4 @@
-postiz.clavastack.com {
+YOUR-DOMAIN.COM {
     @restart path /restart/*
     handle @restart {
         reverse_proxy localhost:8095
@@ -18,18 +18,19 @@ postiz.clavastack.com {
         file_server
         header Access-Control-Allow-Origin "*"
     }
+    # Legal documents (Terms of Service, Privacy Policy, etc.)
     handle /tiktok*.txt {
-        root * /var/www/postiz-legal
+        root * /var/www/legal
         file_server
     }
     handle /tos {
         rewrite * /tos.html
-        root * /var/www/postiz-legal
+        root * /var/www/legal
         file_server
     }
     handle /privacy {
         rewrite * /privacy.html
-        root * /var/www/postiz-legal
+        root * /var/www/legal
         file_server
     }
     handle {

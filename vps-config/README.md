@@ -18,9 +18,9 @@ Diese Dateien laufen auf dem Hetzner VPS (`89.167.19.144`, User: `finn`).
 | `:99` | 5900 | 6080 | Original Specter DIY (`~/specter-diy/`) |
 | `:100` | 5901 | 6081 | Playground/Specter3 (`~/specter-playground/`) |
 
-## WebSocket Endpoints (via postiz.clavastack.com)
+## WebSocket Endpoints (via YOUR-DOMAIN.COM)
 
-- `wss://postiz.clavastack.com/simulator-ws` → Specter DIY
-- `wss://postiz.clavastack.com/playground-ws` → Playground
-- `https://postiz.clavastack.com/restart/sim1` → Simulator 1 neustarten
-- `https://postiz.clavastack.com/restart/sim2` → Simulator 2 neustarten
+- `wss://YOUR-DOMAIN.COM/simulator-ws` → Specter DIY
+- `wss://YOUR-DOMAIN.COM/playground-ws` → Playground
+- `https://YOUR-DOMAIN.COM/restart/sim1` → Simulator 1 neustarten
+- `https://YOUR-DOMAIN.COM/restart/sim2` → Simulator 2 neustarten

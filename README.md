@@ -47,7 +47,7 @@ Both simulators stream a live VNC session directly into your browser via **noVNC
                         ▼                      ▼
           ┌─────────────────────────────────────────────────┐
           │         Caddy Reverse Proxy (HTTPS + WSS)        │
-          │         postiz.clavastack.com                    │
+          │         YOUR-DOMAIN.COM                    │
           └──────────┬──────────────────────────┬───────────┘
                      │ :6080                    │ :6081
                      ▼                          ▼
@@ -241,8 +241,8 @@ chmod +x vps-config/restart-simulator.sh
 
 ```bash
 sudo cp vps-config/Caddyfile /etc/caddy/Caddyfile
-# Replace all occurrences of "postiz.clavastack.com" with your domain:
-sudo sed -i 's/postiz.clavastack.com/YOUR-DOMAIN/g' /etc/caddy/Caddyfile
+# Replace all occurrences of "YOUR-DOMAIN.COM" with your domain:
+sudo sed -i 's/YOUR-DOMAIN.COM/YOUR-DOMAIN/g' /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 ```
 
@@ -252,7 +252,7 @@ In `index.html` and `specter3-testing/index.html`, update the WebSocket URLs:
 
 ```javascript
 // Replace:
-const url = `wss://postiz.clavastack.com/simulator-ws`;
+const url = `wss://YOUR-DOMAIN.COM/simulator-ws`;
 // With:
 const url = `wss://YOUR-DOMAIN/simulator-ws`;
 ```
