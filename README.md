@@ -105,9 +105,6 @@ try-clavastack/
 
 ---
 
-## Self-Hosting Guide
-
-### Prerequisites
 
 - Ubuntu/Debian server (**4 GB RAM minimum**, 8 GB recommended for both simulators)
 - A domain with DNS pointing to your server
