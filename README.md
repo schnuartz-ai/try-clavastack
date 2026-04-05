@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 [![GitHub Pages](https://img.shields.io/badge/Hosted%20on-GitHub%20Pages-black?style=for-the-badge&logo=github)](https://github.com/schnuartz-ai/try-clavastack)
 
-> **"Try Before You Buy"** — Run a real Specter DIY Bitcoin Hardware Wallet in your browser. No hardware required.
+['SETUP.md](SETUP.md).']
 
 ---
 
