@@ -1,0 +1,10 @@
+[Unit]
+Description=Check GitHub repos for simulator updates every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

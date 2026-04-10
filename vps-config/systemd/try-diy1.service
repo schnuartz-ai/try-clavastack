@@ -1,0 +1,18 @@
+[Unit]
+Description=Simulator Pool: Specter DIY Instance 1
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+KillMode=none
+User=root
+WorkingDirectory=/opt/try-clavastack/specter-diy
+RuntimeDirectory=try-clavastack/diy1
+ExecStart=/opt/try-clavastack/pool/restart-simulator.sh diy1 start
+ExecStop=/opt/try-clavastack/pool/restart-simulator.sh diy1 stop
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

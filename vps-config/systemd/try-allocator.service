@@ -1,0 +1,16 @@
+[Unit]
+Description=Allocator API Service for try.clavastack.com Simulator Pool
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/try-clavastack/pool
+ExecStart=/usr/bin/python3 /opt/try-clavastack/pool/server.py
+Restart=always
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=multi-user.target

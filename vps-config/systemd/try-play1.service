@@ -1,0 +1,18 @@
+[Unit]
+Description=Simulator Pool: Specter Playground Instance 1
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+KillMode=none
+User=root
+WorkingDirectory=/opt/try-clavastack/specter-playground
+RuntimeDirectory=try-clavastack/play1
+ExecStart=/opt/try-clavastack/pool/restart-simulator.sh play1 start
+ExecStop=/opt/try-clavastack/pool/restart-simulator.sh play1 stop
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

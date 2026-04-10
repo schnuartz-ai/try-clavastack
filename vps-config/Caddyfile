@@ -1,62 +1,86 @@
-YOUR-DOMAIN.COM {
-    @restart path /restart/*
-    handle @restart {
-        reverse_proxy localhost:8095
-    }
-    @simws path /simulator-ws
-    handle @simws {
-        uri strip_prefix /simulator-ws
-        reverse_proxy localhost:6080
-    }
-    @pgws path /playground-ws
-    handle @pgws {
-        uri strip_prefix /playground-ws
-        reverse_proxy localhost:6081
-    }
-    handle_path /simulator-novnc/* {
-        root * /usr/share/novnc
-        file_server
-        header Access-Control-Allow-Origin "*"
-    }
-    # Legal documents (Terms of Service, Privacy Policy, etc.)
-    handle /tiktok*.txt {
-        root * /var/www/legal
-        file_server
-    }
-    handle /tos {
-        rewrite * /tos.html
-        root * /var/www/legal
-        file_server
-    }
-    handle /privacy {
-        rewrite * /privacy.html
-        root * /var/www/legal
-        file_server
-    }
-    handle {
-        reverse_proxy localhost:4007
-    }
-}
-
 try.clavastack.com {
-    @ws1 path /websockify
-    handle @ws1 {
-        uri strip_prefix /websockify
-        reverse_proxy localhost:6080
-    }
-    @ws2 path /playground-ws
-    handle @ws2 {
-        uri strip_prefix /playground-ws
-        reverse_proxy localhost:6081
-    }
-    handle_path /novnc/* {
-        root * /usr/share/novnc
-        file_server
-        header Access-Control-Allow-Origin "*"
-    }
-    handle {
-        root * /var/www/try-clavastack
-        file_server
-        encode gzip
-    }
+	@api path /api/*
+	handle @api {
+		reverse_proxy localhost:9001
+	}
+
+	@restart path_regexp restart ^/(diy|play|schnuartz)/sim/[1-5]/restart$
+	handle @restart {
+		reverse_proxy localhost:9001
+	}
+
+	@diy1ws path /diy/sim/1/ws
+	handle @diy1ws {
+		reverse_proxy localhost:6080
+	}
+	@diy2ws path /diy/sim/2/ws
+	handle @diy2ws {
+		reverse_proxy localhost:6081
+	}
+	@diy3ws path /diy/sim/3/ws
+	handle @diy3ws {
+		reverse_proxy localhost:6082
+	}
+	@diy4ws path /diy/sim/4/ws
+	handle @diy4ws {
+		reverse_proxy localhost:6083
+	}
+	@diy5ws path /diy/sim/5/ws
+	handle @diy5ws {
+		reverse_proxy localhost:6084
+	}
+
+	@play1ws path /play/sim/1/ws
+	handle @play1ws {
+		reverse_proxy localhost:6090
+	}
+	@play2ws path /play/sim/2/ws
+	handle @play2ws {
+		reverse_proxy localhost:6091
+	}
+	@play3ws path /play/sim/3/ws
+	handle @play3ws {
+		reverse_proxy localhost:6092
+	}
+	@play4ws path /play/sim/4/ws
+	handle @play4ws {
+		reverse_proxy localhost:6093
+	}
+	@play5ws path /play/sim/5/ws
+	handle @play5ws {
+		reverse_proxy localhost:6094
+	}
+
+	@schnuartz1ws path /schnuartz/sim/1/ws
+	handle @schnuartz1ws {
+		reverse_proxy localhost:6100
+	}
+	@schnuartz2ws path /schnuartz/sim/2/ws
+	handle @schnuartz2ws {
+		reverse_proxy localhost:6101
+	}
+	@schnuartz3ws path /schnuartz/sim/3/ws
+	handle @schnuartz3ws {
+		reverse_proxy localhost:6102
+	}
+	@schnuartz4ws path /schnuartz/sim/4/ws
+	handle @schnuartz4ws {
+		reverse_proxy localhost:6103
+	}
+	@schnuartz5ws path /schnuartz/sim/5/ws
+	handle @schnuartz5ws {
+		reverse_proxy localhost:6104
+	}
+
+	handle_path /novnc/* {
+		root * /usr/share/novnc
+		file_server
+		header Access-Control-Allow-Origin "*"
+	}
+
+	handle {
+		root * /var/www/try-clavastack
+		file_server
+		encode gzip
+	}
 }

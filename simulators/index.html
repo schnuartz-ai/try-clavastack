@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Simulators — ClavaStack</title>
+  <style>
+    :root {
+      --dark: #04070B;
+      --dark2: #1E2734;
+      --dark-accent: #0C1A27;
+      --light: #FCFCFC;
+      --light2: #D1D5DB;
+      --primary: #1F99E5;
+      --coral: #FF7A7A;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--dark);
+      color: var(--light);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    header {
+      background: var(--dark-accent);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--dark2);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left img { height: 24px; }
+    .header-left .sep { color: var(--light2); opacity: 0.3; font-size: 16px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .nav-link { color: var(--light2); text-decoration: none; font-size: 12px; }
+    .nav-link:hover { color: var(--primary); }
+
+    /* === 3-column simulator grid === */
+    .sim-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 16px 12px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Tablet: 2 cols + 1 below */
+    @media (max-width: 1100px) {
+      .sim-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    /* Phone: single column, scroll */
+    @media (max-width: 700px) {
+      .sim-grid { grid-template-columns: 1fr; max-width: 420px; }
+    }
+
+    .sim-card {
+      background: var(--dark2);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sim-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .sim-title {
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .sim-subtitle {
+      font-size: 10px;
+      color: var(--light2);
+      margin-top: 2px;
+    }
+    .sim-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: var(--light2);
+    }
+    .sim-status .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #f44;
+    }
+    .sim-status .dot.on { background: #4c5; }
+
+    /* Phone frame */
+    .sim-phone {
+      position: relative;
+      width: 100%;
+      padding: 8px;
+    }
+    .sim-phone .phone-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+    .sim-phone .phone-mockup {
+      width: 100%;
+      display: block;
+      position: relative;
+      z-index: 2;
+      pointer-events: none;
+      user-select: none;
+    }
+    .sim-phone .screen-overlay {
+      position: absolute;
+      left: calc(12.5% + 2px);
+      top: calc(17.9% + 2px);
+      width: 76.0%;
+      height: 66.0%;
+      z-index: 1;
+      overflow: hidden;
+      background: #000;
+      border-radius: 3px;
+    }
+    .sim-phone .loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: var(--light2);
+      font-size: 11px;
+      gap: 8px;
+      z-index: 10;
+    }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 2px solid #333;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sim-actions {
+      padding: 8px 14px 12px;
+      display: flex;
+      gap: 8px;
+    }
+    .sim-actions button {
+      flex: 1;
+      padding: 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+    .sim-actions button:hover { opacity: 0.85; }
+    .sim-actions button:disabled { opacity: 0.5; cursor: default; }
+    .btn-restart {
+      background: transparent;
+      color: var(--coral);
+      border: 1.5px solid var(--coral) !important;
+    }
+    .btn-restart:hover { background: rgba(255,122,122,0.1); }
+    .btn-github {
+      background: var(--dark-accent);
+      color: var(--light2);
+    }
+
+    footer {
+      text-align: center;
+      padding: 16px;
+      color: var(--light2);
+      font-size: 11px;
+      border-top: 1px solid var(--dark2);
+      margin-top: 8px;
+    }
+    footer a { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none">
+      <img src="/assets/clavastack-logo.png" alt="ClavaStack">
+      <span class="sep">&times;</span>
+      <img src="/assets/specter-logo.png" alt="Specter">
+    </a>
+  </div>
+  <div class="header-right">
+    <a href="/" class="nav-link">&larr; Back</a>
+    <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3</a>
+  </div>
+</header>
+
+<div class="sim-grid">
+
+  <!-- Specter DIY -->
+  <div class="sim-card" id="card-diy">
+    <div class="sim-header">
+      <div>
+        <div class="sim-title">&#x1F512; Specter DIY</div>
+        <div class="sim-subtitle">Official production firmware</div>
+      </div>
+      <div class="sim-status">
+        <div class="dot" id="dot-diy"></div>
+        <span id="st-diy">Connecting&hellip;</span>
+      </div>
+    </div>
+    <div class="sim-phone">
+      <div class="phone-wrap">
+        <div class="screen-overlay" id="screen-diy">
+          <div class="loading" id="loading-diy">
+            <div class="spinner"></div>
+            <span>Loading&hellip;</span>
+          </div>
+        </div>
+        <img src="/assets/phone-mockup.png" class="phone-mockup" alt="Device">
+      </div>
+    </div>
+    <div class="sim-actions">
+      <button class="btn-restart" id="restart-diy" onclick="restartSim('diy')">&#x1F504; Restart</button>
+      <a class="btn-github" style="text-align:center;text-decoration:none;padding:8px;border-radius:9999px;font-size:11px;font-weight:600" href="https://github.com/cryptoadvance/specter-diy" target="_blank">GitHub</a>
+    </div>
+  </div>
+
+  <!-- Specter Playground -->
+  <div class="sim-card" id="card-play">
+    <div class="sim-header">
+      <div>
+        <div class="sim-title">&#x1F9EA; Specter Playground</div>
+        <div class="sim-subtitle">Experimenter Edition &mdash; k9ert</div>
+      </div>
+      <div class="sim-status">
+        <div class="dot" id="dot-play"></div>
+        <span id="st-play">Connecting&hellip;</span>
+      </div>
+    </div>
+    <div class="sim-phone">
+      <div class="phone-wrap">
+        <div class="screen-overlay" id="screen-play">
+          <div class="loading" id="loading-play">
+            <div class="spinner"></div>
+            <span>Loading&hellip;</span>
+          </div>
+        </div>
+        <img src="/assets/phone-mockup.png" class="phone-mockup" alt="Device">
+      </div>
+    </div>
+    <div class="sim-actions">
+      <button class="btn-restart" id="restart-play" onclick="restartSim('play')">&#x1F504; Restart</button>
+      <a class="btn-github" style="text-align:center;text-decoration:none;padding:8px;border-radius:9999px;font-size:11px;font-weight:600" href="https://github.com/k9ert/specter-playground" target="_blank">GitHub</a>
+    </div>
+  </div>
+
+  <!-- Specter Schnuartz -->
+  <div class="sim-card" id="card-schnuartz">
+    <div class="sim-header">
+      <div>
+        <div class="sim-title">&#x26A1; Specter Schnuartz</div>
+        <div class="sim-subtitle">ClavaStack Custom Build</div>
+      </div>
+      <div class="sim-status">
+        <div class="dot" id="dot-schnuartz"></div>
+        <span id="st-schnuartz">Connecting&hellip;</span>
+      </div>
+    </div>
+    <div class="sim-phone">
+      <div class="phone-wrap">
+        <div class="screen-overlay" id="screen-schnuartz">
+          <div class="loading" id="loading-schnuartz">
+            <div class="spinner"></div>
+            <span>Loading&hellip;</span>
+          </div>
+        </div>
+        <img src="/assets/phone-mockup.png" class="phone-mockup" alt="Device">
+      </div>
+    </div>
+    <div class="sim-actions">
+      <button class="btn-restart" id="restart-schnuartz" onclick="restartSim('schnuartz')">&#x1F504; Restart</button>
+      <a class="btn-github" style="text-align:center;text-decoration:none;padding:8px;border-radius:9999px;font-size:11px;font-weight:600" href="https://github.com/schnuartz-ai/specter-playground-schnuartz" target="_blank">GitHub</a>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="/">Home</a> &middot; <a href="https://clavastack.com/impressum">Impressum</a></p>
+</footer>
+
+<script type="module">
+import RFB from '/novnc/core/rfb.js';
+
+const POOLS = ['diy', 'play', 'schnuartz'];
+const state = {};  // pool -> {sessionId, restartPath, rfb}
+
+async function allocatePool(pool) {
+  const loadEl = document.getElementById('loading-' + pool);
+  const dotEl = document.getElementById('dot-' + pool);
+  const stEl = document.getElementById('st-' + pool);
+
+  loadEl.innerHTML = '<div class="spinner"></div><span>Finding simulator&hellip;</span>';
+
+  try {
+    const res = await fetch('/api/allocate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pool})
+    });
+    const data = await res.json();
+
+    if (data.status === 'full') {
+      loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px;text-align:center">All busy<br><small>Try again soon</small></p>';
+      stEl.textContent = 'Busy';
+      return;
+    }
+    if (data.status !== 'ok') {
+      loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px">' + (data.message || 'Error') + '</p>';
+      return;
+    }
+
+    state[pool] = {sessionId: data.sessionId, restartPath: data.restartPath};
+
+    const wsUrl = 'wss://' + location.host + data.wsPath;
+    const rfb = new RFB(document.getElementById('screen-' + pool), wsUrl);
+    rfb.scaleViewport = true;
+    rfb.clipViewport = true;
+    rfb.viewOnly = false;
+    rfb.qualityLevel = 6;
+    rfb.compressionLevel = 2;
+    state[pool].rfb = rfb;
+
+    rfb.addEventListener('connect', () => {
+      const canvas = document.getElementById('screen-' + pool).querySelector('canvas');
+      if (canvas) { canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.objectFit = 'contain'; }
+      dotEl.classList.add('on');
+      stEl.textContent = 'Connected';
+      loadEl.style.display = 'none';
+    });
+
+    rfb.addEventListener('disconnect', () => {
+      dotEl.classList.remove('on');
+      stEl.textContent = 'Disconnected';
+      loadEl.style.display = 'flex';
+      loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px;text-align:center">Offline<br><small>Click Restart</small></p>';
+    });
+
+  } catch(e) {
+    loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px">' + e.message + '</p>';
+  }
+}
+
+// Allocate all 3 pools
+POOLS.forEach(p => allocatePool(p));
+
+// Heartbeat for all active sessions
+setInterval(() => {
+  for (const pool of POOLS) {
+    if (state[pool] && state[pool].sessionId) {
+      fetch('/api/heartbeat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sessionId: state[pool].sessionId})
+      }).catch(() => {});
+    }
+  }
+}, 30000);
+
+// Restart function
+window.restartSim = function(pool) {
+  if (!state[pool] || !state[pool].restartPath) return;
+  const btn = document.getElementById('restart-' + pool);
+  const loadEl = document.getElementById('loading-' + pool);
+  btn.disabled = true;
+  btn.textContent = '\u23F3 Restarting...';
+  loadEl.style.display = 'flex';
+  loadEl.innerHTML = '<div class="spinner"></div><span>Restarting&hellip;</span>';
+  fetch(state[pool].restartPath, {method: 'POST'}).catch(() => {});
+  setTimeout(() => {
+    btn.textContent = '\u2705 Reloading...';
+    btn.disabled = false;
+    setTimeout(() => location.reload(), 2000);
+  }, 30000);
+};
+
+// Release all sessions on page close
+window.addEventListener('beforeunload', () => {
+  for (const pool of POOLS) {
+    if (state[pool] && state[pool].sessionId) {
+      navigator.sendBeacon('/api/release', JSON.stringify({sessionId: state[pool].sessionId}));
+    }
+  }
+});
+</script>
+
+</body>
+</html>

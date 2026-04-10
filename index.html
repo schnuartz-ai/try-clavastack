@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Specter DIY — Try Before You Buy | ClavaStack</title>
-  <meta name="description" content="Try the Specter DIY Bitcoin Hardware Wallet in your browser.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Try Specter DIY — Live Device Demo | ClavaStack</title>
+  <meta name="description" content="Interact with a real Specter DIY Bitcoin Hardware Wallet simulator running live in your browser. Air-gapped, open source, Bitcoin only.">
   <style>
     :root {
       --specter-dark: #04070B;
@@ -16,159 +16,378 @@
       --specter-coral: #FF7A7A;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--specter-dark); color: var(--specter-light); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
-    header { background: var(--specter-dark-accent); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--specter-dark-secondary); }
-    .header-left { display: flex; align-items: center; gap: 14px; }
-    .header-left img { height: 32px; }
-    .header-left .sep { color: var(--specter-light-secondary); opacity: 0.3; font-size: 18px; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
-    .nav-link { color: var(--specter-light-secondary); text-decoration: none; font-size: 13px; }
+    html, body {
+      background: var(--specter-dark);
+      color: var(--specter-light);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    header {
+      background: var(--specter-dark-accent);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--specter-dark-secondary);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left img { height: 24px; }
+    .header-left .sep { color: var(--specter-light-secondary); opacity: 0.3; font-size: 16px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .nav-link { color: var(--specter-light-secondary); text-decoration: none; font-size: 12px; }
     .nav-link:hover { color: var(--specter-primary); }
-    .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--specter-light-secondary); }
+
+    /* Status dot */
+    .status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--specter-light-secondary); }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: #f44; }
     .dot.on { background: #4c5; }
-    .hero { text-align: center; padding: 32px 20px 16px; }
-    .hero h1 { color: var(--specter-primary); font-size: 26px; margin-bottom: 8px; }
-    .hero p { color: var(--specter-light-secondary); font-size: 15px; max-width: 560px; margin: 0 auto; line-height: 1.5; }
-    .main { display: flex; gap: 24px; padding: 0 20px 40px; max-width: 1100px; margin: 0 auto; align-items: flex-start; justify-content: center; }
-    .device-wrap { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    .device { background: var(--specter-dark-secondary); border: 2px solid #333; border-radius: 14px; padding: 14px 8px; box-shadow: 0 6px 24px rgba(0,0,0,.5); position: relative; }
-    .device::before { content: 'SPECTER DIY'; position: absolute; top: 3px; left: 50%; transform: translateX(-50%); font-size: 8px; letter-spacing: 2px; color: #555; font-weight: 600; }
-    #screen { width: 480px; height: 800px; overflow: hidden; border-radius: 4px; background: #000; touch-action: none; pointer-events: auto; user-select: none; -webkit-user-select: none; }
-    .device-label { color: var(--specter-light-secondary); font-size: 11px; }
-    .side { max-width: 340px; display: flex; flex-direction: column; gap: 16px; padding-top: 12px; }
-    .card { background: var(--specter-dark-secondary); border-radius: 10px; padding: 20px; }
-    .card h2 { color: var(--specter-primary); font-size: 16px; margin-bottom: 10px; }
-    .card p, .card li { color: var(--specter-light-secondary); font-size: 13px; line-height: 1.6; }
-    .card ul { list-style: none; padding: 0; }
-    .card li { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
-    .card li:last-child { border: none; }
-    .card li::before { content: '\2192 '; color: var(--specter-primary); }
-    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .badge { background: var(--specter-dark); padding: 6px 12px; border-radius: 6px; font-size: 11px; color: var(--specter-light-secondary); border: 1px solid rgba(255,255,255,.06); }
-    .btn { display: block; width: 100%; padding: 14px; border-radius: 9999px; font-size: 15px; font-weight: 600; text-decoration: none; text-align: center; transition: all .2s; border: none; cursor: pointer; min-height: 44px; }
-    .btn-buy { background: var(--specter-primary); color: #fff; }
-    .btn-buy:hover { background: #1680c0; box-shadow: 0 4px 16px rgba(31,153,229,.3); }
-    .btn-test { background: transparent; color: var(--specter-coral); border: 2px solid var(--specter-coral); margin-top: 8px; }
-    .btn-test:hover { background: rgba(255,122,122,.08); }
-    footer { background: var(--specter-dark-secondary); text-align: center; padding: 20px; color: var(--specter-light-secondary); font-size: 12px; }
-    footer a { color: var(--specter-primary); text-decoration: none; }
-    #loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: var(--specter-light-secondary); font-size: 14px; gap: 12px; z-index: 10; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: var(--specter-primary); border-radius: 50%; animation: spin 1s linear infinite; }
+
+    /* Phone container */
+    .page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 12px 32px;
+      gap: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .page {
+        padding: 8px 4px 32px;
+        gap: 10px;
+      }
+    }
+
+    .phone-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    /* On mobile: fill full viewport height so device is life-size.
+       Mockup is portrait (479x905 = 0.529 ratio), so width = height * 0.529 */
+    @media (max-width: 600px) {
+      .phone-wrapper {
+        height: calc(100svh - 54px);
+        width: calc((100svh - 54px) * 0.529);
+        max-width: 96vw;
+        /* If width exceeds viewport, constrain by width instead */
+      }
+      .phone-wrapper .phone-mockup {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    }
+
+    /* CTA section */
+    .cta-section {
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      padding: 8px 4px 0;
+    }
+    .cta-headline {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--specter-light);
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .cta-sub {
+      font-size: 13px;
+      color: var(--specter-light-secondary);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .cta-benefits {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cta-benefits li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--specter-light-secondary);
+      text-align: left;
+    }
+    .cta-benefits li .icon {
+      font-size: 18px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .cta-benefits li strong {
+      color: var(--specter-light);
+      display: block;
+      font-size: 13px;
+      margin-bottom: 1px;
+    }
+    .cta-buy-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      background: var(--specter-primary);
+      color: #fff;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      min-height: 48px;
+      line-height: 1.2;
+    }
+    .cta-buy-btn:hover { opacity: 0.88; }
+
+    /* The noVNC screen sits UNDER the mockup image */
+    #screen-overlay {
+      position: absolute;
+      /* Screen cutout in mockup (479x905): x≈62..423, y≈164..758.
+         Overlay extends ~2px under the opaque bezel (z-index 1 < 2)
+         so there is no visible gap between bezel and screen. */
+      left: calc(12.5% + 2px);
+      top: calc(17.9% + 2px);
+      width: 76.0%;
+      height: 66.0%;
+      z-index: 1;
+      overflow: hidden;
+      background: #000;
+      border-radius: 4px;
+    }
+
+    /* Mockup image on top — pointer-events: none so clicks go through */
+    .phone-mockup {
+      position: relative;
+      width: 100%;
+      display: block;
+      z-index: 2;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Loading overlay inside the screen */
+    #loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: var(--specter-light-secondary);
+      font-size: 13px;
+      gap: 10px;
+      z-index: 10;
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #333;
+      border-top-color: var(--specter-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @media (max-width: 960px) { .main { flex-direction: column; align-items: center; } .side { max-width: 500px; width: 100%; } }
-    @media (max-width: 768px) { .hero { padding: 16px 10px 10px; } .hero h1 { font-size: 20px; } .device { padding: 10px 6px; } }
-    @media (max-width: 500px) {
-      #screen { width: 100vw !important; height: 70vh !important; }
-      .hero { padding: 12px 8px 8px; }
-      .hero h1 { font-size: 18px; }
-      .hero p { font-size: 13px; }
-      .device { border: none; padding: 4px; }
-      .device-label { display: none; }
-      .device::before { font-size: 6px; top: 1px; }
-      #restart-btn { width: 100% !important; margin: 8px 0; padding: 14px !important; font-size: 15px !important; min-height: 48px !important; }
-      .main { padding: 0 4px 16px; }
-      .side { padding: 8px; }
-      .card { padding: 12px; }
-      .card h2 { font-size: 14px; }
-      .badges { gap: 4px; }
-      .badge { padding: 4px 8px; font-size: 10px; }
-      .header-left img { height: 24px; }
-      .header-right { gap: 8px; }
+
+    /* Restart button */
+    .restart-btn {
+      display: block;
+      width: 100%;
+      max-width: 380px;
+      padding: 14px;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      background: transparent;
+      color: var(--specter-coral);
+      border: 2px solid var(--specter-coral);
+      cursor: pointer;
+      min-height: 48px;
+      transition: background 0.2s;
     }
-    @media (max-width: 380px) {
-      header { padding: 8px 10px; }
-      .header-left { gap: 8px; }
-      .header-left img { height: 22px; }
-      .hero h1 { font-size: 17px; }
-      .hero p { font-size: 12px; }
-      .main { padding: 0 8px 24px; }
-      .device { padding: 10px 6px; }
-      .btn { font-size: 13px; min-height: 44px; }
-      .status span { display: none; }
+    .restart-btn:hover, .restart-btn:active {
+      background: rgba(255,122,122,.1);
     }
+    .restart-btn:disabled {
+      opacity: 0.5;
+    }
+
+    /* Status card */
+    .status-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--specter-dark-secondary);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--specter-light-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .status-card a { color: var(--specter-primary); text-decoration: none; font-size: 12px; }
+
+    footer {
+      text-align: center;
+      padding: 16px;
+      color: var(--specter-light-secondary);
+      font-size: 11px;
+    }
+    footer a { color: var(--specter-primary); text-decoration: none; }
   </style>
 </head>
 <body>
+
 <header>
   <div class="header-left">
-    <img src="assets/clavastack-logo.png" alt="ClavaStack">
+    <img src="/assets/clavastack-logo.png" alt="ClavaStack">
     <span class="sep">&times;</span>
-    <img src="assets/specter-logo.png" alt="Specter">
+    <img src="/assets/specter-logo.png" alt="Specter">
   </div>
   <div class="header-right">
-    <a href="/device-test/" class="nav-link">&#x1F4F1; Device Demo</a>
-    <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3 Testing</a>
-    <a href="https://clavastack.com" class="nav-link">Shop</a>
-    <div class="status"><div class="dot" id="dot"></div><span id="st">Connecting&hellip;</span></div>
+    <a href="/simulators/" class="nav-link">&#x1F3AE; All Simulators</a> <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3</a>
+    <div class="status">
+      <div class="dot" id="dot"></div>
+      <span id="st">Connecting&hellip;</span>
+    </div>
   </div>
 </header>
-<div class="hero">
-  <h1>Try the Specter DIY &mdash; in your browser</h1>
-  <p>Explore the open-source Bitcoin hardware wallet before you buy. Click around, navigate menus, and see how self-custody feels.</p>
-</div>
-<div class="main">
-  <div class="device-wrap">
-    <div class="device"><div id="screen" style="position:relative"><div id="loading"><div class="spinner"></div>Loading simulator&hellip;</div></div></div>
-    <div class="device-label">480 &times; 800 &middot; Click to interact</div>
-    <button class="btn btn-test" id="restart-btn" style="width:auto;padding:10px 24px;margin-top:4px;font-size:13px;" onclick="restartSim()">&#x1F504; Restart Simulator</button>
-  </div>
-  <div class="side">
-    <div class="card" style="background:#1a2a1a;border:1px solid #3a5a3a;">
-      <h2 style="color:#4caf50;">&#x2139;&#xFE0F; Demo PIN Setup</h2>
-      <p style="color:#a8d8a8;">Each session starts fresh. You will be asked to <strong>choose your own PIN</strong> — enter any 4+ digit code twice to confirm. The PIN is only valid for this session and resets on restart.</p>
-    </div>
-    <div class="card">
-      <h2>What is Specter DIY?</h2>
-      <p>An open-source, air-gapped Bitcoin hardware wallet. Build it yourself or buy pre-assembled from ClavaStack.</p>
-      <div class="badges">
-        <span class="badge">&#x1F513; Open Source</span>
-        <span class="badge">&#x20BF; Bitcoin Only</span>
-        <span class="badge">&#x1F1E9;&#x1F1EA; From Germany</span>
-        <span class="badge">&#x2708;&#xFE0F; Air-gapped</span>
+
+<div class="page">
+
+  <!-- Phone mockup with noVNC inside -->
+  <div class="phone-wrapper">
+    <!-- noVNC goes here (z-index 1, below mockup) -->
+    <div id="screen-overlay">
+      <div id="loading">
+        <div class="spinner"></div>
+        <span>Loading simulator&hellip;</span>
       </div>
     </div>
-    </div>
+    <!-- Device frame on top (pointer-events: none) -->
+    <img src="/assets/phone-mockup.png" class="phone-mockup" alt="Specter DIY Device">
+  </div>
+
+  <!-- Restart button -->
+  <button class="restart-btn" id="restart-btn" onclick="restartSim()">
+    &#x1F504; Restart Simulator
+  </button>
+
+  <!-- CTA Section -->
+  <div class="cta-section">
+    <p class="cta-headline">The hardware wallet built for real life.</p>
+    <p class="cta-sub">Pre-assembled by ClavaStack — ready to use out of the box.</p>
+
+    <ul class="cta-benefits">
+      <li>
+        <span class="icon">📱</span>
+        <div><strong>Smartphone-sized touchscreen</strong>No button-mashing. Enter your passphrase fast, verify transactions at a glance — big screen, full control.</div>
+      </li>
+      <li>
+        <span class="icon">🔒</span>
+        <div><strong>100% air-gapped &amp; open source</strong>Zero USB. Zero closed firmware. Every line of code is public — your keys never leave the device.</div>
+      </li>
+      <li>
+        <span class="icon">👨‍👩‍👧</span>
+        <div><strong>Family Hardware Wallet</strong>Each family member gets their own Smartcard, Seedphrase &amp; PIN — one device, total separation.</div>
+      </li>
+    </ul>
+
+    <a href="https://clavastack.com" class="cta-buy-btn">Get Your Specter DIY &rarr;</a>
+  </div>
+
+</div>
+
 <footer>
-  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; Specter DIY is open-source &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a></p>
+  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a> &middot; <a href="https://clavastack.com/impressum">Impressum</a></p>
 </footer>
+
 <script type="module">
-import RFB from '/novnc/core/rfb.js';
-const url = `wss://YOUR-DOMAIN.COM/simulator-ws`;
-try {
-  const rfb = new RFB(document.getElementById('screen'), url);
-  rfb.scaleViewport = true;
-  rfb.viewOnly = false;
-  rfb.qualityLevel = 6;
-  rfb.compressionLevel = 2;
-  rfb.addEventListener('connect', () => {
-    document.getElementById('dot').classList.add('on');
-    document.getElementById('st').textContent = 'Connected';
-    document.getElementById('loading').style.display = 'none';
-  });
-  rfb.addEventListener('disconnect', () => {
-    document.getElementById('dot').classList.remove('on');
-    document.getElementById('st').textContent = 'Disconnected';
-    document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">Simulator offline</p><p style="margin-top:8px">Please try again in a moment.</p>';
-    document.getElementById('loading').style.display = 'flex';
-  });
-} catch(e) {
-  document.getElementById('loading').innerHTML = '<p style="color:#FF7A7A">Error: '+e.message+'</p>';
+import RFB from "/novnc/core/rfb.js";
+
+let rfb = null;
+let sessionId = null;
+let heartbeatTimer = null;
+let restartUrl = null;
+
+async function init() {
+  try {
+    const res = await fetch("/api/allocate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({pool: "diy"})
+    });
+    const data = await res.json();
+
+    if (data.status === "full") {
+      document.getElementById("loading").innerHTML = "<p style=\"color:#FF7A7A;text-align:center\">All simulators are in use.<br><small>Try again in 1-2 minutes.</small></p>";
+      document.getElementById("st").textContent = "All busy";
+      return;
+    }
+
+    sessionId = data.sessionId;
+    restartUrl = data.restartPath;
+
+    const wsUrl = "wss://" + location.host + data.wsPath;
+    rfb = new RFB(document.getElementById("screen-overlay"), wsUrl);
+    rfb.scaleViewport = true;
+    rfb.clipViewport = true;
+    rfb.viewOnly = false;
+    rfb.qualityLevel = 6;
+    rfb.compressionLevel = 2;
+
+    rfb.addEventListener("connect", () => {
+      const canvas = document.getElementById("screen-overlay").querySelector("canvas");
+      if (canvas) { canvas.style.width="100%"; canvas.style.height="100%"; canvas.style.objectFit="contain"; }
+      document.getElementById("dot").classList.add("on");
+      document.getElementById("st").textContent = "Connected";
+      document.getElementById("loading").style.display = "none";
+    });
+
+    rfb.addEventListener("disconnect", () => {
+      document.getElementById("dot").classList.remove("on");
+      document.getElementById("st").textContent = "Disconnected";
+      const l = document.getElementById("loading");
+      l.style.display = "flex";
+      l.innerHTML = "<p style=\"color:#FF7A7A;text-align:center\">Simulator offline<br><small>Click Restart to reconnect</small></p>";
+    });
+
+    heartbeatTimer = setInterval(() => {
+      if (sessionId) fetch("/api/heartbeat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({sessionId})}).catch(()=>{});
+    }, 30000);
+
+  } catch(e) {
+    document.getElementById("loading").innerHTML = "<p style=\"color:#FF7A7A\">Error: " + e.message + "</p>";
+  }
 }
 
 function restartSim() {
-  const btn = document.getElementById('restart-btn');
+  if (!restartUrl) return;
+  const btn = document.getElementById("restart-btn");
   btn.disabled = true;
-  btn.textContent = '⏳ Restarting...';
-  document.getElementById('loading').style.display = 'flex';
-  document.getElementById('loading').innerHTML = '<div class="spinner"></div>Restarting simulator…';
-  const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), 35000);
-  fetch('https://YOUR-DOMAIN.COM/restart/sim1', { method: 'POST', signal: ctrl.signal }).catch(() => {});
-  btn.textContent = '⏳ Restarting (~30s)...';
-  setTimeout(() => { btn.textContent = '✅ Reloading...'; setTimeout(() => location.reload(), 2000); }, 30000);
+  btn.textContent = "⏳ Restarting...";
+  const loading = document.getElementById("loading");
+  loading.style.display = "flex";
+  loading.innerHTML = "<div class=\"spinner\"></div><span>Restarting simulator…</span>";
+  fetch(restartUrl, {method:"POST"}).catch(()=>{});
+  btn.textContent = "⏳ Restarting (~30s)...";
+  setTimeout(() => { btn.textContent = "✅ Reloading..."; setTimeout(() => location.reload(), 2000); }, 30000);
 }
 window.restartSim = restartSim;
+
+window.addEventListener("beforeunload", () => {
+  if (sessionId) navigator.sendBeacon("/api/release", JSON.stringify({sessionId}));
+});
+
+init();
 </script>
+
 </body>
 </html>
