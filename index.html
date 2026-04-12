@@ -252,7 +252,7 @@
     <img src="/assets/specter-logo.png" alt="Specter">
   </div>
   <div class="header-right">
-    <a href="/simulators/" class="nav-link">&#x1F3AE; All Simulators</a> <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3</a>
+    <!-- <a href="/simulators/" class="nav-link">&#x1F3AE; All Simulators</a> <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3</a> -->
     <div class="status">
       <div class="dot" id="dot"></div>
       <span id="st">Connecting&hellip;</span>
@@ -282,7 +282,7 @@
 
   <!-- CTA Section -->
   <div class="cta-section">
-    <p class="cta-headline">The hardware wallet built for real life.</p>
+    <p class="cta-headline">The hardware wallet for bitcoiners.</p>
     <p class="cta-sub">Pre-assembled by ClavaStack — ready to use out of the box.</p>
 
     <ul class="cta-benefits">
@@ -312,80 +312,121 @@
 <script type="module">
 import RFB from "/novnc/core/rfb.js";
 
-let rfb = null;
-let sessionId = null;
-let heartbeatTimer = null;
-let restartUrl = null;
+const POOL = "diy";
+const SK = "try-session-" + POOL;
+const MAX_RECONNECT = 3;
+const RECONNECT_DELAY = 3000;
 
-async function init() {
-  try {
-    const res = await fetch("/api/allocate", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({pool: "diy"})
-    });
-    const data = await res.json();
+let rfb = null, sessionId = null, heartbeatTimer = null, restartUrl = null, wsPath = null;
+let reconnectAttempt = 0, reconnectTimeout = null;
 
-    if (data.status === "full") {
-      document.getElementById("loading").innerHTML = "<p style=\"color:#FF7A7A;text-align:center\">All simulators are in use.<br><small>Try again in 1-2 minutes.</small></p>";
-      document.getElementById("st").textContent = "All busy";
-      return;
-    }
+function loadSession() {
+  try { const s = JSON.parse(localStorage.getItem(SK)); if (s && s.sessionId && s.expiresAt > Date.now()) return s; } catch(e) {}
+  localStorage.removeItem(SK); return null;
+}
+function saveSession(sid, wp, rp, exp) {
+  localStorage.setItem(SK, JSON.stringify({sessionId: sid, wsPath: wp, restartPath: rp, expiresAt: Date.now() + exp * 1000}));
+}
+function clearSession() {
+  localStorage.removeItem(SK);
+  sessionId = null; wsPath = null; restartUrl = null;
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
 
-    sessionId = data.sessionId;
-    restartUrl = data.restartPath;
+function connectVNC(wp) {
+  const container = document.getElementById("screen-overlay");
+  if (rfb) { try { rfb.disconnect(); } catch(e) {} rfb = null; }
 
-    const wsUrl = "wss://" + location.host + data.wsPath;
-    rfb = new RFB(document.getElementById("screen-overlay"), wsUrl);
-    rfb.scaleViewport = true;
-    rfb.clipViewport = true;
-    rfb.viewOnly = false;
-    rfb.qualityLevel = 6;
-    rfb.compressionLevel = 2;
-
-    rfb.addEventListener("connect", () => {
-      const canvas = document.getElementById("screen-overlay").querySelector("canvas");
-      if (canvas) { canvas.style.width="100%"; canvas.style.height="100%"; canvas.style.objectFit="contain"; }
-      document.getElementById("dot").classList.add("on");
-      document.getElementById("st").textContent = "Connected";
-      document.getElementById("loading").style.display = "none";
-    });
-
-    rfb.addEventListener("disconnect", () => {
-      document.getElementById("dot").classList.remove("on");
+  rfb = new RFB(container, "wss://" + location.host + wp);
+  rfb.scaleViewport = true; rfb.clipViewport = true; rfb.viewOnly = false; rfb.qualityLevel = 6; rfb.compressionLevel = 2;
+  rfb.addEventListener("connect", () => {
+    reconnectAttempt = 0;
+    const c = container.querySelector("canvas");
+    if (c) { c.style.width="100%"; c.style.height="100%"; c.style.objectFit="contain"; }
+    document.getElementById("dot").classList.add("on");
+    document.getElementById("st").textContent = "Connected";
+    document.getElementById("loading").style.display = "none";
+  });
+  rfb.addEventListener("disconnect", () => {
+    document.getElementById("dot").classList.remove("on");
+    rfb = null;
+    if (reconnectAttempt < MAX_RECONNECT && wsPath) {
+      reconnectAttempt++;
+      document.getElementById("st").textContent = "Reconnecting (" + reconnectAttempt + "/" + MAX_RECONNECT + ")...";
+      const l = document.getElementById("loading");
+      l.style.display = "flex";
+      l.innerHTML = '<div class="spinner"></div><span>Reconnecting (' + reconnectAttempt + '/' + MAX_RECONNECT + ')&hellip;</span>';
+      reconnectTimeout = setTimeout(() => connectVNC(wsPath), RECONNECT_DELAY);
+    } else {
       document.getElementById("st").textContent = "Disconnected";
       const l = document.getElementById("loading");
       l.style.display = "flex";
-      l.innerHTML = "<p style=\"color:#FF7A7A;text-align:center\">Simulator offline<br><small>Click Restart to reconnect</small></p>";
-    });
+      l.innerHTML = '<p style="color:#FF7A7A;text-align:center">Simulator offline<br><small>Click Restart to reconnect</small></p>';
+    }
+  });
+}
 
-    heartbeatTimer = setInterval(() => {
-      if (sessionId) fetch("/api/heartbeat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({sessionId})}).catch(()=>{});
-    }, 30000);
+function startHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(async () => {
+    if (!sessionId) return;
+    try {
+      const r = await fetch("/api/heartbeat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({sessionId})});
+      const data = await r.json();
+      if (data.status === "not_found") {
+        clearSession();
+        reconnectAttempt = 0;
+        init();
+      }
+    } catch(e) { /* network error, keep trying next interval */ }
+  }, 30000);
+}
 
+async function init() {
+  try {
+    const saved = loadSession();
+    if (saved) {
+      let hb;
+      try {
+        const r = await fetch("/api/heartbeat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({sessionId:saved.sessionId})});
+        hb = await r.json();
+      } catch(e) {
+        hb = {status: "error"};
+      }
+      if (hb.status === "ok") {
+        sessionId = saved.sessionId; restartUrl = saved.restartPath; wsPath = saved.wsPath;
+        connectVNC(wsPath); startHeartbeat(); return;
+      }
+      localStorage.removeItem(SK);
+    }
+    const res = await fetch("/api/allocate", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pool:POOL})});
+    const data = await res.json();
+    if (data.status === "full") {
+      document.getElementById("loading").innerHTML = '<p style="color:#FF7A7A;text-align:center">All simulators in use.<br><small>Try again in 1-2 minutes.</small></p>';
+      document.getElementById("st").textContent = "All busy"; return;
+    }
+    sessionId = data.sessionId; restartUrl = data.restartPath; wsPath = data.wsPath;
+    saveSession(sessionId, wsPath, restartUrl, data.expiresIn);
+    connectVNC(wsPath); startHeartbeat();
   } catch(e) {
-    document.getElementById("loading").innerHTML = "<p style=\"color:#FF7A7A\">Error: " + e.message + "</p>";
+    document.getElementById("loading").innerHTML = '<p style="color:#FF7A7A">Error: ' + e.message + '</p>';
   }
 }
 
 function restartSim() {
   if (!restartUrl) return;
+  if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
+  reconnectAttempt = 0;
   const btn = document.getElementById("restart-btn");
-  btn.disabled = true;
-  btn.textContent = "⏳ Restarting...";
+  btn.disabled = true; btn.textContent = '\u23f3 Restarting...';
   const loading = document.getElementById("loading");
   loading.style.display = "flex";
-  loading.innerHTML = "<div class=\"spinner\"></div><span>Restarting simulator…</span>";
+  loading.innerHTML = '<div class="spinner"></div><span>Restarting simulator\u2026</span>';
   fetch(restartUrl, {method:"POST"}).catch(()=>{});
-  btn.textContent = "⏳ Restarting (~30s)...";
-  setTimeout(() => { btn.textContent = "✅ Reloading..."; setTimeout(() => location.reload(), 2000); }, 30000);
+  btn.textContent = '\u23f3 Restarting (~30s)...';
+  setTimeout(() => { btn.textContent = '\u2705 Reloading...'; setTimeout(() => location.reload(), 2000); }, 30000);
 }
 window.restartSim = restartSim;
-
-window.addEventListener("beforeunload", () => {
-  if (sessionId) navigator.sendBeacon("/api/release", JSON.stringify({sessionId}));
-});
-
 init();
 </script>
 

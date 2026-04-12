@@ -14,7 +14,7 @@ if [[ -z "$INST_ID" ]]; then
 fi
 
 # Parse type and number
-if [[ "$INST_ID" =~ ^diy([1-5])$ ]]; then
+if [[ "$INST_ID" =~ ^diy([0-9][0-9]*)$ ]]; then
     TYPE="diy"; NUM="${BASH_REMATCH[1]}"
     BASE_DIR="/opt/try-clavastack/specter-diy"
     RUN_CMD="./bin/micropython_unix run_simulator.py"
@@ -62,8 +62,8 @@ mkdir -p "$PID_DIR" "$LOG_DIR" "$FS_DIR"
 kill_pid_file() {
     local pf="$1"
     if [[ -f "$pf" ]]; then
-        local pid=$(cat "$pf")
-        if kill -0 "$pid" 2>/dev/null; then
+        local pid=$(cat "$pf" 2>/dev/null)
+        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
             kill "$pid" 2>/dev/null || true
             sleep 0.5
             kill -9 "$pid" 2>/dev/null || true
@@ -72,13 +72,43 @@ kill_pid_file() {
     fi
 }
 
+# Kill any process listening on a specific port (catch orphans not tracked by PID files)
+kill_port() {
+    local port="$1"
+    local pids=$(ss -tlnp "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u)
+    for pid in $pids; do
+        echo "Killing orphan process $pid on port $port"
+        kill "$pid" 2>/dev/null || true
+        sleep 0.3
+        kill -9 "$pid" 2>/dev/null || true
+    done
+}
+
+# Kill any Xvfb on our display (catch orphans)
+kill_display() {
+    local display="$1"
+    local pids=$(pgrep -f "Xvfb $display " 2>/dev/null || true)
+    for pid in $pids; do
+        echo "Killing orphan Xvfb $pid on display $display"
+        kill "$pid" 2>/dev/null || true
+        sleep 0.3
+        kill -9 "$pid" 2>/dev/null || true
+    done
+}
+
 stop_inst() {
     echo "Stopping $INST_ID..."
+    # First try PID files (clean path)
     kill_pid_file "$PID_DIR/micropython.pid"
     kill_pid_file "$PID_DIR/websockify.pid"
     kill_pid_file "$PID_DIR/x11vnc.pid"
     kill_pid_file "$PID_DIR/xvfb.pid"
-    sleep 1
+    sleep 0.5
+    # Then kill any orphans by port/display (catches leaked processes)
+    kill_port "$WS_PORT"
+    kill_port "$VNC_PORT"
+    kill_display "$XDISPLAY"
+    sleep 0.5
     echo "$INST_ID stopped."
 }
 
@@ -104,7 +134,7 @@ start_inst() {
     DISPLAY="$XDISPLAY" $RUN_CMD > "$LOG_DIR/$INST_ID.log" 2>&1 &
     echo $! > "$PID_DIR/micropython.pid"
 
-    echo "$INST_ID started."
+    echo "$INST_ID started (pids: xvfb=$(cat $PID_DIR/xvfb.pid), vnc=$(cat $PID_DIR/x11vnc.pid), ws=$(cat $PID_DIR/websockify.pid), mp=$(cat $PID_DIR/micropython.pid))"
 }
 
 restart_inst() {

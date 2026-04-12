@@ -301,11 +301,51 @@
 import RFB from '/novnc/core/rfb.js';
 
 const POOLS = ['diy', 'play', 'schnuartz'];
-const state = {};  // pool -> {sessionId, restartPath, rfb}
+const MAX_RECONNECT = 3;
+const RECONNECT_DELAY = 3000;
+const state = {};
+
+function connectPool(pool, wsPath) {
+  const container = document.getElementById('screen-' + pool);
+  const dotEl = document.getElementById('dot-' + pool);
+  const stEl = document.getElementById('st-' + pool);
+  const loadEl = document.getElementById('loading-' + pool);
+
+  if (state[pool] && state[pool].rfb) { try { state[pool].rfb.disconnect(); } catch(e) {} }
+
+  const rfb = new RFB(container, 'wss://' + location.host + wsPath);
+  rfb.scaleViewport = true; rfb.clipViewport = true; rfb.viewOnly = false; rfb.qualityLevel = 6; rfb.compressionLevel = 2;
+  state[pool].rfb = rfb;
+
+  rfb.addEventListener('connect', () => {
+    state[pool].reconnectAttempt = 0;
+    const canvas = container.querySelector('canvas');
+    if (canvas) { canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.objectFit = 'contain'; }
+    dotEl.classList.add('on');
+    stEl.textContent = 'Connected';
+    loadEl.style.display = 'none';
+  });
+
+  rfb.addEventListener('disconnect', () => {
+    dotEl.classList.remove('on');
+    state[pool].rfb = null;
+    const attempt = (state[pool].reconnectAttempt || 0) + 1;
+    if (attempt <= MAX_RECONNECT && state[pool].wsPath) {
+      state[pool].reconnectAttempt = attempt;
+      stEl.textContent = 'Reconnecting (' + attempt + '/' + MAX_RECONNECT + ')...';
+      loadEl.style.display = 'flex';
+      loadEl.innerHTML = '<div class="spinner"></div><span>Reconnecting (' + attempt + '/' + MAX_RECONNECT + ')&hellip;</span>';
+      state[pool].reconnectTimeout = setTimeout(() => connectPool(pool, state[pool].wsPath), RECONNECT_DELAY);
+    } else {
+      stEl.textContent = 'Disconnected';
+      loadEl.style.display = 'flex';
+      loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px;text-align:center">Offline<br><small>Click Restart</small></p>';
+    }
+  });
+}
 
 async function allocatePool(pool) {
   const loadEl = document.getElementById('loading-' + pool);
-  const dotEl = document.getElementById('dot-' + pool);
   const stEl = document.getElementById('st-' + pool);
 
   loadEl.innerHTML = '<div class="spinner"></div><span>Finding simulator&hellip;</span>';
@@ -328,56 +368,43 @@ async function allocatePool(pool) {
       return;
     }
 
-    state[pool] = {sessionId: data.sessionId, restartPath: data.restartPath};
-
-    const wsUrl = 'wss://' + location.host + data.wsPath;
-    const rfb = new RFB(document.getElementById('screen-' + pool), wsUrl);
-    rfb.scaleViewport = true;
-    rfb.clipViewport = true;
-    rfb.viewOnly = false;
-    rfb.qualityLevel = 6;
-    rfb.compressionLevel = 2;
-    state[pool].rfb = rfb;
-
-    rfb.addEventListener('connect', () => {
-      const canvas = document.getElementById('screen-' + pool).querySelector('canvas');
-      if (canvas) { canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.objectFit = 'contain'; }
-      dotEl.classList.add('on');
-      stEl.textContent = 'Connected';
-      loadEl.style.display = 'none';
-    });
-
-    rfb.addEventListener('disconnect', () => {
-      dotEl.classList.remove('on');
-      stEl.textContent = 'Disconnected';
-      loadEl.style.display = 'flex';
-      loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px;text-align:center">Offline<br><small>Click Restart</small></p>';
-    });
+    state[pool] = {sessionId: data.sessionId, restartPath: data.restartPath, wsPath: data.wsPath, reconnectAttempt: 0, reconnectTimeout: null, rfb: null};
+    connectPool(pool, data.wsPath);
 
   } catch(e) {
     loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px">' + e.message + '</p>';
   }
 }
 
-// Allocate all 3 pools
 POOLS.forEach(p => allocatePool(p));
 
-// Heartbeat for all active sessions
-setInterval(() => {
+// Heartbeat with session expiry detection
+setInterval(async () => {
   for (const pool of POOLS) {
     if (state[pool] && state[pool].sessionId) {
-      fetch('/api/heartbeat', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({sessionId: state[pool].sessionId})
-      }).catch(() => {});
+      try {
+        const r = await fetch('/api/heartbeat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({sessionId: state[pool].sessionId})
+        });
+        const data = await r.json();
+        if (data.status === 'not_found') {
+          state[pool].sessionId = null;
+          if (state[pool].rfb) { try { state[pool].rfb.disconnect(); } catch(e) {} state[pool].rfb = null; }
+          if (state[pool].reconnectTimeout) { clearTimeout(state[pool].reconnectTimeout); }
+          state[pool].reconnectAttempt = 0;
+          allocatePool(pool);
+        }
+      } catch(e) { /* network error, keep trying next interval */ }
     }
   }
 }, 30000);
 
-// Restart function
 window.restartSim = function(pool) {
   if (!state[pool] || !state[pool].restartPath) return;
+  if (state[pool].reconnectTimeout) { clearTimeout(state[pool].reconnectTimeout); state[pool].reconnectTimeout = null; }
+  state[pool].reconnectAttempt = 0;
   const btn = document.getElementById('restart-' + pool);
   const loadEl = document.getElementById('loading-' + pool);
   btn.disabled = true;
@@ -392,7 +419,6 @@ window.restartSim = function(pool) {
   }, 30000);
 };
 
-// Release all sessions on page close
 window.addEventListener('beforeunload', () => {
   for (const pool of POOLS) {
     if (state[pool] && state[pool].sessionId) {
