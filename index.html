@@ -438,6 +438,38 @@
       flex: 1; min-width: 0; font: inherit; font-size: 11.5px; padding: 8px 9px; border-radius: 7px;
       background: var(--specter-dark-accent); border: 1px solid var(--specter-dark-secondary); color: var(--specter-light);
     }
+
+    /* Smartcard tray */
+    .unsupported-tag {
+      display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+      color: var(--specter-light-secondary); background: rgba(255,255,255,.06);
+      border: 1px solid var(--specter-dark-secondary); border-radius: 4px; padding: 1px 6px; margin-left: 6px;
+      vertical-align: middle; text-transform: uppercase;
+    }
+    .card-reader {
+      display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.03);
+      border: 1px solid var(--specter-dark-accent); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px;
+    }
+    .card-reader-lamp { width: 8px; height: 8px; border-radius: 50%; background: #3a3f47; flex-shrink: 0; }
+    .card-reader.live .card-reader-lamp { background: var(--specter-primary); box-shadow: 0 0 6px var(--specter-primary); }
+    .card-reader-label { flex: 1; font-size: 11.5px; color: var(--specter-light-secondary); }
+    .card-row { display: flex; gap: 10px; justify-content: center; }
+    .card-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
+    .smartcard-visual {
+      width: 84px; height: 54px; border-radius: 7px; cursor: pointer;
+      background: linear-gradient(160deg,#20242b,#15171b); border: 1px solid #2f343c;
+      display: flex; flex-direction: column; justify-content: space-between; padding: 7px 8px;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .smartcard-visual:hover { border-color: #4a515c; transform: translateY(-2px); }
+    .smartcard-visual:focus-visible { outline: 2px solid var(--specter-primary); outline-offset: 2px; }
+    .smartcard-visual.in-reader { border-color: var(--specter-primary); transform: translateY(-6px); box-shadow: 0 6px 14px rgba(0,0,0,.5); }
+    @media (prefers-reduced-motion: reduce) {
+      .smartcard-visual, .card-reader-lamp { transition: none; }
+    }
+    .smartcard-chip { width: 20px; height: 15px; border-radius: 2px; background: linear-gradient(160deg,#d9b45a,#a97e2c); }
+    .smartcard-label { font-size: 10.5px; font-weight: 700; color: var(--specter-light); }
+    .card-cell-caption { font-size: 10px; color: var(--specter-light-secondary); text-align: center; min-height: 2.4em; }
   </style>
 </head>
 <body>
@@ -569,6 +601,20 @@
       </div>
       <div class="hw-msg" id="qr-msg"></div>
       <p class="hw-note" id="qr-camera-note"></p>
+    </div>
+  </details>
+
+  <!-- Smartcard tray -->
+  <details class="hw-panel" id="card-panel">
+    <summary>&#x1F4B3; Smartcards <span class="hw-sub">tray only<span class="unsupported-tag">not wired to firmware</span></span><span class="chev">&#x25BE;</span></summary>
+    <div class="hw-body">
+      <p style="margin-bottom:10px">Specter DIY's smartcard support (Shield / Shield Lite) talks to a separate JavaCard simulator process that this deployment doesn't run yet. Rather than fake a "seeded" or "PIN set" state we can't actually verify, this tray only shows physical insert/eject position — nothing here affects the real device.</p>
+      <div class="card-reader" id="card-reader">
+        <span class="card-reader-lamp" id="card-reader-lamp"></span>
+        <span class="card-reader-label" id="card-reader-label">Reader empty</span>
+        <button class="hw-btn" id="card-eject-btn" onclick="cardEject()" disabled>Eject</button>
+      </div>
+      <div class="card-row" id="card-row"></div>
     </div>
   </details>
 
@@ -945,6 +991,46 @@ function qrStopCamera() {
   document.getElementById("qr-camera-stop-btn").style.display = "none";
 }
 window.qrStartCamera = qrStartCamera; window.qrStopCamera = qrStopCamera;
+
+// --- Smartcard tray ---
+// Upstream Specter DIY's smartcard stack (Shield / Shield Lite) talks to a
+// separate JavaCard simulator (see uscard.py, port 21111) that this
+// deployment does not run. There is nothing truthful we can bridge yet, so
+// this is deliberately UI-only: it tracks which card is physically "in the
+// reader" for this browser tab and nothing else. It never claims a card is
+// seeded, PIN-protected, or otherwise touches wallet state.
+const CARD_LABELS = ["Card A", "Card B", "Card C"];
+let cardInReader = null; // index or null
+
+function renderCards() {
+  const row = document.getElementById("card-row");
+  row.innerHTML = "";
+  CARD_LABELS.forEach((label, i) => {
+    const cell = document.createElement("div");
+    cell.className = "card-cell";
+    const visual = document.createElement("button");
+    visual.type = "button";
+    visual.className = "smartcard-visual" + (cardInReader === i ? " in-reader" : "");
+    visual.setAttribute("aria-pressed", String(cardInReader === i));
+    visual.innerHTML = '<span class="smartcard-chip"></span><span class="smartcard-label">' + label + "</span>";
+    visual.addEventListener("click", () => cardToggle(i));
+    const caption = document.createElement("div");
+    caption.className = "card-cell-caption";
+    caption.textContent = cardInReader === i ? "In reader" : "In tray";
+    cell.appendChild(visual);
+    cell.appendChild(caption);
+    row.appendChild(cell);
+  });
+  const reader = document.getElementById("card-reader");
+  reader.classList.toggle("live", cardInReader !== null);
+  document.getElementById("card-reader-label").textContent =
+    cardInReader === null ? "Reader empty" : CARD_LABELS[cardInReader] + " inserted (position only, not read by firmware here)";
+  document.getElementById("card-eject-btn").disabled = cardInReader === null;
+}
+function cardToggle(i) { cardInReader = (cardInReader === i) ? null : i; renderCards(); }
+function cardEject() { cardInReader = null; renderCards(); }
+window.cardEject = cardEject;
+renderCards();
 
 function restartSim() {
   if (!restartUrl) return;
