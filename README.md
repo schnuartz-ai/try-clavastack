@@ -11,7 +11,7 @@
 
 ## What Is This?
 
-**Specter DIY** is an open-source Bitcoin hardware wallet you can build yourself or buy pre-assembled. Before investing in hardware, you can now try the actual firmware — running live in your browser.
+**Specter DIY** is an open-source Bitcoin hardware wallet you can build yourself or buy pre-assembled. Before investing in hardware, you can now try the actual firmware — real Specter DIY firmware streamed interactively to your browser from an isolated remote simulator session.
 
 This repository hosts the **frontend** for two interactive simulators:
 
@@ -22,7 +22,9 @@ This repository hosts the **frontend** for two interactive simulators:
 
 > ⚠️ **Specter 3 is under active development.** Many screens are incomplete, some flows use temporary workarounds, and the UI will change significantly before release. It is a developer preview — not representative of the final product. Known limitations: Create Seed/Wallet screens are placeholders; some navigation uses temporary hacks; not all menu items are functional yet.
 
-Both simulators stream a live VNC session directly into your browser via **noVNC** — you're interacting with **real firmware**, not a mockup.
+Both simulators stream a live VNC session directly into your browser via **noVNC** — you're interacting with **real firmware running in an isolated remote simulator instance**, not a mockup and not code running locally in your browser.
+
+> ⚠️ **Never enter a seed phrase you rely on.** These are shared, resettable remote sessions — use a throwaway test seed only, never a wallet holding real funds.
 
 ---
 
