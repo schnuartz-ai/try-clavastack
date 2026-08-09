@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Try Specter DIY — Live Device Demo | ClavaStack</title>
-  <meta name="description" content="Interact with a real Specter DIY Bitcoin Hardware Wallet simulator running live in your browser. Air-gapped, open source, Bitcoin only.">
+  <meta name="description" content="Interact with real Specter DIY Bitcoin hardware wallet firmware, streamed interactively from an isolated remote simulator session to your browser. Air-gapped design, open source, Bitcoin only.">
   <style>
     :root {
       --specter-dark: #04070B;
@@ -241,6 +241,235 @@
       font-size: 11px;
     }
     footer a { color: var(--specter-primary); text-decoration: none; }
+
+    /* Safety warning banner */
+    .safety-banner {
+      width: 100%;
+      max-width: 380px;
+      background: linear-gradient(180deg, rgba(255,122,122,.12), rgba(255,122,122,.05));
+      border: 1px solid rgba(255,122,122,.35);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--specter-light);
+    }
+    .safety-banner .warn-icon { font-size: 16px; flex-shrink: 0; line-height: 1.3; }
+    .safety-banner strong { color: var(--specter-coral); }
+
+    /* Info / About this simulator */
+    .info-panel {
+      width: 100%;
+      max-width: 380px;
+      background: var(--specter-dark-secondary);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .info-panel summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--specter-light-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    .info-panel summary::-webkit-details-marker { display: none; }
+    .info-panel summary .chev { transition: transform .18s ease; opacity: .6; }
+    .info-panel[open] summary .chev { transform: rotate(180deg); }
+    .info-panel summary:focus-visible { outline: 2px solid var(--specter-primary); outline-offset: -2px; }
+    .info-body {
+      padding: 0 14px 14px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--specter-light-secondary);
+    }
+    .info-body h4 {
+      color: var(--specter-light);
+      font-size: 12px;
+      margin: 10px 0 4px;
+    }
+    .info-body ul { margin: 4px 0 4px 18px; padding: 0; }
+    .info-body code {
+      background: rgba(255,255,255,.06);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .info-meta {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      font-size: 11px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 10px;
+    }
+    .info-meta dt { color: var(--specter-light-secondary); opacity: .75; }
+    .info-meta dd { color: var(--specter-light); word-break: break-all; }
+    .info-meta a { color: var(--specter-primary); text-decoration: none; }
+
+    /* Network badge (only rendered when a network state is genuinely known) */
+    .network-badge {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--specter-dark-secondary);
+      color: var(--specter-light-secondary);
+      background: rgba(255,255,255,.04);
+    }
+    .network-badge.show { display: inline-flex; }
+    .network-badge .dot-net { width: 6px; height: 6px; border-radius: 50%; background: #4c5; }
+    .network-badge[data-net="mainnet"] { border-color: var(--specter-coral); color: var(--specter-coral); }
+    .network-badge[data-net="mainnet"] .dot-net { background: var(--specter-coral); }
+
+    /* Hardware workbench: SD card + QR panels */
+    .hw-panel {
+      width: 100%;
+      max-width: 380px;
+      background: var(--specter-dark-secondary);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .hw-panel summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--specter-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    .hw-panel summary::-webkit-details-marker { display: none; }
+    .hw-panel summary:focus-visible { outline: 2px solid var(--specter-primary); outline-offset: -2px; }
+    .hw-panel summary .chev { transition: transform .18s ease; opacity: .6; font-size: 11px; }
+    .hw-panel[open] summary .chev { transform: rotate(180deg); }
+    .hw-panel .hw-sub { font-weight: 400; font-size: 11px; color: var(--specter-light-secondary); }
+    .hw-body { padding: 0 14px 14px; font-size: 12px; color: var(--specter-light-secondary); }
+
+    /* Physical SD card */
+    .sd-slot-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .sd-card-visual {
+      width: 46px; height: 60px; border-radius: 4px 8px 4px 4px;
+      background: linear-gradient(155deg, #2b3644, #131a22);
+      border: 1px solid #364252;
+      position: relative;
+      flex-shrink: 0;
+      transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .35s ease;
+      transform: translateY(0);
+    }
+    .sd-card-visual::before {
+      content: ""; position: absolute; top: 6px; left: 6px; right: 6px; height: 16px;
+      background: linear-gradient(160deg,#d9b45a,#a97e2c); border-radius: 2px;
+    }
+    .sd-card-visual::after {
+      content: "SD"; position: absolute; bottom: 6px; left: 0; right: 0; text-align: center;
+      font-size: 8px; letter-spacing: .06em; color: #5c6b7d;
+    }
+    .sd-card-visual.inserted { transform: translateY(-10px); border-color: var(--specter-primary); box-shadow: 0 0 0 1px rgba(31,153,229,.35); }
+    .sd-card-visual.ejected { opacity: .55; }
+    @media (prefers-reduced-motion: reduce) {
+      .sd-card-visual { transition: none; }
+    }
+    .sd-slot-info { flex: 1; min-width: 0; }
+    .sd-slot-status { font-size: 12px; color: var(--specter-light); font-weight: 600; }
+    .sd-slot-hint { font-size: 11px; color: var(--specter-light-secondary); margin-top: 2px; }
+    .hw-btn {
+      font: inherit; font-size: 12px; font-weight: 600; color: var(--specter-light);
+      background: var(--specter-dark-accent); border: 1px solid var(--specter-dark-secondary);
+      border-radius: 7px; padding: 7px 12px; cursor: pointer;
+    }
+    .hw-btn:hover:not(:disabled) { border-color: var(--specter-primary); }
+    .hw-btn:disabled { opacity: .4; cursor: default; }
+    .hw-btn:focus-visible { outline: 2px solid var(--specter-primary); outline-offset: 1px; }
+    .hw-btn.primary { background: var(--specter-primary); border-color: var(--specter-primary); }
+    .hw-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+
+    .sd-file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .sd-file-row {
+      display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.03);
+      border: 1px solid var(--specter-dark-accent); border-radius: 7px; padding: 6px 8px;
+    }
+    .sd-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--specter-light); }
+    .sd-file-size { font-size: 10.5px; color: var(--specter-light-secondary); flex-shrink: 0; }
+    .sd-file-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .sd-file-actions button, .sd-file-actions a {
+      font-size: 10px; background: none; border: 1px solid var(--specter-dark-secondary); color: var(--specter-light-secondary);
+      border-radius: 5px; padding: 3px 7px; cursor: pointer; text-decoration: none;
+    }
+    .sd-file-actions button:hover, .sd-file-actions a:hover { color: var(--specter-light); border-color: var(--specter-primary); }
+    .sd-empty-hint { font-size: 11.5px; color: var(--specter-light-secondary); opacity: .7; padding: 8px 0; }
+    .hw-upload-label {
+      display: inline-block; margin-top: 10px; font-size: 11.5px; color: var(--specter-primary);
+      cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+    }
+    .hw-note { font-size: 10.5px; color: var(--specter-light-secondary); opacity: .75; margin-top: 8px; line-height: 1.5; }
+    .hw-msg { font-size: 11.5px; margin-top: 8px; min-height: 1.3em; }
+    .hw-msg.error { color: var(--specter-coral); }
+    .hw-msg.ok { color: #6fd08c; }
+
+    /* QR panel */
+    .qr-mode-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .qr-preview { width: 100%; max-width: 220px; aspect-ratio: 1; background: #000; border-radius: 8px; overflow: hidden; display: none; margin: 4px 0 10px; }
+    .qr-preview.show { display: block; }
+    .qr-preview video { width: 100%; height: 100%; object-fit: cover; }
+    .qr-testpayloads { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .qr-testpayload-btn {
+      text-align: left; font-size: 11.5px; padding: 8px 10px; border-radius: 7px;
+      background: rgba(255,255,255,.03); border: 1px solid var(--specter-dark-accent); color: var(--specter-light-secondary);
+      cursor: pointer;
+    }
+    .qr-testpayload-btn:hover { border-color: var(--specter-primary); color: var(--specter-light); }
+    .qr-testpayload-btn strong { display: block; color: var(--specter-light); font-size: 11.5px; }
+    .qr-custom-row { display: flex; gap: 6px; margin-top: 10px; }
+    .qr-custom-row input {
+      flex: 1; min-width: 0; font: inherit; font-size: 11.5px; padding: 8px 9px; border-radius: 7px;
+      background: var(--specter-dark-accent); border: 1px solid var(--specter-dark-secondary); color: var(--specter-light);
+    }
+
+    /* Smartcard tray */
+    .unsupported-tag {
+      display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+      color: var(--specter-light-secondary); background: rgba(255,255,255,.06);
+      border: 1px solid var(--specter-dark-secondary); border-radius: 4px; padding: 1px 6px; margin-left: 6px;
+      vertical-align: middle; text-transform: uppercase;
+    }
+    .card-reader {
+      display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.03);
+      border: 1px solid var(--specter-dark-accent); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px;
+    }
+    .card-reader-lamp { width: 8px; height: 8px; border-radius: 50%; background: #3a3f47; flex-shrink: 0; }
+    .card-reader.live .card-reader-lamp { background: var(--specter-primary); box-shadow: 0 0 6px var(--specter-primary); }
+    .card-reader-label { flex: 1; font-size: 11.5px; color: var(--specter-light-secondary); }
+    .card-row { display: flex; gap: 10px; justify-content: center; }
+    .card-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
+    .smartcard-visual {
+      width: 84px; height: 54px; border-radius: 7px; cursor: pointer;
+      background: linear-gradient(160deg,#20242b,#15171b); border: 1px solid #2f343c;
+      display: flex; flex-direction: column; justify-content: space-between; padding: 7px 8px;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .smartcard-visual:hover { border-color: #4a515c; transform: translateY(-2px); }
+    .smartcard-visual:focus-visible { outline: 2px solid var(--specter-primary); outline-offset: 2px; }
+    .smartcard-visual.in-reader { border-color: var(--specter-primary); transform: translateY(-6px); box-shadow: 0 6px 14px rgba(0,0,0,.5); }
+    @media (prefers-reduced-motion: reduce) {
+      .smartcard-visual, .card-reader-lamp { transition: none; }
+    }
+    .smartcard-chip { width: 20px; height: 15px; border-radius: 2px; background: linear-gradient(160deg,#d9b45a,#a97e2c); }
+    .smartcard-label { font-size: 10.5px; font-weight: 700; color: var(--specter-light); }
+    .card-cell-caption { font-size: 10px; color: var(--specter-light-secondary); text-align: center; min-height: 2.4em; }
   </style>
 </head>
 <body>
@@ -253,6 +482,7 @@
   </div>
   <div class="header-right">
     <!-- <a href="/simulators/" class="nav-link">&#x1F3AE; All Simulators</a> <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3</a> -->
+    <span class="network-badge" id="network-badge" data-net=""><span class="dot-net"></span><span id="network-badge-label"></span></span>
     <div class="status">
       <div class="dot" id="dot"></div>
       <span id="st">Connecting&hellip;</span>
@@ -275,10 +505,118 @@
     <img src="/assets/phone-mockup.png" class="phone-mockup" alt="Specter DIY Device">
   </div>
 
+  <!-- Safety warning -->
+  <div class="safety-banner">
+    <span class="warn-icon">⚠️</span>
+    <span><strong>Never enter a seed phrase you rely on.</strong> Use a throwaway test seed only. This is a shared remote simulator, not a secure hardware wallet — anything typed into it should be treated as public.</span>
+  </div>
+
   <!-- Restart button -->
   <button class="restart-btn" id="restart-btn" onclick="restartSim()">
     &#x1F504; Restart Simulator
   </button>
+
+  <!-- About this simulator -->
+  <details class="info-panel" id="about-panel">
+    <summary>&#x2139;&#xfe0f; About this simulator <span class="chev">&#x25BE;</span></summary>
+    <div class="info-body">
+      <p>This is <strong>real Specter DIY firmware</strong> — the same MicroPython codebase that runs on physical Specter DIY hardware — built for its official Unix simulator target and run in an <strong>isolated, ephemeral server-side session</strong> allocated just for you.</p>
+      <h4>How it works</h4>
+      <ul>
+        <li>Your click/tap input is sent to a dedicated simulator process on our server.</li>
+        <li>Its screen is streamed to your browser over <a href="https://novnc.com" target="_blank" rel="noopener">noVNC</a> (VNC-over-WebSocket) — this is a remote desktop stream, not local/offline code.</li>
+        <li>Nobody else shares your simulator instance while your session is active.</li>
+      </ul>
+      <h4>What's simulated vs. real</h4>
+      <ul>
+        <li><strong>Real:</strong> wallet firmware logic, seed handling, PSBT parsing/signing, SD card code, QR scanner input path.</li>
+        <li><strong>Simulated hardware:</strong> the touchscreen (rendered via VNC), the microSD card (backed by a per-session server folder), the QR scanner (backed by a real TCP interface the firmware itself exposes for its Unix simulator).</li>
+        <li><strong>Not accurately simulated:</strong> secure element / hardware key isolation, physical tamper resistance, battery, exact touch latency — those only exist on real hardware.</li>
+      </ul>
+      <h4>Why never use a real seed</h4>
+      <p>This session runs on shared server infrastructure, is not tamper-resistant, and its state can be reset or reclaimed at any time. Treat everything you enter here as public. Use a throwaway BIP39 test phrase, never a wallet you actually hold funds in.</p>
+      <div class="info-meta" id="info-meta">
+        <dt>Upstream firmware</dt><dd><a href="https://github.com/cryptoadvance/specter-diy" target="_blank" rel="noopener">cryptoadvance/specter-diy</a></dd>
+        <dt>Simulator arch.</dt><dd>MicroPython Unix port + noVNC over WebSocket</dd>
+        <dt>Session isolation</dt><dd>One dedicated backend instance per browser session</dd>
+        <dt>try-clavastack source</dt><dd><a href="https://github.com/schnuartz-ai/try-clavastack" target="_blank" rel="noopener">GitHub repo</a></dd>
+      </div>
+    </div>
+  </details>
+
+  <!-- Virtual microSD card -->
+  <details class="hw-panel" id="sd-panel">
+    <summary>&#x1F4BE; Virtual microSD card <span class="hw-sub" id="sd-summary-sub">ejected</span><span class="chev">&#x25BE;</span></summary>
+    <div class="hw-body">
+      <div class="sd-slot-row">
+        <div class="sd-card-visual ejected" id="sd-card-visual"></div>
+        <div class="sd-slot-info">
+          <div class="sd-slot-status" id="sd-status-text">Card ejected</div>
+          <div class="sd-slot-hint">Backed by this session's real <code>fs/sd</code> — the firmware reads it through its own SD-card code.</div>
+        </div>
+      </div>
+      <div class="hw-btn-row">
+        <button class="hw-btn primary" id="sd-insert-btn" onclick="sdInsert()">Insert card</button>
+        <button class="hw-btn" id="sd-eject-btn" onclick="sdEject()" disabled>Eject card</button>
+      </div>
+
+      <div id="sd-files-wrap" style="display:none">
+        <div class="sd-file-list" id="sd-file-list"></div>
+        <label class="hw-upload-label">
+          &#x2B06;&#xfe0f; Upload a .psbt / .txt / .json file
+          <input type="file" id="sd-upload-input" accept=".psbt,.txt,.json" style="display:none" onchange="sdUpload(event)">
+        </label>
+      </div>
+      <div class="hw-msg" id="sd-msg"></div>
+      <p class="hw-note">Eject only hides these controls on this page — the simulator's SD driver always reports a card present (it has no real removal signal), so open the device's own SD menu to browse what's here.</p>
+    </div>
+  </details>
+
+  <!-- QR scanner bridge -->
+  <details class="hw-panel" id="qr-panel">
+    <summary>&#x1F4F7; QR scanner <span class="hw-sub">camera or test payload</span><span class="chev">&#x25BE;</span></summary>
+    <div class="hw-body">
+      <p style="margin-bottom:8px">On the Specter screen, tap <strong>Scan QR code</strong> first — then send a payload below. It's decoded in your browser and delivered to the firmware's own QR input, exactly like a real scanner module would.</p>
+
+      <div class="qr-mode-row">
+        <button class="hw-btn" id="qr-camera-btn" onclick="qrStartCamera()">&#x1F4F9; Use camera</button>
+        <button class="hw-btn" id="qr-camera-stop-btn" onclick="qrStopCamera()" style="display:none">Stop camera</button>
+      </div>
+      <div class="qr-preview" id="qr-preview"><video id="qr-video" playsinline muted></video></div>
+
+      <div class="qr-testpayloads">
+        <button class="qr-testpayload-btn" onclick="qrSendTest('addwallet')">
+          <strong>Test: import a public testnet wallet</strong>
+          Sends a safe <code>addwallet</code> descriptor command
+        </button>
+        <button class="qr-testpayload-btn" onclick="qrSendTest('address')">
+          <strong>Test: verify a receive address</strong>
+          Sends a public testnet <code>bitcoin:</code> address-check payload
+        </button>
+      </div>
+
+      <div class="qr-custom-row">
+        <input type="text" id="qr-custom-input" placeholder="Custom payload (advanced)" maxlength="4000">
+        <button class="hw-btn" onclick="qrSendCustom()">Send</button>
+      </div>
+      <div class="hw-msg" id="qr-msg"></div>
+      <p class="hw-note" id="qr-camera-note"></p>
+    </div>
+  </details>
+
+  <!-- Smartcard tray -->
+  <details class="hw-panel" id="card-panel">
+    <summary>&#x1F4B3; Smartcards <span class="hw-sub">tray only<span class="unsupported-tag">not wired to firmware</span></span><span class="chev">&#x25BE;</span></summary>
+    <div class="hw-body">
+      <p style="margin-bottom:10px">Specter DIY's smartcard support (Shield / Shield Lite) talks to a separate JavaCard simulator process that this deployment doesn't run yet. Rather than fake a "seeded" or "PIN set" state we can't actually verify, this tray only shows physical insert/eject position — nothing here affects the real device.</p>
+      <div class="card-reader" id="card-reader">
+        <span class="card-reader-lamp" id="card-reader-lamp"></span>
+        <span class="card-reader-label" id="card-reader-label">Reader empty</span>
+        <button class="hw-btn" id="card-eject-btn" onclick="cardEject()" disabled>Eject</button>
+      </div>
+      <div class="card-row" id="card-row"></div>
+    </div>
+  </details>
 
   <!-- CTA Section -->
   <div class="cta-section">
@@ -395,7 +733,7 @@ async function init() {
       }
       if (hb.status === "ok") {
         sessionId = saved.sessionId; restartUrl = saved.restartPath; wsPath = saved.wsPath;
-        connectVNC(wsPath); startHeartbeat(); return;
+        connectVNC(wsPath); startHeartbeat(); startSdPolling(); return;
       }
       localStorage.removeItem(SK);
     }
@@ -407,11 +745,292 @@ async function init() {
     }
     sessionId = data.sessionId; restartUrl = data.restartPath; wsPath = data.wsPath;
     saveSession(sessionId, wsPath, restartUrl, data.expiresIn);
-    connectVNC(wsPath); startHeartbeat();
+    connectVNC(wsPath); startHeartbeat(); startSdPolling();
   } catch(e) {
     document.getElementById("loading").innerHTML = '<p style="color:#FF7A7A">Error: ' + e.message + '</p>';
   }
 }
+
+let sdPollTimer = null;
+function startSdPolling() {
+  sdRefresh();
+  if (sdPollTimer) clearInterval(sdPollTimer);
+  sdPollTimer = setInterval(sdRefresh, 5000);
+}
+
+// ---------------------------------------------------------------------
+// Virtual microSD card + QR scanner bridge.
+// Both talk to the SAME backend allocator (/api/session/<id>/...), bound
+// strictly to this browser's own allocated sessionId. All file/QR
+// processing happens on the REAL Specter firmware - nothing here fakes an
+// import/export in JavaScript.
+// ---------------------------------------------------------------------
+const SD_MAX_BYTES = 512 * 1024;
+let sdInsertedState = false;
+
+function fmtBytes(n) {
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1024 / 1024).toFixed(1) + " MB";
+}
+function hwMsg(elId, text, kind) {
+  const el = document.getElementById(elId);
+  el.textContent = text || "";
+  el.className = "hw-msg" + (kind ? " " + kind : "");
+}
+
+async function sdRefresh() {
+  if (!sessionId) return;
+  try {
+    const r = await fetch(`/api/session/${sessionId}/sd`);
+    const data = await r.json();
+    if (data.status !== "ok") return;
+    sdInsertedState = data.inserted;
+    renderSdState(data.inserted, data.files || []);
+  } catch (e) { /* transient network hiccup, next poll will catch up */ }
+}
+
+function renderSdState(inserted, files) {
+  const visual = document.getElementById("sd-card-visual");
+  const statusText = document.getElementById("sd-status-text");
+  const summarySub = document.getElementById("sd-summary-sub");
+  const insertBtn = document.getElementById("sd-insert-btn");
+  const ejectBtn = document.getElementById("sd-eject-btn");
+  const filesWrap = document.getElementById("sd-files-wrap");
+
+  visual.classList.toggle("inserted", inserted);
+  visual.classList.toggle("ejected", !inserted);
+  insertBtn.disabled = inserted;
+  ejectBtn.disabled = !inserted;
+  filesWrap.style.display = inserted ? "block" : "none";
+  summarySub.textContent = inserted ? (files.length ? files.length + " file(s)" : "inserted, empty") : "ejected";
+  statusText.textContent = inserted ? "Card inserted" : "Card ejected";
+
+  const list = document.getElementById("sd-file-list");
+  list.innerHTML = "";
+  if (inserted && files.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "sd-empty-hint";
+    empty.textContent = "No files yet. Upload a .psbt, .txt or .json file below.";
+    list.appendChild(empty);
+  }
+  for (const f of files) {
+    const row = document.createElement("div");
+    row.className = "sd-file-row";
+    row.innerHTML = `<span class="sd-file-name" title="${f.name}">${f.name}</span>` +
+      `<span class="sd-file-size">${fmtBytes(f.size)}</span>` +
+      `<span class="sd-file-actions">` +
+      `<a href="/api/session/${sessionId}/sd/download?filename=${encodeURIComponent(f.name)}" download>Download</a>` +
+      `<button type="button">Delete</button>` +
+      `</span>`;
+    row.querySelector("button").addEventListener("click", () => sdDelete(f.name));
+    list.appendChild(row);
+  }
+}
+
+async function sdInsert() {
+  if (!sessionId) return;
+  const r = await fetch(`/api/session/${sessionId}/sd/insert`, { method: "POST" });
+  if (r.ok) { hwMsg("sd-msg", "", ""); await sdRefresh(); }
+}
+async function sdEject() {
+  if (!sessionId) return;
+  const r = await fetch(`/api/session/${sessionId}/sd/eject`, { method: "POST" });
+  if (r.ok) { hwMsg("sd-msg", "", ""); await sdRefresh(); }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1] || "");
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function sdUpload(event) {
+  const input = event.target;
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file || !sessionId) return;
+  if (!/\.(psbt|txt|json)$/i.test(file.name)) {
+    hwMsg("sd-msg", "Only .psbt, .txt or .json files are accepted.", "error");
+    return;
+  }
+  if (file.size > SD_MAX_BYTES) {
+    hwMsg("sd-msg", `File too large (max ${fmtBytes(SD_MAX_BYTES)}).`, "error");
+    return;
+  }
+  hwMsg("sd-msg", "Uploading…", "");
+  try {
+    const b64 = await fileToBase64(file);
+    const r = await fetch(`/api/session/${sessionId}/sd/upload`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, data: b64 }),
+    });
+    const data = await r.json();
+    if (data.status === "ok") {
+      hwMsg("sd-msg", "Uploaded. Open the SD menu on the device to use it.", "ok");
+      renderSdState(true, data.files || []);
+    } else {
+      hwMsg("sd-msg", data.message || "Upload failed.", "error");
+    }
+  } catch (e) {
+    hwMsg("sd-msg", "Upload failed: " + e.message, "error");
+  }
+}
+
+async function sdDelete(filename) {
+  if (!sessionId) return;
+  const r = await fetch(`/api/session/${sessionId}/sd/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename }),
+  });
+  const data = await r.json();
+  if (data.status === "ok") {
+    hwMsg("sd-msg", "Deleted.", "ok");
+    renderSdState(true, data.files || []);
+  } else {
+    hwMsg("sd-msg", data.message || "Delete failed.", "error");
+  }
+}
+window.sdInsert = sdInsert; window.sdEject = sdEject; window.sdUpload = sdUpload;
+
+// --- QR bridge ---
+// Two public, regtest-only descriptor/address strings taken verbatim from
+// the upstream Specter DIY documentation (docs/communication.md) - safe,
+// well-formed test data that can never touch real funds.
+const QR_TEST_PAYLOADS = {
+  addwallet: "addwallet Test Wallet&wpkh([b317ec86/84h/1h/0h]vpub5YHLPnkkpPW1ecL7Di7Gv2wDHDtBNqRdt17gMULpxJ27ZA1MmW7xbZjdg1S7d5JKaJ8CiZEmRUHrEB6CGuLomA6ioVa1Pcke6fEb5CzDBU1)",
+  address: "bitcoin:bcrt1qd3mtrhysk3k4w6fmu7ayjvwk6q98c2dpf0p4x87zauu8rcgq5dzq73tyrx?index=2",
+};
+
+let qrStream = null, qrDetector = null, qrRAF = null, qrSending = false;
+
+async function qrSendPayload(payload) {
+  if (!sessionId) return;
+  if (qrSending) return;
+  qrSending = true;
+  hwMsg("qr-msg", "Sending to simulator…", "");
+  try {
+    const r = await fetch(`/api/session/${sessionId}/qr`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload }),
+    });
+    const data = await r.json();
+    if (data.status === "ok") {
+      hwMsg("qr-msg", "Sent. Check the Specter screen.", "ok");
+    } else {
+      hwMsg("qr-msg", data.message || "Failed to deliver QR payload.", "error");
+    }
+  } catch (e) {
+    hwMsg("qr-msg", "Failed to deliver QR payload: " + e.message, "error");
+  } finally {
+    qrSending = false;
+  }
+}
+function qrSendTest(kind) { qrSendPayload(QR_TEST_PAYLOADS[kind]); }
+function qrSendCustom() {
+  const input = document.getElementById("qr-custom-input");
+  const val = input.value.trim();
+  if (!val) return;
+  qrSendPayload(val);
+}
+window.qrSendTest = qrSendTest; window.qrSendCustom = qrSendCustom;
+
+async function qrStartCamera() {
+  const note = document.getElementById("qr-camera-note");
+  if (!("BarcodeDetector" in window)) {
+    note.textContent = "This browser doesn't support native QR detection yet. Use a test payload below instead.";
+    return;
+  }
+  try {
+    qrDetector = new BarcodeDetector({ formats: ["qr_code"] });
+  } catch (e) {
+    note.textContent = "QR detection isn't available in this browser. Use a test payload below instead.";
+    return;
+  }
+  try {
+    note.textContent = "";
+    qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+  } catch (e) {
+    note.textContent = e.name === "NotAllowedError"
+      ? "Camera permission was denied. Use a test payload below instead."
+      : "Could not start the camera (" + e.message + "). Use a test payload below instead.";
+    return;
+  }
+  const video = document.getElementById("qr-video");
+  video.srcObject = qrStream;
+  await video.play();
+  document.getElementById("qr-preview").classList.add("show");
+  document.getElementById("qr-camera-btn").style.display = "none";
+  document.getElementById("qr-camera-stop-btn").style.display = "";
+
+  const scanLoop = async () => {
+    if (!qrStream) return;
+    try {
+      const codes = await qrDetector.detect(video);
+      if (codes.length && codes[0].rawValue) {
+        await qrSendPayload(codes[0].rawValue);
+        qrStopCamera();
+        return;
+      }
+    } catch (e) { /* transient decode error, keep trying */ }
+    qrRAF = requestAnimationFrame(scanLoop);
+  };
+  qrRAF = requestAnimationFrame(scanLoop);
+}
+function qrStopCamera() {
+  if (qrRAF) { cancelAnimationFrame(qrRAF); qrRAF = null; }
+  if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+  document.getElementById("qr-preview").classList.remove("show");
+  document.getElementById("qr-camera-btn").style.display = "";
+  document.getElementById("qr-camera-stop-btn").style.display = "none";
+}
+window.qrStartCamera = qrStartCamera; window.qrStopCamera = qrStopCamera;
+
+// --- Smartcard tray ---
+// Upstream Specter DIY's smartcard stack (Shield / Shield Lite) talks to a
+// separate JavaCard simulator (see uscard.py, port 21111) that this
+// deployment does not run. There is nothing truthful we can bridge yet, so
+// this is deliberately UI-only: it tracks which card is physically "in the
+// reader" for this browser tab and nothing else. It never claims a card is
+// seeded, PIN-protected, or otherwise touches wallet state.
+const CARD_LABELS = ["Card A", "Card B", "Card C"];
+let cardInReader = null; // index or null
+
+function renderCards() {
+  const row = document.getElementById("card-row");
+  row.innerHTML = "";
+  CARD_LABELS.forEach((label, i) => {
+    const cell = document.createElement("div");
+    cell.className = "card-cell";
+    const visual = document.createElement("button");
+    visual.type = "button";
+    visual.className = "smartcard-visual" + (cardInReader === i ? " in-reader" : "");
+    visual.setAttribute("aria-pressed", String(cardInReader === i));
+    visual.innerHTML = '<span class="smartcard-chip"></span><span class="smartcard-label">' + label + "</span>";
+    visual.addEventListener("click", () => cardToggle(i));
+    const caption = document.createElement("div");
+    caption.className = "card-cell-caption";
+    caption.textContent = cardInReader === i ? "In reader" : "In tray";
+    cell.appendChild(visual);
+    cell.appendChild(caption);
+    row.appendChild(cell);
+  });
+  const reader = document.getElementById("card-reader");
+  reader.classList.toggle("live", cardInReader !== null);
+  document.getElementById("card-reader-label").textContent =
+    cardInReader === null ? "Reader empty" : CARD_LABELS[cardInReader] + " inserted (position only, not read by firmware here)";
+  document.getElementById("card-eject-btn").disabled = cardInReader === null;
+}
+function cardToggle(i) { cardInReader = (cardInReader === i) ? null : i; renderCards(); }
+function cardEject() { cardInReader = null; renderCards(); }
+window.cardEject = cardEject;
+renderCards();
 
 function restartSim() {
   if (!restartUrl) return;

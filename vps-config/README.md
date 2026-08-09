@@ -27,6 +27,24 @@ Multi-user simulator pool with 3 simulator types, auto-scaling (min 2, max 5 per
 - `POST /{pool}/sim/{1-5}/restart` — Instanz neustarten
 - `GET /api/status` — Pool-Übersicht
 
+### Hardware bridge (per session, real Specter simulator I/O)
+
+These are all narrowly scoped to the caller's *own* allocated `sessionId` —
+resolved server-side to exactly one instance, never an arbitrary path/host.
+
+- `GET  /api/session/{sessionId}/sd` — list files + insert state of the real `fs/sd`
+- `POST /api/session/{sessionId}/sd/insert` / `.../sd/eject` — client-facing card state (the Unix simulator's SD driver always reports "present", so this only gates our own upload/delete UI, not the firmware)
+- `POST /api/session/{sessionId}/sd/upload` — Body: `{"filename": "wallet.psbt", "data": "<base64>"}` (`.psbt`/`.txt`/`.json` only, 512KB cap, 25 files/session)
+- `POST /api/session/{sessionId}/sd/delete` — Body: `{"filename": "..."}`
+- `GET  /api/session/{sessionId}/sd/download?filename=...`
+- `POST /api/session/{sessionId}/qr` — Body: `{"payload": "..."}` (≤32KB) — opens a fresh TCP connection to the firmware's own QR "UART" socket (see `restart-simulator.sh`) and writes the payload, exactly like a physical QR scanner module would. The firmware parses it through its normal QR code path.
+
+`restart-simulator.sh` now also writes, per instance, under `/run/try-clavastack/<inst>/`:
+- `sd_dir` — absolute path to that instance's real `fs/sd` directory
+- `qr_port` — the TCP port the firmware's QR UART actually bound (scraped from its own boot log, since it auto-increments on a bind conflict rather than being fixed)
+
+Tests: `pool/tests/test_hwbridge.py` (`python3 -m unittest pool.tests.test_hwbridge -v`). Set `SPECTER_SIM_QR_PORT=<port>` to also run a true end-to-end test against a locally built specter-diy Unix simulator.
+
 ## systemd Services
 
 - `try-diy{1-5}.service` — Specter DIY Instanzen

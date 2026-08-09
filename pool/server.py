@@ -3,14 +3,17 @@
 Multi-Pool Allocator API for 3 simulator types, each with auto-scaling (min 2, max 5).
 """
 
+import base64
 import json
 import logging
 import os
 import re
+import socket
 import subprocess
 import random
 import threading
 import time
+import urllib.parse
 from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -57,6 +60,29 @@ MAX_INSTANCES = 5
 
 STATE_FILE = "/opt/try-clavastack/pool/state.json"
 RESTART_SCRIPT = "/opt/try-clavastack/pool/restart-simulator.sh"
+
+# --- Hardware bridge: virtual microSD card + QR scanner TCP bridge ---
+# These give the browser narrow, session-scoped access to the REAL Specter
+# Unix simulator's own hardware interfaces (fs/sd directory, QR "UART" TCP
+# socket) instead of faking hardware behaviour in JavaScript. Every request
+# is bound to an allocated session -> instance mapping; nothing here accepts
+# an arbitrary filesystem path, host, or port from the browser.
+POOL_BASE_DIR = "/opt/try-clavastack/pool"
+RUN_BASE_DIR = "/run/try-clavastack"
+
+SD_FILENAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$')
+SD_ALLOWED_UPLOAD_EXT = (".psbt", ".txt", ".json")
+SD_MAX_FILE_BYTES = 512 * 1024          # generous for PSBTs/descriptors, still bounded
+SD_MAX_FILES = 25                       # matches the real SD card being a small, not infinite, disk
+QR_MAX_PAYLOAD_BYTES = 32 * 1024        # single (non-animated) QR frame payload
+
+# Per-session "is the virtual card physically inserted" state. This is a
+# *client-facing* affordance only: the Unix simulator's SDCard.is_present
+# always returns True (there's no real insert/eject signal in the unix
+# platform code), so we gate OUR OWN upload/delete endpoints on it, and are
+# explicit in the UI that the real firmware cannot itself observe "ejected".
+sd_inserted = {}   # sessionId -> bool
+sd_lock = threading.Lock()
 SESSION_TIMEOUT = 600          # 10 min inactivity timeout (no heartbeat = session dies)
 CLEANUP_INTERVAL = 30
 SCALE_DOWN_IDLE = 300
@@ -206,6 +232,8 @@ def cleanup_and_scale():
         for sid, inst_id in expired:
             log_event("expired", instance=inst_id, session=sid[:16], reason="no_heartbeat")
             _heartbeat_counts.pop(sid, None)
+            with sd_lock:
+                sd_inserted.pop(sid, None)
             threading.Thread(target=restart_instance_proc, args=(inst_id,), daemon=True).start()
 
         # --- 2. Health check: verify running instances actually have live processes ---
@@ -375,6 +403,8 @@ def release_session(session_id):
         save_state()
     log_event("released", pool=pool, instance=inst_id, session=session_id[:16])
     _heartbeat_counts.pop(session_id, None)
+    with sd_lock:
+        sd_inserted.pop(session_id, None)
     threading.Thread(target=restart_instance_proc, args=(inst_id,), daemon=True).start()
     return {"status": "ok"}
 
@@ -388,6 +418,9 @@ def restart_by_pool_num(pool_name, num):
             del sessions[sid]
         if to_remove:
             save_state()
+    with sd_lock:
+        for sid in to_remove:
+            sd_inserted.pop(sid, None)
     log_event("restarted", pool=pool_name, instance=inst_id)
     try:
         subprocess.run(["systemctl", "restart", f"try-{inst_id}"], timeout=60, capture_output=True)
@@ -397,6 +430,85 @@ def restart_by_pool_num(pool_name, num):
         return {"status": "ok", "instanceId": inst_id}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def session_instance(session_id):
+    """Resolve a browser-supplied sessionId to the (only) instance it may touch."""
+    with lock:
+        info = sessions.get(session_id)
+        return info["instance_id"] if info else None
+
+
+def instance_sd_dir(inst_id):
+    """The real fs/sd directory for this instance, as reported by
+    restart-simulator.sh (falls back to the conventional path if the state
+    file is missing, e.g. right after a fresh deploy before first restart)."""
+    try:
+        with open(f"{RUN_BASE_DIR}/{inst_id}/sd_dir") as f:
+            path = f.read().strip()
+            if path:
+                return path
+    except Exception:
+        pass
+    return f"{POOL_BASE_DIR}/{inst_id}/fs/sd"
+
+
+def instance_qr_port(inst_id):
+    """The real TCP port the firmware's QR 'UART' is currently listening on
+    (scraped from its own boot log by restart-simulator.sh, since it can
+    auto-increment on a bind conflict)."""
+    try:
+        with open(f"{RUN_BASE_DIR}/{inst_id}/qr_port") as f:
+            return int(f.read().strip())
+    except Exception:
+        return None
+
+
+def sd_safe_path(inst_id, filename):
+    """Resolve `filename` to a path strictly inside this instance's fs/sd
+    directory, or None if it's missing/invalid/escapes the directory."""
+    if not filename or not SD_FILENAME_RE.match(filename):
+        return None
+    base_dir = instance_sd_dir(inst_id)
+    base_real = os.path.realpath(base_dir)
+    candidate = os.path.realpath(os.path.join(base_dir, filename))
+    if candidate != base_real and not candidate.startswith(base_real + os.sep):
+        return None
+    return candidate
+
+
+def sd_list_files(inst_id):
+    base_dir = instance_sd_dir(inst_id)
+    out = []
+    try:
+        for name in sorted(os.listdir(base_dir)):
+            full = os.path.join(base_dir, name)
+            if not os.path.isfile(full):
+                continue
+            try:
+                st = os.stat(full)
+            except OSError:
+                continue
+            out.append({"name": name, "size": st.st_size, "mtime": int(st.st_mtime)})
+    except OSError:
+        pass
+    return out
+
+
+def qr_send_payload(inst_id, payload_bytes):
+    """Deliver a QR payload to the REAL Specter simulator's QR scanner input
+    by connecting to the same TCP socket a physical QR module would drive
+    (see f469-disco/libs/unix/pyb.py / tcphost.py). The firmware parses it
+    through its own normal QR code path - we never touch wallet state."""
+    port = instance_qr_port(inst_id)
+    if port is None:
+        return False, "QR bridge is not available for this session yet (simulator still starting?)"
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+            s.sendall(payload_bytes + b"\r\n")
+        return True, None
+    except OSError as e:
+        return False, f"Could not reach simulator QR input: {e}"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -415,13 +527,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_json({})
 
+    MAX_BODY_BYTES = 2 * 1024 * 1024  # generous headroom over SD_MAX_FILE_BYTES base64'd
+
     def do_POST(self):
         cl = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(cl).decode() if cl > 0 else '{}'
+        if cl > self.MAX_BODY_BYTES:
+            self.send_json({"error": "Request too large"}, 413)
+            return
+        body = self.rfile.read(cl).decode('utf-8', 'replace') if cl > 0 else '{}'
         try:
             data = json.loads(body) if body.strip() else {}
         except json.JSONDecodeError:
             data = {}
+
+        hw = re.match(r'^/api/session/([^/]+)/(sd/insert|sd/eject|sd/upload|sd/delete|qr)$', self.path)
 
         if self.path == '/api/allocate':
             pool = data.get('pool', 'diy')
@@ -441,6 +560,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send_json(release_session(sid))
 
+        elif hw:
+            self.handle_hw_action(hw.group(1), hw.group(2), data)
+
         else:
             m = re.match(r'^/(diy|play|schnuartz)/sim/([1-5])/restart$', self.path)
             if m:
@@ -448,8 +570,139 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send_json({"error": "Not found"}, 404)
 
+    def handle_hw_action(self, session_id, action, data):
+        """All /api/session/<id>/... hardware-bridge actions. Every one of
+        these is strictly bound to the caller's OWN allocated session -
+        there is no way to reach another visitor's instance from here."""
+        inst_id = session_instance(session_id)
+        if inst_id is None:
+            self.send_json({"status": "not_found", "error": "Unknown or expired session"}, 404)
+            return
+
+        if action == 'sd/insert':
+            with sd_lock:
+                sd_inserted[session_id] = True
+            self.send_json({"status": "ok", "inserted": True})
+
+        elif action == 'sd/eject':
+            with sd_lock:
+                sd_inserted[session_id] = False
+            self.send_json({"status": "ok", "inserted": False})
+
+        elif action == 'sd/upload':
+            with sd_lock:
+                if not sd_inserted.get(session_id):
+                    self.send_json({"status": "error", "message": "Card is ejected - insert it first"}, 409)
+                    return
+            filename = data.get('filename', '')
+            b64 = data.get('data', '')
+            if not filename or not any(filename.lower().endswith(ext) for ext in SD_ALLOWED_UPLOAD_EXT):
+                self.send_json({"status": "error", "message": "Filename must end in .psbt, .txt or .json"}, 400)
+                return
+            path = sd_safe_path(inst_id, filename)
+            if path is None:
+                self.send_json({"status": "error", "message": "Invalid filename"}, 400)
+                return
+            try:
+                raw = base64.b64decode(b64, validate=True)
+            except Exception:
+                self.send_json({"status": "error", "message": "data must be valid base64"}, 400)
+                return
+            if len(raw) > SD_MAX_FILE_BYTES:
+                self.send_json({"status": "error", "message": "File too large"}, 413)
+                return
+            existing = sd_list_files(inst_id)
+            if not os.path.exists(path) and len(existing) >= SD_MAX_FILES:
+                self.send_json({"status": "error", "message": "SD card is full (test-session limit reached)"}, 400)
+                return
+            try:
+                os.makedirs(instance_sd_dir(inst_id), exist_ok=True)
+                with open(path, 'wb') as f:
+                    f.write(raw)
+            except OSError as e:
+                self.send_json({"status": "error", "message": f"Write failed: {e}"}, 500)
+                return
+            log_event("sd_upload", instance=inst_id, session=session_id[:16], file=filename, bytes=str(len(raw)))
+            self.send_json({"status": "ok", "files": sd_list_files(inst_id)})
+
+        elif action == 'sd/delete':
+            filename = data.get('filename', '')
+            path = sd_safe_path(inst_id, filename)
+            if path is None or not os.path.isfile(path):
+                self.send_json({"status": "error", "message": "File not found"}, 404)
+                return
+            try:
+                os.remove(path)
+            except OSError as e:
+                self.send_json({"status": "error", "message": f"Delete failed: {e}"}, 500)
+                return
+            log_event("sd_delete", instance=inst_id, session=session_id[:16], file=filename)
+            self.send_json({"status": "ok", "files": sd_list_files(inst_id)})
+
+        elif action == 'qr':
+            payload = data.get('payload', '')
+            if not isinstance(payload, str) or not payload:
+                self.send_json({"status": "error", "message": "Missing payload"}, 400)
+                return
+            payload_bytes = payload.encode('utf-8')
+            if len(payload_bytes) > QR_MAX_PAYLOAD_BYTES:
+                self.send_json({"status": "error", "message": "QR payload too large"}, 413)
+                return
+            ok, err = qr_send_payload(inst_id, payload_bytes)
+            # Never log QR payload contents - they may contain PSBTs, wallet
+            # descriptors, or (accidentally) other sensitive data.
+            log_event("qr_send", instance=inst_id, session=session_id[:16], ok=str(ok), bytes=str(len(payload_bytes)))
+            if ok:
+                self.send_json({"status": "ok"})
+            else:
+                self.send_json({"status": "error", "message": err}, 502)
+
     def do_GET(self):
-        if self.path == '/api/status':
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        query = urllib.parse.parse_qs(parsed.query)
+
+        sd_get = re.match(r'^/api/session/([^/]+)/sd$', path)
+        sd_dl = re.match(r'^/api/session/([^/]+)/sd/download$', path)
+
+        if sd_get:
+            session_id = sd_get.group(1)
+            inst_id = session_instance(session_id)
+            if inst_id is None:
+                self.send_json({"status": "not_found", "error": "Unknown or expired session"}, 404)
+                return
+            with sd_lock:
+                inserted = sd_inserted.get(session_id, False)
+            self.send_json({"status": "ok", "inserted": inserted, "files": sd_list_files(inst_id)})
+            return
+
+        if sd_dl:
+            session_id = sd_dl.group(1)
+            inst_id = session_instance(session_id)
+            if inst_id is None:
+                self.send_json({"status": "not_found", "error": "Unknown or expired session"}, 404)
+                return
+            filename = (query.get('filename') or [''])[0]
+            path = sd_safe_path(inst_id, filename)
+            if path is None or not os.path.isfile(path):
+                self.send_json({"status": "error", "message": "File not found"}, 404)
+                return
+            try:
+                with open(path, 'rb') as f:
+                    content = f.read()
+            except OSError:
+                self.send_json({"status": "error", "message": "Read failed"}, 500)
+                return
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(filename)}"')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+            return
+
+        if path == '/api/status':
             with lock:
                 result = {}
                 for pname, pinfo in POOLS.items():

@@ -116,7 +116,8 @@ start_inst() {
     echo "Starting $INST_ID (type=$TYPE, display=$XDISPLAY, vnc=$VNC_PORT, ws=$WS_PORT)..."
 
     rm -rf "$FS_DIR"
-    mkdir -p "$FS_DIR"
+    mkdir -p "$FS_DIR" "$FS_DIR/sd"
+    rm -f "$PID_DIR/qr_port" "$PID_DIR/sd_dir"
 
     Xvfb "$XDISPLAY" -screen 0 480x800x24 -ac &
     echo $! > "$PID_DIR/xvfb.pid"
@@ -131,8 +132,30 @@ start_inst() {
     sleep 1
 
     cd "$BASE_DIR"
+    : > "$LOG_DIR/$INST_ID.log"
     DISPLAY="$XDISPLAY" $RUN_CMD > "$LOG_DIR/$INST_ID.log" 2>&1 &
     echo $! > "$PID_DIR/micropython.pid"
+
+    # The firmware's QR "scanner" is a real TCP-UART socket it opens itself
+    # (see f469-disco/libs/unix/pyb.py). It normally binds a fixed port
+    # derived from the UART name ("YA" -> 22849), but auto-increments on a
+    # bind conflict, so the actual port is not guaranteed across instances.
+    # The firmware logs the real bound port on the very first
+    # "Running TCP-UART" line (the QR host is constructed before any other
+    # simulated UART) - scrape that instead of assuming a fixed port.
+    QR_PORT=""
+    for i in $(seq 1 50); do
+        QR_PORT=$(grep -m1 "Running TCP-UART on 127.0.0.1 port" "$LOG_DIR/$INST_ID.log" 2>/dev/null | grep -oP 'port \K[0-9]+')
+        [[ -n "$QR_PORT" ]] && break
+        sleep 0.2
+    done
+    if [[ -n "$QR_PORT" ]]; then
+        echo "$QR_PORT" > "$PID_DIR/qr_port"
+        echo "$INST_ID QR TCP bridge on port $QR_PORT"
+    else
+        echo "WARNING: $INST_ID did not report a QR TCP port in time"
+    fi
+    echo "$FS_DIR/sd" > "$PID_DIR/sd_dir"
 
     echo "$INST_ID started (pids: xvfb=$(cat $PID_DIR/xvfb.pid), vnc=$(cat $PID_DIR/x11vnc.pid), ws=$(cat $PID_DIR/websockify.pid), mp=$(cat $PID_DIR/micropython.pid))"
 }
