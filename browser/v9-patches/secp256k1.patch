@@ -1,0 +1,159 @@
+diff --git a/mpy/config/rangeproof_preallocated/rangeproof_preallocated.h b/mpy/config/rangeproof_preallocated/rangeproof_preallocated.h
+index 4cef4b0..f11bd10 100644
+--- a/mpy/config/rangeproof_preallocated/rangeproof_preallocated.h
++++ b/mpy/config/rangeproof_preallocated/rangeproof_preallocated.h
+@@ -4,12 +4,12 @@
+ int secp256k1_rangeproof_sign_preallocated(const secp256k1_context* ctx, unsigned char *proof, size_t *plen, uint64_t min_value,
+  const secp256k1_pedersen_commitment *commit, const unsigned char *blind, const unsigned char *nonce, int exp, int min_bits, uint64_t value,
+  const unsigned char *message, size_t msg_len, const unsigned char *extra_commit, size_t extra_commit_len, const secp256k1_generator* gen,
+- void * preallocated_ptr, uint64_t allocated_len);
++ void * preallocated_ptr, intptr_t allocated_len);
+ 
+ int secp256k1_rangeproof_rewind_preallocated(const secp256k1_context* ctx,
+  unsigned char *blind_out, uint64_t *value_out, unsigned char *message_out, size_t *outlen, const unsigned char *nonce,
+  uint64_t *min_value, uint64_t *max_value,
+  const secp256k1_pedersen_commitment *commit, const unsigned char *proof, size_t plen, const unsigned char *extra_commit, size_t extra_commit_len, const secp256k1_generator* gen,
+- void * preallocated_ptr, uint64_t allocated_len);
++ void * preallocated_ptr, intptr_t allocated_len);
+ 
+ #endif
+\ No newline at end of file
+diff --git a/mpy/libsecp256k1.c b/mpy/libsecp256k1.c
+index 7df2891..431ebb2 100644
+--- a/mpy/libsecp256k1.c
++++ b/mpy/libsecp256k1.c
+@@ -128,7 +128,7 @@ static mp_obj_t usecp256k1_ec_pubkey_parse(const mp_obj_t arg){
+ static MP_DEFINE_CONST_FUN_OBJ_1(usecp256k1_ec_pubkey_parse_obj, usecp256k1_ec_pubkey_parse);
+ 
+ // serialize public key
+-static mp_obj_t usecp256k1_ec_pubkey_serialize(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_ec_pubkey_serialize(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     mp_buffer_info_t pubbuf;
+     mp_get_buffer_raise(args[0], &pubbuf, MP_BUFFER_READ);
+@@ -306,7 +306,7 @@ static mp_obj_t usecp256k1_ecdsa_signature_normalize(const mp_obj_t arg){
+ static MP_DEFINE_CONST_FUN_OBJ_1(usecp256k1_ecdsa_signature_normalize_obj, usecp256k1_ecdsa_signature_normalize);
+ 
+ // same as secp256k1_nonce_function_rfc6979
+-static mp_obj_t usecp256k1_nonce_function_default(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_nonce_function_default(size_t n_args, const mp_obj_t *args){
+     mp_buffer_info_t msgbuf;
+     mp_get_buffer_raise(args[0], &msgbuf, MP_BUFFER_READ);
+     if(msgbuf.len != 32){
+@@ -408,7 +408,7 @@ static int usecp256k1_nonce_function(
+ }
+ 
+ // msg, secret, [callback, data]
+-static mp_obj_t usecp256k1_ecdsa_sign(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_ecdsa_sign(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     mp_nonce_data = NULL;
+     if(n_args < 2){
+@@ -707,7 +707,7 @@ static mp_obj_t usecp256k1_ec_pubkey_tweak_mul(mp_obj_t pubarg, const mp_obj_t t
+ static MP_DEFINE_CONST_FUN_OBJ_2(usecp256k1_ec_pubkey_tweak_mul_obj, usecp256k1_ec_pubkey_tweak_mul);
+ 
+ // adds public keys
+-static mp_obj_t usecp256k1_ec_pubkey_combine(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_ec_pubkey_combine(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     secp256k1_pubkey pubkey;
+     secp256k1_pubkey ** pubkeys;
+@@ -834,7 +834,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(usecp256k1_keypair_create_obj, usecp256k1_keypa
+ 
+ 
+ // msg, secret, [callback, data]
+-static mp_obj_t usecp256k1_schnorrsig_sign(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_schnorrsig_sign(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     mp_nonce_data = NULL;
+     if(n_args < 2){
+@@ -901,7 +901,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_schnorrsig_sign_obj, 2, usecp256k1
+ /**************************** recoverable ***************************/
+ 
+ // msg, secret, [callback, data]
+-static mp_obj_t usecp256k1_ecdsa_sign_recoverable(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_ecdsa_sign_recoverable(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     mp_nonce_data = NULL;
+     if(n_args < 2){
+@@ -1175,7 +1175,7 @@ uint64_t get_uint64(mp_obj_t arg){
+ }
+ 
+ // vals, abfs, vbfs, psbtv.num_inputs
+-static mp_obj_t usecp256k1_pedersen_blind_generator_blind_sum(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_pedersen_blind_generator_blind_sum(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     mp_obj_list_t *vals = MP_OBJ_TO_PTR(args[0]);
+     mp_obj_list_t *abfs = MP_OBJ_TO_PTR(args[1]);
+@@ -1248,7 +1248,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_pedersen_blind_generator_blind_sum
+ // surjection proofs
+ 
+ // surjectionproof_initialize(in_assets, asset, seed, tags_to_use=None, iterations=100)
+-static mp_obj_t usecp256k1_surjectionproof_initialize(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_surjectionproof_initialize(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     secp256k1_fixed_asset_tag * in_assets_ptr = NULL;
+     mp_obj_list_t *in_assets = NULL;
+@@ -1321,7 +1321,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_surjectionproof_initialize_obj, 3,
+ // surjectionproof_initialize_preallocated(proofptr, prooflen, in_assets, asset, seed, tags_to_use=None, iterations=100)
+ // proofptr is a pointer to preallocated memory and prooflen is the length of availble memory
+ // returns a tuple: (used prooflen, in_index)
+-static mp_obj_t usecp256k1_surjectionproof_initialize_preallocated(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_surjectionproof_initialize_preallocated(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     intptr_t proofptr = get_uint64(args[0]);
+     size_t prooflen = get_uint64(args[1]);
+@@ -1395,7 +1395,7 @@ static mp_obj_t usecp256k1_surjectionproof_initialize_preallocated(mp_uint_t n_a
+ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_surjectionproof_initialize_preallocated_obj, 3, usecp256k1_surjectionproof_initialize_preallocated);
+ 
+ // surjectionproof_generate(proof, in_idx, in_tags, out_tag, in_abf, out_abf)
+-static mp_obj_t usecp256k1_surjectionproof_generate(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_surjectionproof_generate(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     mp_buffer_info_t proof;
+     secp256k1_surjectionproof * ptr = NULL;
+@@ -1482,7 +1482,7 @@ static mp_obj_t usecp256k1_surjectionproof_serialize(const mp_obj_t arg){
+ static MP_DEFINE_CONST_FUN_OBJ_1(usecp256k1_surjectionproof_serialize_obj, usecp256k1_surjectionproof_serialize);
+ 
+ // rangeproof_sign(nonce, value, value_commitment, vbf, message, extra, gen, min_value=1, exp=0, min_bits=52)
+-static mp_obj_t usecp256k1_rangeproof_sign(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_rangeproof_sign(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     if(n_args < 7){
+         mp_raise_ValueError(MP_ERROR_TEXT("Function requires at least 7 arguments"));
+@@ -1571,7 +1571,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_rangeproof_sign_obj, 7, usecp256k1
+ 
+ // rangeproof_sign_to(stream, mem_ptr, mem_len,
+ //                    nonce, value, value_commitment, vbf, message, extra, gen, min_value=1, exp=0, min_bits=52)
+-static mp_obj_t usecp256k1_rangeproof_sign_to(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_rangeproof_sign_to(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     if(n_args < 10){
+         mp_raise_ValueError(MP_ERROR_TEXT("Function requires at least 10 arguments"));
+@@ -1673,7 +1673,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_rangeproof_sign_to_obj, 10, usecp2
+ 
+ 
+ // rangeproof_rewind(proof, nonce, value_commitment, script_pubkey, generator)
+-static mp_obj_t usecp256k1_rangeproof_rewind(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_rangeproof_rewind(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     if(n_args < 5){
+         mp_raise_ValueError(MP_ERROR_TEXT("Function requires 5 arguments"));
+@@ -1753,7 +1753,7 @@ static mp_obj_t usecp256k1_rangeproof_rewind(mp_uint_t n_args, const mp_obj_t *a
+ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_rangeproof_rewind_obj, 5, usecp256k1_rangeproof_rewind);
+ 
+ // rangeproof_verify(proof, value_commitment, script_pubkey, generator)
+-static mp_obj_t usecp256k1_rangeproof_verify(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_rangeproof_verify(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     if(n_args < 4){
+         mp_raise_ValueError(MP_ERROR_TEXT("Function requires 4 arguments"));
+@@ -1802,7 +1802,7 @@ static mp_obj_t usecp256k1_rangeproof_verify(mp_uint_t n_args, const mp_obj_t *a
+ static MP_DEFINE_CONST_FUN_OBJ_VAR(usecp256k1_rangeproof_verify_obj, 4, usecp256k1_rangeproof_verify);
+ 
+ // rangeproof_rewind_from(stream, len, memptr, memlen, nonce, value_commitment, script_pubkey, generator)
+-static mp_obj_t usecp256k1_rangeproof_rewind_from(mp_uint_t n_args, const mp_obj_t *args){
++static mp_obj_t usecp256k1_rangeproof_rewind_from(size_t n_args, const mp_obj_t *args){
+     maybe_init_ctx();
+     if(n_args < 8){
+         mp_raise_ValueError(MP_ERROR_TEXT("Function requires 8 arguments"));

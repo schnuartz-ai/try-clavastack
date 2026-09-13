@@ -1,0 +1,2 @@
+# Patch payloads preserve upstream context whitespace required by git apply.
+browser/v9-patches/*.patch whitespace=-blank-at-eol

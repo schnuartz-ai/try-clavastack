@@ -1,0 +1,69 @@
+diff --git a/ports/unix/main.c b/ports/unix/main.c
+index 37e54c0b..a8d69600 100644
+--- a/ports/unix/main.c
++++ b/ports/unix/main.c
+@@ -482,6 +482,10 @@ int main(int argc, char **argv) {
+ 
+     // Define a reasonable stack limit to detect stack overflow.
+     mp_uint_t stack_size = 40000 * (sizeof(void *) / 4);
++    #ifdef __EMSCRIPTEN__
++    // MockUI has deep package imports; the browser worker has an 8 MiB stack.
++    stack_size = 2 * 1024 * 1024;
++    #endif
+     #if defined(__arm__) && !defined(__thumb2__)
+     // ARM (non-Thumb) architectures require more stack.
+     stack_size *= 2;
+diff --git a/ports/unix/variants/mpconfigvariant_common.h b/ports/unix/variants/mpconfigvariant_common.h
+index 9eeed879..69aaf515 100644
+--- a/ports/unix/variants/mpconfigvariant_common.h
++++ b/ports/unix/variants/mpconfigvariant_common.h
+@@ -77,7 +77,7 @@
+ #define MICROPY_MEM_STATS              (1)
+ 
+ // Enable a small performance boost for the VM.
+-#define MICROPY_OPT_COMPUTED_GOTO      (1)
++#define MICROPY_OPT_COMPUTED_GOTO      (0)
+ 
+ // Return number of collected objects from gc.collect().
+ #define MICROPY_PY_GC_COLLECT_RETVAL   (1)
+diff --git a/py/obj.h b/py/obj.h
+index 93d1e0ee..4c8bbc88 100644
+--- a/py/obj.h
++++ b/py/obj.h
+@@ -570,7 +570,7 @@ typedef struct _mp_obj_iter_buf_t {
+ 
+ // The number of slots that an mp_obj_iter_buf_t needs on the Python value stack.
+ // It's rounded up in case mp_obj_base_t is smaller than mp_obj_t (eg for OBJ_REPR_D).
+-#define MP_OBJ_ITER_BUF_NSLOTS ((sizeof(mp_obj_iter_buf_t) + sizeof(mp_obj_t) - 1) / sizeof(mp_obj_t))
++#define MP_OBJ_ITER_BUF_NSLOTS ((int)((sizeof(mp_obj_iter_buf_t) + sizeof(mp_obj_t) - 1) / sizeof(mp_obj_t)))
+ 
+ typedef void (*mp_print_fun_t)(const mp_print_t *print, mp_obj_t o, mp_print_kind_t kind);
+ typedef mp_obj_t (*mp_make_new_fun_t)(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args);
+diff --git a/shared/runtime/gchelper_generic.c b/shared/runtime/gchelper_generic.c
+index 45b2e4f7..6262a6ad 100644
+--- a/shared/runtime/gchelper_generic.c
++++ b/shared/runtime/gchelper_generic.c
+@@ -211,12 +211,23 @@ static void gc_helper_get_regs(gc_helper_regs_t arr) {
+ // LTO is enabled and a lot of inlining takes place we risk a stack
+ // layout where regs is lower on the stack than pointers which have
+ // just been allocated but not yet marked, and get incorrectly sweeped.
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++static void browser_gc_range(void *start, void *end) {
++    gc_collect_root(start, ((uintptr_t)end - (uintptr_t)start) / sizeof(uintptr_t));
++}
++#endif
+ MP_NOINLINE void gc_helper_collect_regs_and_stack(void) {
++#ifdef __EMSCRIPTEN__
++    emscripten_scan_registers(browser_gc_range);
++    emscripten_scan_stack(browser_gc_range);
++#else
+     gc_helper_regs_t regs;
+     gc_helper_get_regs(regs);
+     // GC stack (and regs because we captured them)
+     void **regs_ptr = (void **)(void *)&regs;
+     gc_collect_root(regs_ptr, ((uintptr_t)MP_STATE_THREAD(stack_top) - (uintptr_t)&regs) / sizeof(uintptr_t));
++#endif
+ }
+ 
+ #endif // MICROPY_ENABLE_GC

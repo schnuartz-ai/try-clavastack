@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Specter worker smoke test</title>
+<canvas id="screen" width="480" height="800"></canvas>
+<pre id="log"></pre>
+<script>
+const build = '/builds/schnuartz-ai/specter-diy/eb8397d2b53bfe43cec0571f8efa235aa352d8ec/';
+const canvas = document.querySelector('#screen');
+const worker = new Worker('/browser/runtime-worker.js');
+worker.onmessage = ({ data }) => {
+  document.querySelector('#log').textContent += JSON.stringify(data) + '\n';
+  console.log(data);
+};
+worker.onerror = event => console.error('Worker error', event.message);
+for (const type of ['pointerdown', 'pointermove', 'pointerup']) {
+  canvas.addEventListener(type, event => {
+    event.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(479, Math.floor((event.clientX - r.left) * 480 / r.width)));
+    const y = Math.max(0, Math.min(799, Math.floor((event.clientY - r.top) * 800 / r.height)));
+    worker.postMessage({ type: 'pointer', x, y,
+      down: type === 'pointerdown' ? 1 : type === 'pointerup' ? 0 : 2 });
+  });
+}
+const offscreen = canvas.transferControlToOffscreen();
+worker.postMessage({ type: 'start', build, canvas: offscreen,
+  diag: location.search.includes('diag=1') }, [offscreen]);
+</script>

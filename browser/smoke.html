@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Specter WebAssembly runtime smoke test</title>
+<style>
+  body { background:#111; color:#eee; font:14px monospace; }
+  canvas { width:360px; height:600px; touch-action:none; }
+  pre { white-space:pre-wrap; max-height:30vh; overflow:auto; }
+</style>
+<canvas id="screen" width="480" height="800"></canvas>
+<pre id="log"></pre>
+<script>
+const build = '/builds/schnuartz-ai/specter-diy/eb8397d2b53bfe43cec0571f8efa235aa352d8ec/';
+const log = document.querySelector('#log');
+function line(s) { log.textContent += s + '\n'; console.log(s); }
+var Module = {
+  canvas: document.querySelector('#screen'),
+  arguments: ['-X', 'heapsize=64M', location.search.includes('diag=1') ? '/browser/diagnose.py' : '/browser/boot.py', '/state'],
+  locateFile: path => build + path,
+  print: line,
+  printErr: line,
+  onAbort: reason => line('ABORT: ' + reason),
+  onRuntimeInitialized: () => line('RUNTIME_INITIALIZED'),
+};
+const script = document.createElement('script');
+script.src = build + 'micropython.js';
+script.onerror = () => line('SCRIPT_LOAD_FAILED');
+document.body.append(script);
+</script>

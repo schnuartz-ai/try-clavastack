@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Try Specter DIY — Live Device Demo | ClavaStack</title>
+  <meta name="description" content="Interact with a real Specter DIY Bitcoin Hardware Wallet simulator running live in your browser. Air-gapped, open source, Bitcoin only.">
+  <style>
+    :root {
+      --specter-dark: #04070B;
+      --specter-dark-secondary: #1E2734;
+      --specter-dark-accent: #0C1A27;
+      --specter-light: #FCFCFC;
+      --specter-light-secondary: #D1D5DB;
+      --specter-primary: #1F99E5;
+      --specter-coral: #FF7A7A;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--specter-dark);
+      color: var(--specter-light);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    header {
+      background: var(--specter-dark-accent);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--specter-dark-secondary);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left img { height: 24px; }
+    .header-left .sep { color: var(--specter-light-secondary); opacity: 0.3; font-size: 16px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .nav-link { color: var(--specter-light-secondary); text-decoration: none; font-size: 12px; }
+    .nav-link:hover { color: var(--specter-primary); }
+
+    /* Status dot */
+    .status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--specter-light-secondary); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #f44; }
+    .dot.on { background: #4c5; }
+
+    /* Phone container */
+    .page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 12px 32px;
+      gap: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .page {
+        padding: 8px 4px 32px;
+        gap: 10px;
+      }
+    }
+
+    .phone-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    /* On mobile: fill full viewport height so device is life-size.
+       Mockup is portrait (479x905 = 0.529 ratio), so width = height * 0.529 */
+    @media (max-width: 600px) {
+      .phone-wrapper {
+        height: calc(100svh - 54px);
+        width: calc((100svh - 54px) * 0.529);
+        max-width: 96vw;
+        /* If width exceeds viewport, constrain by width instead */
+      }
+      .phone-wrapper .phone-mockup {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    }
+
+    /* CTA section */
+    .cta-section {
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+      padding: 8px 4px 0;
+    }
+    .cta-headline {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--specter-light);
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .cta-sub {
+      font-size: 13px;
+      color: var(--specter-light-secondary);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .cta-benefits {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cta-benefits li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--specter-light-secondary);
+      text-align: left;
+    }
+    .cta-benefits li .icon {
+      font-size: 18px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .cta-benefits li strong {
+      color: var(--specter-light);
+      display: block;
+      font-size: 13px;
+      margin-bottom: 1px;
+    }
+    .cta-buy-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      background: var(--specter-primary);
+      color: #fff;
+      text-decoration: none;
+      transition: opacity 0.2s;
+      min-height: 48px;
+      line-height: 1.2;
+    }
+    .cta-buy-btn:hover { opacity: 0.88; }
+
+    /* The noVNC screen sits UNDER the mockup image */
+    #screen-overlay {
+      position: absolute;
+      /* Screen cutout in mockup (479x905): x≈62..423, y≈164..758.
+         Overlay extends ~2px under the opaque bezel (z-index 1 < 2)
+         so there is no visible gap between bezel and screen. */
+      left: calc(12.5% + 2px);
+      top: calc(17.9% + 2px);
+      width: 76.0%;
+      height: 66.0%;
+      z-index: 1;
+      overflow: hidden;
+      background: #000;
+      border-radius: 4px;
+    }
+
+    /* Mockup image on top — pointer-events: none so clicks go through */
+    .phone-mockup {
+      position: relative;
+      width: 100%;
+      display: block;
+      z-index: 2;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Loading overlay inside the screen */
+    #loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: var(--specter-light-secondary);
+      font-size: 13px;
+      gap: 10px;
+      z-index: 10;
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #333;
+      border-top-color: var(--specter-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Restart button */
+    .restart-btn {
+      display: block;
+      width: 100%;
+      max-width: 380px;
+      padding: 14px;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      background: transparent;
+      color: var(--specter-coral);
+      border: 2px solid var(--specter-coral);
+      cursor: pointer;
+      min-height: 48px;
+      transition: background 0.2s;
+    }
+    .restart-btn:hover, .restart-btn:active {
+      background: rgba(255,122,122,.1);
+    }
+    .restart-btn:disabled {
+      opacity: 0.5;
+    }
+
+    /* Status card */
+    .status-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--specter-dark-secondary);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--specter-light-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .status-card a { color: var(--specter-primary); text-decoration: none; font-size: 12px; }
+
+    footer {
+      text-align: center;
+      padding: 16px;
+      color: var(--specter-light-secondary);
+      font-size: 11px;
+    }
+    footer a { color: var(--specter-primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <img src="/assets/clavastack-logo.png" alt="ClavaStack">
+    <span class="sep">&times;</span>
+    <img src="/assets/specter-logo.png" alt="Specter">
+  </div>
+  <div class="header-right">
+    <!-- <a href="/simulators/" class="nav-link">&#x1F3AE; All Simulators</a> <a href="/specter3-testing/" class="nav-link">&#x1F9EA; Specter 3</a> -->
+    <div class="status">
+      <div class="dot" id="dot"></div>
+      <span id="st">Connecting&hellip;</span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- Phone mockup with noVNC inside -->
+  <div class="phone-wrapper">
+    <!-- noVNC goes here (z-index 1, below mockup) -->
+    <div id="screen-overlay">
+      <div id="loading">
+        <div class="spinner"></div>
+        <span>Loading simulator&hellip;</span>
+      </div>
+    </div>
+    <!-- Device frame on top (pointer-events: none) -->
+    <img src="/assets/phone-mockup.png" class="phone-mockup" alt="Specter DIY Device">
+  </div>
+
+  <!-- Restart button -->
+  <button class="restart-btn" id="restart-btn" onclick="restartSim()">
+    &#x1F504; Restart Simulator
+  </button>
+
+  <!-- CTA Section -->
+  <div class="cta-section">
+    <p class="cta-headline">The hardware wallet for bitcoiners.</p>
+    <p class="cta-sub">Pre-assembled by ClavaStack — ready to use out of the box.</p>
+
+    <ul class="cta-benefits">
+      <li>
+        <span class="icon">📱</span>
+        <div><strong>Smartphone-sized touchscreen</strong>No button-mashing. Enter your passphrase fast, verify transactions at a glance — big screen, full control.</div>
+      </li>
+      <li>
+        <span class="icon">🔒</span>
+        <div><strong>100% air-gapped &amp; open source</strong>Zero USB. Zero closed firmware. Every line of code is public — your keys never leave the device.</div>
+      </li>
+      <li>
+        <span class="icon">👨‍👩‍👧</span>
+        <div><strong>Family Hardware Wallet</strong>Each family member gets their own Smartcard, Seedphrase &amp; PIN — one device, total separation.</div>
+      </li>
+    </ul>
+
+    <a href="https://clavastack.com" class="cta-buy-btn">Get Your Specter DIY &rarr;</a>
+  </div>
+
+</div>
+
+<footer>
+  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a> &middot; <a href="https://clavastack.com/impressum">Impressum</a></p>
+</footer>
+
+<script type="module">
+import RFB from "/novnc/core/rfb.js";
+
+const POOL = "diy";
+const SK = "try-session-" + POOL;
+const MAX_RECONNECT = 3;
+const RECONNECT_DELAY = 3000;
+
+let rfb = null, sessionId = null, heartbeatTimer = null, restartUrl = null, wsPath = null;
+let reconnectAttempt = 0, reconnectTimeout = null;
+
+function loadSession() {
+  try { const s = JSON.parse(localStorage.getItem(SK)); if (s && s.sessionId && s.expiresAt > Date.now()) return s; } catch(e) {}
+  localStorage.removeItem(SK); return null;
+}
+function saveSession(sid, wp, rp, exp) {
+  localStorage.setItem(SK, JSON.stringify({sessionId: sid, wsPath: wp, restartPath: rp, expiresAt: Date.now() + exp * 1000}));
+}
+function clearSession() {
+  localStorage.removeItem(SK);
+  sessionId = null; wsPath = null; restartUrl = null;
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
+
+function connectVNC(wp) {
+  const container = document.getElementById("screen-overlay");
+  if (rfb) { try { rfb.disconnect(); } catch(e) {} rfb = null; }
+
+  rfb = new RFB(container, "wss://" + location.host + wp);
+  rfb.scaleViewport = true; rfb.clipViewport = true; rfb.viewOnly = false; rfb.qualityLevel = 6; rfb.compressionLevel = 2;
+  rfb.addEventListener("connect", () => {
+    reconnectAttempt = 0;
+    const c = container.querySelector("canvas");
+    if (c) { c.style.width="100%"; c.style.height="100%"; c.style.objectFit="contain"; }
+    document.getElementById("dot").classList.add("on");
+    document.getElementById("st").textContent = "Connected";
+    document.getElementById("loading").style.display = "none";
+  });
+  rfb.addEventListener("disconnect", () => {
+    document.getElementById("dot").classList.remove("on");
+    rfb = null;
+    if (reconnectAttempt < MAX_RECONNECT && wsPath) {
+      reconnectAttempt++;
+      document.getElementById("st").textContent = "Reconnecting (" + reconnectAttempt + "/" + MAX_RECONNECT + ")...";
+      const l = document.getElementById("loading");
+      l.style.display = "flex";
+      l.innerHTML = '<div class="spinner"></div><span>Reconnecting (' + reconnectAttempt + '/' + MAX_RECONNECT + ')&hellip;</span>';
+      reconnectTimeout = setTimeout(() => connectVNC(wsPath), RECONNECT_DELAY);
+    } else {
+      document.getElementById("st").textContent = "Disconnected";
+      const l = document.getElementById("loading");
+      l.style.display = "flex";
+      l.innerHTML = '<p style="color:#FF7A7A;text-align:center">Simulator offline<br><small>Click Restart to reconnect</small></p>';
+    }
+  });
+}
+
+function startHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(async () => {
+    if (!sessionId) return;
+    try {
+      const r = await fetch("/api/heartbeat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({sessionId})});
+      const data = await r.json();
+      if (data.status === "not_found") {
+        clearSession();
+        reconnectAttempt = 0;
+        init();
+      }
+    } catch(e) { /* network error, keep trying next interval */ }
+  }, 30000);
+}
+
+async function init() {
+  try {
+    const saved = loadSession();
+    if (saved) {
+      let hb;
+      try {
+        const r = await fetch("/api/heartbeat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({sessionId:saved.sessionId})});
+        hb = await r.json();
+      } catch(e) {
+        hb = {status: "error"};
+      }
+      if (hb.status === "ok") {
+        sessionId = saved.sessionId; restartUrl = saved.restartPath; wsPath = saved.wsPath;
+        connectVNC(wsPath); startHeartbeat(); return;
+      }
+      localStorage.removeItem(SK);
+    }
+    const res = await fetch("/api/allocate", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pool:POOL})});
+    const data = await res.json();
+    if (data.status === "full") {
+      document.getElementById("loading").innerHTML = '<p style="color:#FF7A7A;text-align:center">All simulators in use.<br><small>Try again in 1-2 minutes.</small></p>';
+      document.getElementById("st").textContent = "All busy"; return;
+    }
+    sessionId = data.sessionId; restartUrl = data.restartPath; wsPath = data.wsPath;
+    saveSession(sessionId, wsPath, restartUrl, data.expiresIn);
+    connectVNC(wsPath); startHeartbeat();
+  } catch(e) {
+    document.getElementById("loading").innerHTML = '<p style="color:#FF7A7A">Error: ' + e.message + '</p>';
+  }
+}
+
+function restartSim() {
+  if (!restartUrl) return;
+  if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
+  reconnectAttempt = 0;
+  const btn = document.getElementById("restart-btn");
+  btn.disabled = true; btn.textContent = '\u23f3 Restarting...';
+  const loading = document.getElementById("loading");
+  loading.style.display = "flex";
+  loading.innerHTML = '<div class="spinner"></div><span>Restarting simulator\u2026</span>';
+  fetch(restartUrl, {method:"POST"}).catch(()=>{});
+  btn.textContent = '\u23f3 Restarting (~30s)...';
+  setTimeout(() => { btn.textContent = '\u2705 Reloading...'; setTimeout(() => location.reload(), 2000); }, 30000);
+}
+window.restartSim = restartSim;
+init();
+</script>
+
+</body>
+</html>

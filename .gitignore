@@ -1,0 +1,6 @@
+node_modules/
+builds/
+.browser-work/
+test-results/
+__pycache__/
+*.pyc

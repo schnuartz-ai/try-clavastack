@@ -1,4 +1,14 @@
-# VPS Config — Specter Simulator Pool
+# VPS Config — Browser Simulator and Legacy Pool
+
+The default `try.clavastack.com` page and `/simulators/` now run Specter
+WebAssembly in the visitor's browser. Caddy serves static pages, versioned
+builds, and the required COOP/COEP/CORP headers. The pool below remains for
+`/legacy/` and `/simulators/legacy/` rollback. See [the browser setup guide](../SETUP.md).
+
+Deploy the contents of `builds/` before publishing the matching `browser/current.json`
+and `browser/variants/*.json` pointers. Run `python3 browser/verify-build.py`
+against the deployed tree, then reload the validated Caddyfile. Do not stop the
+pool services until browser mode has been proven stable and rollback is retired.
 
 Multi-user simulator pool with 3 simulator types, auto-scaling (min 2, max 5 per type).
 

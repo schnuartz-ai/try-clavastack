@@ -1,10 +1,25 @@
 try.clavastack.com {
+	# Isolate only the browser simulator; keep legacy pages untouched.
+	@browserPaths path / /index.html /browser/* /builds/* /simulators/ /simulators/index.html /simulators/site.js
+	header @browserPaths {
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "require-corp"
+		Cross-Origin-Resource-Policy "same-origin"
+	}
+
+	@versionedBuild path_regexp versioned ^/builds/.+/micropython\.(js|wasm|data)$
+	header @versionedBuild Cache-Control "public, max-age=31536000, immutable"
+	@buildManifest path_regexp manifest ^/builds/.+/build-info\.json$
+	header @buildManifest Cache-Control "no-cache"
+	header /browser/current.json Cache-Control "no-cache"
+	header /browser/variants/* Cache-Control "no-cache"
+
 	@api path /api/*
 	handle @api {
 		reverse_proxy localhost:9001
 	}
 
-	@restart path_regexp restart ^/(diy|play|schnuartz)/sim/[1-5]/restart$
+	@restart path_regexp restart ^/(diy|play|schnuartz|marko|marcobn)/sim/[1-5]/restart$
 	handle @restart {
 		reverse_proxy localhost:9001
 	}
@@ -72,6 +87,24 @@ try.clavastack.com {
 		reverse_proxy localhost:6104
 	}
 
+	@marko1ws path /marko/sim/1/ws
+	handle @marko1ws {
+		reverse_proxy localhost:6105
+	}
+	@marko2ws path /marko/sim/2/ws
+	handle @marko2ws {
+		reverse_proxy localhost:6106
+	}
+
+	@marcobn1ws path /marcobn/sim/1/ws
+	handle @marcobn1ws {
+		reverse_proxy localhost:6107
+	}
+	@marcobn2ws path /marcobn/sim/2/ws
+	handle @marcobn2ws {
+		reverse_proxy localhost:6108
+	}
+
 	handle_path /novnc/* {
 		root * /usr/share/novnc
 		file_server
@@ -81,6 +114,6 @@ try.clavastack.com {
 	handle {
 		root * /var/www/try-clavastack
 		file_server
-		encode gzip
+		encode zstd gzip
 	}
 }
