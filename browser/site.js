@@ -467,7 +467,7 @@ try {
   const pointer = await (await fetch(pointerPath, { cache: 'no-store' })).json();
   build = pointer.build;
   version = pointer.version;
-  if (!/^\/builds\/[a-z0-9-]+\/[a-z0-9-]+\/[a-f0-9]{40}\/$/.test(build)) throw new Error('Invalid build pointer');
+  if (!/^\/builds\/[A-Za-z0-9-]+\/[A-Za-z0-9-]+\/[a-f0-9]{40}\/$/.test(build)) throw new Error('Invalid build pointer');
   if (!/^[a-f0-9]{16}$/.test(version)) throw new Error('Invalid artifact version');
   const manifest = await (await fetch(`${build}build-info.json`, { cache: 'no-store' })).json();
   if (!build.includes(manifest.commit) || manifest.artifact_set_sha256?.slice(0, 16) !== version) {
