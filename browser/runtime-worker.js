@@ -188,10 +188,13 @@ onmessage = ({ data }) => {
     canvas,
     headlessDisplay,
     // Real Specter DIY hardware runs everything (firmware + wallet state) in
-    // 16MB total RAM. 64M here was simulator-only headroom, not a firmware
-    // requirement - with 3 instances running at once in the gallery, it was
-    // the single biggest avoidable memory cost (192MB of GC heap alone).
-    arguments: ['-X', 'heapsize=16M', data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state'],
+    // 16MB total RAM, so the real wallet firmware gets exactly that. The
+    // MockUI scenarios render considerably more LVGL objects at once (wallet
+    // lists, multiple icons/menus) with a stock desktop-style LVGL heap
+    // assumption behind them, not the 16MB-constrained one - 16M there made
+    // GC run noticeably more often (visible as stutter after a few seconds),
+    // so they get more headroom instead.
+    arguments: ['-X', `heapsize=${data.program === 'mockui' ? '32M' : '16M'}`, data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state'],
     monitorRunDependencies: remaining => send('loading-progress', { remaining }),
     locateFile: path => data.build + path + assetSuffix,
     preRun: [() => {
