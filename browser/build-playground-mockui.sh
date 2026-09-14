@@ -22,8 +22,19 @@ git -C "$FORK_SRC" submodule update --init --recursive
 
 apply_if_needed() {
   local repo="$1" patch="$2"
-  if git -C "$repo" apply --reverse --check "$patch" 2>/dev/null; then return; fi
-  git -C "$repo" apply "$patch"
+  local top prefix
+  top="$(git -C "$repo" rev-parse --show-toplevel)"
+  if [[ "$top" = "$repo" ]]; then
+    if git -C "$repo" apply --reverse --check "$patch" 2>/dev/null; then return; fi
+    git -C "$repo" apply "$patch"
+  else
+    # Schnuartz vendors these sources; apply relative to the containing Git
+    # root so git apply cannot silently ignore all paths from a subdirectory.
+    prefix="${repo#"$top"/}"
+    [[ "$prefix" != "$repo" ]] || { echo "Patch path is outside Git root: $repo" >&2; exit 1; }
+    if git -C "$top" apply --directory="$prefix" --reverse --check "$patch" 2>/dev/null; then return; fi
+    git -C "$top" apply --directory="$prefix" "$patch"
+  fi
 }
 apply_if_needed "$FORK_SRC/f469-disco/micropython" "$ROOT/browser/v9-patches/micropython.patch"
 apply_if_needed "$FORK_SRC/f469-disco/usermods" "$ROOT/browser/v9-patches/usermods.patch"
