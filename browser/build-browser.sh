@@ -38,7 +38,10 @@ freeze('f469-disco/usermods/udisplay_f469/display_unixport')
 freeze('f469-disco/libs/common')
 freeze('src')
 EOF
-make -C "$SPECTER_SRC/f469-disco/micropython/mpy-cross" -j4
+# This older MicroPython records a stack marker from a local variable by design.
+# Modern GCC diagnoses that pattern as dangling-pointer; keep other warnings fatal.
+make -C "$SPECTER_SRC/f469-disco/micropython/mpy-cross" -j4 \
+  CFLAGS_EXTRA=-Wno-error=dangling-pointer
 
 # The older MicroPython makefiles do not track a changed frozen manifest or
 # Emscripten link flags reliably. Rebuild the dedicated browser target.
