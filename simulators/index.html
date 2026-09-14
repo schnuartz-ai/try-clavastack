@@ -77,7 +77,8 @@
     .feedback-actions a[aria-disabled="true"] { pointer-events:none; opacity:.5; }
     .feedback-note { font-size:12px; margin:10px 0 0; color:#a9bdcf; }
     .feedback a,footer a { color:var(--blue); }
-    footer { text-align:center; padding:22px; font-size:12px; color:var(--muted); }
+    footer { background:#0b1624; border-top:1px solid #35506d; text-align:center; padding:22px; font-size:12px; color:var(--muted); }
+    footer .footer-imprint { color:#ffd166; font-weight:700; }
     @media(max-width:1000px) { .device-grid { overflow-x:auto; grid-template-columns:repeat(3,minmax(285px,1fr)); padding-bottom:8px; } .device-frame { width:min(100%,265px); } }
     @media(max-width:700px) { main { padding:16px 10px 30px; } .media-grid { grid-template-columns:1fr; } .memory-tray { gap:5px; } .memory-token .card-art { padding:6px; } .memory-token .card-art strong { font-size:9px; } }
   </style>
@@ -103,7 +104,7 @@
     </section>
     <section class="feedback" aria-labelledby="feedback-heading"><h2 id="feedback-heading">Your feedback helps improve the simulator</h2><p class="feedback-intro">Tell us what happened, what you expected, and which device you were using.</p><form class="feedback-form" id="feedback-form"><label for="feedback-device">Simulator</label><select id="feedback-device"><option value="diy">Specter DIY · Device 1</option><option value="play">K9ert Playground · Device 2</option><option value="schnuartz">Schnuartz Playground · Device 3</option></select><label for="feedback-message">Your comment</label><textarea id="feedback-message" minlength="10" maxlength="5000" placeholder="For example: I inserted an SD card, opened Wallets, and expected to see…" required></textarea><div class="feedback-actions"><span id="feedback-count">0 / 5000 characters</span><a id="feedback-submit" href="#feedback-message" target="_blank" rel="noopener noreferrer" aria-disabled="true">Continue on GitHub ↗</a></div><p class="feedback-note">Your text stays in this tab until you continue to GitHub. Sign in there to review and submit it as a public issue. Please do not include seed phrases, private keys, or personal data.</p></form><p class="feedback-note">The <a href="/simulators/legacy/">legacy simulators</a> remain available. Playground devices use their original MockUI prototypes; some wallet and media functions are not implemented in those forks. SD artwork: <a href="https://commons.wikimedia.org/wiki/File:32GB_SD_card.svg">Wikimedia Commons, CC0</a>.</p></section>
   </main>
-  <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="/simulators/">Simulators (in development)</a> · Browser simulation is not secure hardware.</footer>
+  <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="/simulators/">Development Drafts</a> · <a class="footer-imprint" href="https://clavastack.com/impressum">Impressum</a> · Browser simulation is not secure hardware.</footer>
   <script type="module" src="/simulators/site.js"></script>
 </body>
 </html>

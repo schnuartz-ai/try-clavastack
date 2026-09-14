@@ -286,12 +286,15 @@
     @media (max-width:600px) { .card-tray { gap:5px; } .smartcard-graphic { padding:5px; } }
 
     footer {
+      background: #0b1624;
+      border-top: 1px solid #35506d;
       text-align: center;
       padding: 16px;
       color: var(--specter-light-secondary);
       font-size: 11px;
     }
     footer a { color: var(--specter-primary); text-decoration: none; }
+    footer .footer-imprint { color: #ffd166; font-weight: 700; }
     .embedded header, .embedded .cta-section, .embedded footer { display:none; }
     .embedded, .embedded body { min-height:0; }
     .embedded .page { padding:10px 12px 22px; }
@@ -424,7 +427,7 @@
 </div>
 
 <footer>
-  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="/simulators/">Simulatoren (in Entwicklung)</a> &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a> &middot; <a href="https://clavastack.com/impressum">Impressum</a></p>
+  <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="/simulators/">Development Drafts</a> &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a> &middot; <a class="footer-imprint" href="https://clavastack.com/impressum">Impressum</a></p>
 </footer>
 
 <script src="/assets/jsQR-1.4.0.js"></script>
