@@ -178,7 +178,7 @@ let savedFeedback = [];
 try {
   const stored = JSON.parse(localStorage.getItem(feedbackStorageKey) || '[]');
   if (Array.isArray(stored)) {
-    savedFeedback = stored.filter(item => item && typeof item.comment === 'string' && item.comment.length >= 10 && typeof item.label === 'string').slice(0, 50);
+    savedFeedback = stored.filter(item => item && typeof item.comment === 'string' && item.comment.trim().length > 0 && typeof item.label === 'string').slice(0, 50);
   }
 } catch {}
 function persistFeedback() {
@@ -233,7 +233,7 @@ function currentFeedback() {
 }
 function saveCurrentFeedback() {
   const current = currentFeedback();
-  if (current.comment.length < 10) return;
+  if (!current.comment) return;
   const id = globalThis.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   savedFeedback.unshift({ id, createdAt: new Date().toISOString(), ...current });
   savedFeedback = savedFeedback.slice(0, 50);
@@ -245,8 +245,9 @@ function saveCurrentFeedback() {
 function updateFeedback() {
   const comment = feedbackMessage.value.trim();
   document.querySelector('#feedback-count').textContent = `${feedbackMessage.value.length} / 5000 characters`;
+  const hasComment = comment.length > 0;
   const valid = comment.length >= 10;
-  feedbackSave.disabled = !valid;
+  feedbackSave.disabled = !hasComment;
   feedbackSubmit.setAttribute('aria-disabled', String(!valid));
   if (!valid) { feedbackSubmit.href = '#feedback-message'; return; }
   const device = devices[feedbackDevice.value];
