@@ -39,7 +39,12 @@ let lastQr = '';
 let lastQrAt = 0;
 let startupTimer;
 let requestId = 0;
+let startupStartedAt = 0;
+let workerDependencyCount = null;
 const snapshots = new Map();
+
+const mobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const startupTimeoutMs = mobileDevice ? 180000 : 90000;
 
 function log(message) {
   debug.textContent = `${String(message)}\n${debug.textContent}`.slice(0, 7000);
@@ -58,7 +63,15 @@ function failure(message) {
   loading.replaceChildren();
   const text = document.createElement('p');
   text.textContent = message;
-  loading.append(text);
+  const actions = document.createElement('p');
+  const details = document.createElement('a');
+  details.href = '#technical-details';
+  details.textContent = 'Open Technical details';
+  const legacy = document.createElement('a');
+  legacy.href = '/legacy/';
+  legacy.textContent = 'Use Legacy mode';
+  actions.append(details, ' · ', legacy);
+  loading.append(text, actions);
   log(message);
   notifyParent({ type: 'simulator-error', variant, message });
 }
@@ -158,8 +171,21 @@ function renderCards(slots) {
     tray.append(row);
   }
 }
+function setLoadingMessage(message) {
+  const label = loading.querySelector('[data-loading-label]');
+  if (label) label.textContent = message;
+}
 function onWorkerMessage({ data }) {
-  if (data.type === 'running') {
+  if (data.type === 'loading-progress') {
+    workerDependencyCount = data.remaining;
+    const steps = data.remaining === 1 ? 'startup step' : 'startup steps';
+    setLoadingMessage(data.remaining > 0
+      ? `Loading Specter runtime… (${data.remaining} ${steps} remaining)`
+      : 'Starting Specter firmware…');
+    setStatus('Loading runtime');
+  } else if (data.type === 'wasm-ready') {
+    setLoadingMessage('Starting Specter firmware…');
+  } else if (data.type === 'running') {
     clearTimeout(startupTimer);
     loading.style.display = 'none';
     setStatus('Running locally', true);
@@ -247,13 +273,21 @@ async function start() {
     return;
   }
   loading.style.display = 'flex';
-  loading.innerHTML = '<div class="spinner"></div><span>Starting Specter on this device…</span>';
+  loading.innerHTML = '<div class="spinner"></div><span data-loading-label>Starting Specter on this device…</span>';
   setStatus('Starting locally');
+  startupStartedAt = performance.now();
+  workerDependencyCount = null;
   worker = new Worker('/browser/runtime-worker.js', { name: 'Specter DIY' });
   worker.onmessage = onWorkerMessage;
   worker.onerror = event => failure(`Worker crashed: ${event.message || 'unknown error'}`);
   worker.onmessageerror = () => failure('Worker communication failed');
-  startupTimer = setTimeout(() => failure('Specter did not finish loading. Open Technical details or use Legacy mode.'), 45000);
+  startupTimer = setTimeout(() => {
+    const elapsed = Math.round((performance.now() - startupStartedAt) / 1000);
+    const detail = workerDependencyCount > 0
+      ? `The WebAssembly runtime is still loading (${workerDependencyCount} startup ${workerDependencyCount === 1 ? 'step' : 'steps'} pending).`
+      : `The WebAssembly runtime did not report ready after ${elapsed} seconds.`;
+    failure(`${detail} The first load can take longer on a mobile connection or a low-memory device.`);
+  }, startupTimeoutMs);
   const offscreen = transferable ? canvas.transferControlToOffscreen() : undefined;
   send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
     stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe }, offscreen ? [offscreen] : []);
