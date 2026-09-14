@@ -473,9 +473,9 @@ try {
   if (!build.includes(manifest.commit) || manifest.artifact_set_sha256?.slice(0, 16) !== version) {
     throw new Error('Build manifest mismatch');
   }
-  const expectedRepo = variant === 'diy' ? 'schnuartz-ai/specter-diy' :
-    variant === 'play' ? 'k9ert/specter-playground' : 'schnuartz-ai/specter-playground-schnuartz';
-  if (manifest.repository?.toLowerCase() !== expectedRepo.toLowerCase()) throw new Error('Wrong firmware variant in build manifest');
+  const expectedRepos = variant === 'diy' ? ['schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
+    variant === 'play' ? ['k9ert/specter-playground'] : ['schnuartz-ai/specter-playground-schnuartz'];
+  if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
   $('#build-label').textContent = `${manifest.repository} · ${manifest.commit.slice(0, 7)} · Browser / WASM`;

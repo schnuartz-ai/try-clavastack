@@ -166,8 +166,10 @@ for (const name of order) {
     try {
       const pointer = await (await fetch(pointers[name], { cache: 'no-store' })).json();
       const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
+      const allowedRepositories = name === 'diy' ?
+        ['schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] : [feedbackRepositories[name]];
       if (!/^[a-f0-9]{40}$/.test(info.commit) ||
-          info.repository?.toLowerCase() !== feedbackRepositories[name] ||
+          !allowedRepositories.includes(info.repository?.toLowerCase()) ||
           !pointer.build.includes(`/${info.commit}/`) ||
           pointer.version !== info.artifact_set_sha256?.slice(0, 16)) {
         throw new Error('Build manifest mismatch');
