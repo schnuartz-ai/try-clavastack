@@ -255,7 +255,10 @@ function updateFeedback() {
   const label = feedbackDevice.selectedOptions[0].textContent;
   const body = `${comment}\n\n---\nSimulator: ${label}\nFirmware source: ${source}\n\nBrowser simulator feedback; no seed phrases or private keys included.`;
   const query = new URLSearchParams({ title: `Simulator feedback: ${label}`, body });
-  feedbackSubmit.href = `https://github.com/schnuartz-ai/try-clavastack/issues/new?${query}`;
+  const sourceUrl = new URL(source);
+  const sourceParts = sourceUrl.pathname.split('/').filter(Boolean);
+  const repository = sourceParts.length >= 2 ? sourceParts.slice(0, 2).join('/') : 'schnuartz-ai/try-clavastack';
+  feedbackSubmit.href = `https://github.com/${repository}/issues/new?${query}`;
 }
 feedbackMessage.addEventListener('input', updateFeedback);
 feedbackDevice.addEventListener('change', updateFeedback);
