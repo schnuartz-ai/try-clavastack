@@ -56,6 +56,13 @@ MIN_INSTANCES = 2
 MAX_INSTANCES = 5
 
 STATE_FILE = "/opt/try-clavastack/pool/state.json"
+FEEDBACK_FILE = "/opt/try-clavastack/pool/feedback.json"
+FEEDBACK_LIMIT = 200
+FEEDBACK_VARIANTS = {
+    "diy": {"label": "Specter DIY · Device 1", "repository": "schnuartz-ai/specter-diy"},
+    "play": {"label": "K9ert Playground · Device 2", "repository": "k9ert/specter-playground"},
+    "schnuartz": {"label": "Schnuartz Playground · Device 3", "repository": "schnuartz-ai/specter-playground-schnuartz"},
+}
 RESTART_SCRIPT = "/opt/try-clavastack/pool/restart-simulator.sh"
 SESSION_TIMEOUT = 600          # 10 min inactivity timeout (no heartbeat = session dies)
 CLEANUP_INTERVAL = 30
@@ -68,6 +75,8 @@ sessions = {}           # sessionId -> {pool, instance_id, created_at, last_hear
 running = set()         # set of instance IDs currently running
 idle_since = {}         # instance_id -> timestamp when became idle
 last_reset = {}         # instance_id -> timestamp of last reset
+feedback_lock = threading.Lock()
+feedback_items = []
 
 
 def load_state():
@@ -86,6 +95,78 @@ def save_state():
             json.dump({"sessions": sessions}, f, indent=2)
     except Exception:
         pass
+
+
+def load_feedback():
+    global feedback_items
+    try:
+        with open(FEEDBACK_FILE, 'r') as f:
+            data = json.load(f)
+        items = data.get('comments', []) if isinstance(data, dict) else data if isinstance(data, list) else []
+        if not isinstance(items, list):
+            items = []
+        valid = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            comment = str(item.get('comment', '')).strip()
+            variant = item.get('variant')
+            if not comment or len(comment) > 5000 or variant not in FEEDBACK_VARIANTS:
+                continue
+            valid.append({
+                'id': str(item.get('id', '')),
+                'createdAt': str(item.get('createdAt', '')),
+                'variant': variant,
+                'label': FEEDBACK_VARIANTS[variant]['label'],
+                'repository': FEEDBACK_VARIANTS[variant]['repository'],
+                'comment': comment,
+            })
+        feedback_items = valid[:FEEDBACK_LIMIT]
+    except (OSError, ValueError, TypeError):
+        feedback_items = []
+
+
+def save_feedback():
+    temp_file = f"{FEEDBACK_FILE}.tmp"
+    try:
+        with open(temp_file, 'w') as f:
+            json.dump({'comments': feedback_items}, f, ensure_ascii=False, indent=2)
+        os.replace(temp_file, FEEDBACK_FILE)
+    except OSError:
+        try:
+            os.unlink(temp_file)
+        except OSError:
+            pass
+
+
+def get_feedback():
+    with feedback_lock:
+        return {'status': 'ok', 'comments': list(feedback_items)}
+
+
+def create_feedback(data):
+    variant = data.get('variant') if isinstance(data, dict) else None
+    if variant not in FEEDBACK_VARIANTS:
+        return {'status': 'error', 'error': 'Choose a valid simulator.'}
+    comment = str(data.get('comment', '')).strip() if isinstance(data, dict) else ''
+    if not comment:
+        return {'status': 'error', 'error': 'Comment cannot be empty.'}
+    if len(comment) > 5000:
+        return {'status': 'error', 'error': 'Comment is limited to 5000 characters.'}
+    now = datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
+    item = {
+        'id': f"feedback_{int(time.time() * 1000)}_{random.randint(1000, 9999)}",
+        'createdAt': now,
+        'variant': variant,
+        'label': FEEDBACK_VARIANTS[variant]['label'],
+        'repository': FEEDBACK_VARIANTS[variant]['repository'],
+        'comment': comment,
+    }
+    with feedback_lock:
+        feedback_items.insert(0, item)
+        del feedback_items[FEEDBACK_LIMIT:]
+        save_feedback()
+        return {'status': 'ok', 'comment': item}
 
 
 def is_instance_healthy(inst_id):
@@ -417,13 +498,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         cl = int(self.headers.get('Content-Length', 0))
+        if cl > 12000:
+            self.send_json({'error': 'Request body too large'}, 413)
+            return
         body = self.rfile.read(cl).decode() if cl > 0 else '{}'
         try:
             data = json.loads(body) if body.strip() else {}
         except json.JSONDecodeError:
             data = {}
 
-        if self.path == '/api/allocate':
+        if self.path == '/api/feedback':
+            result = create_feedback(data)
+            self.send_json(result, 201 if result.get('status') == 'ok' else 400)
+
+        elif self.path == '/api/allocate':
             pool = data.get('pool', 'diy')
             self.send_json(allocate_session(pool))
 
@@ -449,7 +537,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "Not found"}, 404)
 
     def do_GET(self):
-        if self.path == '/api/status':
+        if self.path == '/api/feedback':
+            self.send_json(get_feedback())
+        elif self.path == '/api/status':
             with lock:
                 result = {}
                 for pname, pinfo in POOLS.items():
@@ -491,6 +581,7 @@ def detect_running():
 
 def main():
     load_state()
+    load_feedback()
     with lock:
         sessions.clear()
         save_state()
@@ -500,6 +591,7 @@ def main():
 
     ensure_all_mins()
     print(f"After ensure_min: {len(running)} running: {running}")
+    print(f"Loaded shared feedback comments: {len(feedback_items)}")
 
     threading.Thread(target=cleanup_and_scale, daemon=True).start()
 

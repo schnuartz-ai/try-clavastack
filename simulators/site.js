@@ -176,26 +176,15 @@ const feedbackMessage = document.querySelector('#feedback-message');
 const feedbackDevice = document.querySelector('#feedback-device');
 const feedbackSubmit = document.querySelector('#feedback-submit');
 const feedbackSave = document.querySelector('#feedback-save');
-const feedbackClear = document.querySelector('#feedback-clear');
+const feedbackStatus = document.querySelector('#feedback-status');
 const feedbackList = document.querySelector('#feedback-list');
-const feedbackStorageKey = 'try-clavastack-feedback-v1';
 let savedFeedback = [];
-try {
-  const stored = JSON.parse(localStorage.getItem(feedbackStorageKey) || '[]');
-  if (Array.isArray(stored)) {
-    savedFeedback = stored.filter(item => item && typeof item.comment === 'string' && item.comment.trim().length > 0 && typeof item.label === 'string').slice(0, 50);
-  }
-} catch {}
-function persistFeedback() {
-  try { localStorage.setItem(feedbackStorageKey, JSON.stringify(savedFeedback)); } catch {}
-}
 function renderFeedback() {
   feedbackList.replaceChildren();
-  feedbackClear.hidden = savedFeedback.length === 0;
   if (!savedFeedback.length) {
     const empty = document.createElement('li');
     empty.className = 'feedback-empty';
-    empty.textContent = 'No saved comments yet.';
+    empty.textContent = 'No shared comments yet.';
     feedbackList.append(empty);
     return;
   }
@@ -207,25 +196,29 @@ function renderFeedback() {
     const label = document.createElement('strong');
     label.textContent = item.label;
     const time = document.createElement('time');
-    time.dateTime = item.createdAt;
+    time.dateTime = item.createdAt || '';
     const date = new Date(item.createdAt);
     time.textContent = Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
     head.append(label, time);
     const body = document.createElement('p');
     body.textContent = item.comment;
-    const actions = document.createElement('div');
-    actions.className = 'feedback-item-actions';
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.textContent = 'Delete';
-    remove.addEventListener('click', () => {
-      savedFeedback = savedFeedback.filter(candidate => candidate.id !== item.id);
-      persistFeedback();
-      renderFeedback();
-    });
-    actions.append(remove);
-    entry.append(head, body, actions);
+    entry.append(head, body);
     feedbackList.append(entry);
+  }
+}
+function setFeedbackStatus(message) {
+  feedbackStatus.textContent = message;
+}
+async function loadFeedback() {
+  try {
+    const response = await fetch('/api/feedback', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    savedFeedback = Array.isArray(data.comments) ? data.comments : [];
+    renderFeedback();
+    setFeedbackStatus(`${savedFeedback.length} shared comment${savedFeedback.length === 1 ? '' : 's'}.`);
+  } catch (error) {
+    setFeedbackStatus('Shared comments could not be loaded. Please try again later.');
   }
 }
 function currentFeedback() {
@@ -236,16 +229,30 @@ function currentFeedback() {
     source: device.querySelector('.source-link').href,
   };
 }
-function saveCurrentFeedback() {
+async function saveCurrentFeedback() {
   const current = currentFeedback();
   if (!current.comment) return;
-  const id = globalThis.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-  savedFeedback.unshift({ id, createdAt: new Date().toISOString(), ...current });
-  savedFeedback = savedFeedback.slice(0, 50);
-  persistFeedback();
-  renderFeedback();
-  feedbackMessage.value = '';
-  updateFeedback();
+  feedbackSave.disabled = true;
+  feedbackSave.textContent = 'Saving…';
+  setFeedbackStatus('Saving comment for everyone…');
+  try {
+    const response = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variant: feedbackDevice.value, comment: current.comment, source: current.source }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.comment) throw new Error(data.error || `HTTP ${response.status}`);
+    savedFeedback = [data.comment, ...savedFeedback.filter(item => item.id !== data.comment.id)];
+    renderFeedback();
+    feedbackMessage.value = '';
+    setFeedbackStatus('Comment saved and visible to everyone.');
+  } catch (error) {
+    setFeedbackStatus(`Comment could not be saved: ${error.message}`);
+  } finally {
+    feedbackSave.textContent = 'Save comment';
+    updateFeedback();
+  }
 }
 function updateFeedback() {
   const comment = feedbackMessage.value.trim();
@@ -266,13 +273,9 @@ function updateFeedback() {
 feedbackMessage.addEventListener('input', updateFeedback);
 feedbackDevice.addEventListener('change', updateFeedback);
 feedbackSave.addEventListener('click', saveCurrentFeedback);
-feedbackClear.addEventListener('click', () => {
-  savedFeedback = [];
-  persistFeedback();
-  renderFeedback();
-});
 document.querySelector('#feedback-form').addEventListener('submit', event => event.preventDefault());
 renderFeedback();
+loadFeedback();
 updateFeedback();
 
 let drag;
