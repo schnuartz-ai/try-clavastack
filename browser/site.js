@@ -41,6 +41,7 @@ let startupTimer;
 let requestId = 0;
 let startupStartedAt = 0;
 let workerDependencyCount = null;
+let crashRetriesLeft = 2;
 const snapshots = new Map();
 
 const mobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
@@ -74,6 +75,27 @@ function failure(message) {
   loading.append(text, actions);
   log(message);
   notifyParent({ type: 'simulator-error', variant, message });
+}
+// A worker crash (e.g. an uncaught native-stack RangeError from deep
+// recursion in the firmware) kills that worker outright - nothing left to
+// send a normal restart message to. Auto-recover a couple of times with a
+// fresh worker before giving up and showing the dead-end error UI, so a
+// one-off crash doesn't strand the visitor on a page that looks broken.
+function crashRecover(message) {
+  clearTimeout(startupTimer);
+  stopCamera();
+  worker?.terminate();
+  worker = undefined;
+  if (crashRetriesLeft > 0) {
+    crashRetriesLeft--;
+    log(`${message} - recovering (${crashRetriesLeft} ${crashRetriesLeft === 1 ? 'retry' : 'retries'} left)`);
+    setStatus('Recovering…');
+    loading.style.display = 'flex';
+    loading.innerHTML = '<div class="spinner"></div><span data-loading-label>Recovering from a crash…</span>';
+    setTimeout(start, 500);
+    return;
+  }
+  failure(message);
 }
 function send(message, transfer = []) {
   if (worker) worker.postMessage(message, transfer);
@@ -189,6 +211,7 @@ function onWorkerMessage({ data }) {
     clearTimeout(startupTimer);
     loading.style.display = 'none';
     setStatus('Running locally', true);
+    crashRetriesLeft = 2; // a crash long after a healthy boot deserves fresh retries
     send({ type: 'sd-list' });
     send({ type: 'card-list' });
     notifyParent({ type: 'simulator-running', variant });
@@ -282,8 +305,8 @@ async function start() {
   workerDependencyCount = null;
   worker = new Worker('/browser/runtime-worker.js', { name: 'Specter DIY' });
   worker.onmessage = onWorkerMessage;
-  worker.onerror = event => failure(`Worker crashed: ${event.message || 'unknown error'}`);
-  worker.onmessageerror = () => failure('Worker communication failed');
+  worker.onerror = event => crashRecover(`Worker crashed: ${event.message || 'unknown error'}`);
+  worker.onmessageerror = () => crashRecover('Worker communication failed');
   startupTimer = setTimeout(() => {
     const elapsed = Math.round((performance.now() - startupStartedAt) / 1000);
     const detail = workerDependencyCount > 0
