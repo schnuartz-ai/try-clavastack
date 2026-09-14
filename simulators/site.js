@@ -5,6 +5,11 @@ const pointers = {
   play: '/browser/variants/specter-playground.json',
   schnuartz: '/browser/variants/specter-playground-schnuartz.json',
 };
+const feedbackRepositories = {
+  diy: 'schnuartz-ai/specter-diy',
+  play: 'k9ert/specter-playground',
+  schnuartz: 'schnuartz-ai/specter-playground-schnuartz',
+};
 const devices = Object.fromEntries(order.map(name => [name, document.querySelector(`[data-device="${name}"]`)]));
 const frames = Object.fromEntries(order.map(name => [name, devices[name].querySelector('iframe')]));
 const ready = new Set();
@@ -255,9 +260,7 @@ function updateFeedback() {
   const label = feedbackDevice.selectedOptions[0].textContent;
   const body = `${comment}\n\n---\nSimulator: ${label}\nFirmware source: ${source}\n\nBrowser simulator feedback; no seed phrases or private keys included.`;
   const query = new URLSearchParams({ title: `Simulator feedback: ${label}`, body });
-  const sourceUrl = new URL(source);
-  const sourceParts = sourceUrl.pathname.split('/').filter(Boolean);
-  const repository = sourceParts.length >= 2 ? sourceParts.slice(0, 2).join('/') : 'schnuartz-ai/try-clavastack';
+  const repository = feedbackRepositories[feedbackDevice.value];
   feedbackSubmit.href = `https://github.com/${repository}/issues/new?${query}`;
 }
 feedbackMessage.addEventListener('input', updateFeedback);
