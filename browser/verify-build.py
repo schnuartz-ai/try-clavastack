@@ -6,7 +6,7 @@ import json
 
 root = Path(__file__).resolve().parent.parent
 for pointer_file, repository in (
-    ('current.json', 'schnuartz-ai/specter-diy'),
+    ('current.json', 'Schnuartz/specter-diy'),
     ('variants/specter-playground.json', 'k9ert/specter-playground'),
     ('variants/specter-playground-schnuartz.json', 'schnuartz-ai/specter-playground-schnuartz'),
 ):
@@ -16,7 +16,7 @@ for pointer_file, repository in (
     build = root / pointer.lstrip('/')
     manifest = json.loads((build / 'build-info.json').read_text())
     assert manifest['repository'] == repository
-    if repository != 'schnuartz-ai/specter-diy':
+    if repository != 'Schnuartz/specter-diy':
         assert manifest['entrypoint'] == 'mockui' and '-mockui/' in pointer
     assert manifest['commit'] in pointer
     assert current['version'] == manifest['artifact_set_sha256'][:16]

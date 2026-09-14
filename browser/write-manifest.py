@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 source, output = (Path(p).resolve() for p in sys.argv[1:3])
-repository = sys.argv[3] if len(sys.argv) > 3 else "schnuartz-ai/specter-diy"
+repository = sys.argv[3] if len(sys.argv) > 3 else "Schnuartz/specter-diy"
 
 
 def git(*args):
@@ -48,7 +48,7 @@ pointer = {
     "build": "/" + str(output.relative_to(Path(__file__).resolve().parent.parent)).replace('\\', '/') + "/",
     "version": artifact_set[:16],
 }
-pointer_name = "current.json" if repository == "schnuartz-ai/specter-diy" else (
+pointer_name = "current.json" if repository.lower() in ("schnuartz/specter-diy", "schnuartz-ai/specter-diy") else (
     "variants/" + repository.split("/")[1] + ".json"
 )
 pointer_path = Path(__file__).resolve().parent / pointer_name

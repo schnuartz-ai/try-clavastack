@@ -4,11 +4,11 @@ set -euo pipefail
 # Rebuild the browser runtime from a pinned Specter tree. Set SPECTER_SRC to an
 # already checked-out, clean source tree when iterating locally.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_REPO="https://github.com/schnuartz-ai/specter-diy.git"
-SOURCE_SHA="eb8397d2b53bfe43cec0571f8efa235aa352d8ec"
+SOURCE_REPO="https://github.com/Schnuartz/specter-diy.git"
+SOURCE_SHA="89431c644cc300c55b53220d262a31be02353969"
 SPECTER_SRC="${SPECTER_SRC:-$ROOT/.browser-work/specter-diy}"
 EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
-OUT="$ROOT/builds/schnuartz-ai/specter-diy/$SOURCE_SHA"
+OUT="$ROOT/builds/Schnuartz/specter-diy/$SOURCE_SHA"
 
 if [[ ! -d "$SPECTER_SRC/.git" ]]; then
   mkdir -p "$(dirname "$SPECTER_SRC")"
@@ -71,5 +71,5 @@ mkdir -p "$OUT"
 cp "$SPECTER_SRC/f469-disco/micropython/ports/unix/micropython.js" "$OUT/"
 cp "$SPECTER_SRC/f469-disco/micropython/ports/unix/micropython.wasm" "$OUT/"
 cp "$SPECTER_SRC/f469-disco/micropython/ports/unix/micropython.data" "$OUT/"
-python3 "$ROOT/browser/write-manifest.py" "$SPECTER_SRC" "$OUT"
+python3 "$ROOT/browser/write-manifest.py" "$SPECTER_SRC" "$OUT" "Schnuartz/specter-diy"
 echo "Browser artifacts: $OUT"

@@ -4,11 +4,11 @@ The default site is static. Its only server requirements are HTTPS, correct WASM
 
 ## Local build
 
-Run the commands in the [README](README.md#build-and-test) on Linux or WSL2. `browser/build-browser.sh` pins Specter commit `eb8397d2b53bfe43cec0571f8efa235aa352d8ec`, fetches its recursive submodules, requires Emscripten 3.1.74, and writes:
+Run the commands in the [README](README.md#build-and-test) on Linux or WSL2. `browser/build-browser.sh` pins Specter commit `89431c644cc300c55b53220d262a31be02353969`, fetches its recursive submodules, requires Emscripten 3.1.74, and writes:
 
 ```text
 browser/current.json
-builds/schnuartz-ai/specter-diy/eb8397d2b53bfe43cec0571f8efa235aa352d8ec/
+builds/Schnuartz/specter-diy/89431c644cc300c55b53220d262a31be02353969/
   micropython.js
   micropython.wasm
   micropython.data
