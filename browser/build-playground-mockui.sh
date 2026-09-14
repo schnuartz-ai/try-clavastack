@@ -28,6 +28,9 @@ apply_if_needed() {
 apply_if_needed "$FORK_SRC/f469-disco/micropython" "$ROOT/browser/v9-patches/micropython.patch"
 apply_if_needed "$FORK_SRC/f469-disco/usermods" "$ROOT/browser/v9-patches/usermods.patch"
 apply_if_needed "$FORK_SRC/f469-disco/usermods/secp256k1" "$ROOT/browser/v9-patches/secp256k1.patch"
+if [[ "$1" = schnuartz ]]; then
+  python3 "$ROOT/browser/patch-playground-qstr.py" "$FORK_SRC/f469-disco/micropython"
+fi
 
 if ! command -v emcc >/dev/null; then
   test -f "$EMSDK_ENV" || { echo "Emscripten 3.1.74 required" >&2; exit 1; }
