@@ -170,7 +170,7 @@ repo-root/
 │   └── core/
 │       └── rfb.js          # Core VNC client
 └── assets/
-    ├── phone-mockup.png    # Device mockup image
+    ├── Specter-Shield-Metal-mockup.png    # Device mockup image
     ├── clavastack-logo.png
     └── specter-logo.png
 ```

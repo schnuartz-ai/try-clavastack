@@ -13,6 +13,10 @@ await page.goto(`${base}/simulators/`);
 for (const name of ['diy', 'play', 'schnuartz']) {
   await page.locator(`[data-device="${name}"] .device-status`).getByText('Running locally', { exact: false })
     .waitFor({ timeout: 75000 });
+  if (!await page.locator(`[data-device="${name}"] .device-shell`)
+    .evaluate(img => img.complete && img.naturalWidth > 0)) {
+    throw new Error(`${name} Specter Shield Metal device image did not load`);
+  }
   const frame = page.frameLocator(`[data-device="${name}"] iframe`);
   await frame.locator('#screen').waitFor();
 }
@@ -23,15 +27,19 @@ for (const name of ['diy', 'play', 'schnuartz']) {
   for (let i = 0; i < png.data.length; i += 4) colors.add(`${png.data[i]},${png.data[i + 1]},${png.data[i + 2]}`);
   if (colors.size < 12) throw new Error(`${name} Specter display has only ${colors.size} colors`);
 }
-for (const [name, x, y] of [['play', .24, .38], ['schnuartz', .94, .03]]) {
+for (const [name, targets] of [
+  ['play', [[.24, .38], [.50, .38], [.75, .38], [.24, .55]]],
+  ['schnuartz', [[.94, .03], [.50, .48], [.50, .85]]],
+]) {
   const canvas = page.frameLocator(`[data-device="${name}"] iframe`).locator('#screen');
   const before = await canvas.screenshot();
   const box = await canvas.boundingBox();
   let changed = false;
-  for (let attempt = 0; attempt < 3 && !changed; attempt++) {
-    await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
-    await page.waitForTimeout(650);
+  for (const [x, y] of targets) {
+    await canvas.click({ position: { x: box.width * x, y: box.height * y } });
+    await page.waitForTimeout(1600);
     changed = !before.equals(await canvas.screenshot());
+    if (changed) break;
   }
   if (!changed) throw new Error(`${name} gallery pointer did not reach LVGL`);
 }
