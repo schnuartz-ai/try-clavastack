@@ -14,7 +14,7 @@ EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
 OUT="$ROOT/builds/${REPOSITORY}-mockui/$SOURCE_SHA"
 if [[ ! -d "$FORK_SRC/.git" ]]; then
   mkdir -p "$(dirname "$FORK_SRC")"
-  git clone --recursive "https://github.com/$REPOSITORY.git" "$FORK_SRC"
+  git clone "https://github.com/$REPOSITORY.git" "$FORK_SRC"
   git -C "$FORK_SRC" checkout "$SOURCE_SHA"
 fi
 test "$(git -C "$FORK_SRC" rev-parse HEAD)" = "$SOURCE_SHA" || { echo "Wrong fork commit" >&2; exit 1; }

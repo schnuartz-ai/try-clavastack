@@ -12,7 +12,7 @@ OUT="$ROOT/builds/Schnuartz/specter-diy/$SOURCE_SHA"
 
 if [[ ! -d "$SPECTER_SRC/.git" ]]; then
   mkdir -p "$(dirname "$SPECTER_SRC")"
-  git clone --recursive "$SOURCE_REPO" "$SPECTER_SRC"
+  git clone "$SOURCE_REPO" "$SPECTER_SRC"
   git -C "$SPECTER_SRC" checkout "$SOURCE_SHA"
 fi
 test "$(git -C "$SPECTER_SRC" rev-parse HEAD)" = "$SOURCE_SHA" || {
