@@ -187,7 +187,11 @@ onmessage = ({ data }) => {
   self.Module = {
     canvas,
     headlessDisplay,
-    arguments: ['-X', 'heapsize=64M', data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state'],
+    // Real Specter DIY hardware runs everything (firmware + wallet state) in
+    // 16MB total RAM. 64M here was simulator-only headroom, not a firmware
+    // requirement - with 3 instances running at once in the gallery, it was
+    // the single biggest avoidable memory cost (192MB of GC heap alone).
+    arguments: ['-X', 'heapsize=16M', data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state'],
     monitorRunDependencies: remaining => send('loading-progress', { remaining }),
     locateFile: path => data.build + path + assetSuffix,
     preRun: [() => {
