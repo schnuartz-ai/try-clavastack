@@ -15,10 +15,10 @@ await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 
 const mainPointer = await (await page.request.get(`${base}/browser/current.json`)).json();
 const mainManifest = await (await page.request.get(`${base}${mainPointer.build}build-info.json`)).json();
 const sourceLink = page.locator('#source-commit-link');
-const expectedCommitUrl = `https://github.com/${mainManifest.repository}/commit/${mainManifest.commit}`;
-if (await sourceLink.textContent() !== `GitHub · ${mainManifest.commit.slice(0, 7)}` ||
-    await sourceLink.getAttribute('href') !== expectedCommitUrl) {
-  throw new Error('Main page does not link to its exact firmware commit below Restart');
+const expectedRepositoryUrl = `https://github.com/${mainManifest.repository}`;
+if (await sourceLink.textContent() !== 'GitHub' ||
+    await sourceLink.getAttribute('href') !== expectedRepositoryUrl) {
+  throw new Error('Main page does not link to its firmware repository below Restart');
 }
 if (!await page.locator('.phone-mockup').evaluate(img => img.complete && img.naturalWidth > 0)) {
   throw new Error('Specter Shield Metal device image did not load');
@@ -41,6 +41,10 @@ if (before.equals(after)) throw new Error('Pointer input did not change the Spec
 
 await page.locator('#sd-toggle').click();
 await page.locator('#sd-state').getByText('Inserted').waitFor();
+if (await page.locator('#sd-hint').textContent() !== 'Click to remove' ||
+    await page.locator('#sd-toggle').getAttribute('aria-pressed') !== 'true') {
+  throw new Error('SD card image did not switch to the inserted state');
+}
 await page.locator('#sd-picker').setInputFiles({
   name: 'probe.bin', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 1, 2, 255]),
 });
@@ -51,6 +55,14 @@ const download = await downloadPromise;
 if (!(await readFile(await download.path())).equals(Buffer.from([0, 1, 2, 255]))) {
   throw new Error('Virtual SD export bytes differ from imported bytes');
 }
+await page.locator('#sd-toggle').click();
+await page.locator('#sd-state').getByText('Ejected').waitFor();
+if (await page.locator('#sd-hint').textContent() !== 'Click to insert' ||
+    await page.locator('#sd-toggle').getAttribute('aria-pressed') !== 'false') {
+  throw new Error('SD card image did not switch to the ejected state');
+}
+await page.locator('#sd-toggle').click();
+await page.locator('#sd-state').getByText('Inserted').waitFor();
 
 const previousCanvas = await canvas.elementHandle();
 await page.locator('#restart-btn').click();
@@ -58,8 +70,8 @@ await page.waitForFunction(previous => document.querySelector('#screen') !== pre
   previousCanvas, { timeout: 10000 });
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
 await previousCanvas.dispose();
-if (await sourceLink.getAttribute('href') !== expectedCommitUrl) {
-  throw new Error('Source commit link changed after local restart');
+if (await sourceLink.getAttribute('href') !== expectedRepositoryUrl) {
+  throw new Error('Repository link changed after local restart');
 }
 await page.locator('#sd-state').getByText('Inserted').waitFor();
 await page.locator('#sd-files').getByText('probe.bin', { exact: false }).waitFor();

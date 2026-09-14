@@ -204,7 +204,10 @@ function onWorkerMessage({ data }) {
   } else if (data.type === 'sd-state') {
     inserted = data.inserted;
     $('#sd-state').textContent = inserted ? 'Inserted' : 'Ejected';
-    $('#sd-toggle').textContent = inserted ? 'Eject SD card' : 'Insert SD card';
+    $('#sd-toggle').setAttribute('aria-label', inserted ? 'Remove SD card' : 'Insert SD card');
+    $('#sd-toggle').setAttribute('aria-pressed', String(inserted));
+    $('#sd-toggle').title = inserted ? 'Click to remove SD card' : 'Click to insert SD card';
+    $('#sd-hint').textContent = inserted ? 'Click to remove' : 'Click to insert';
     $('#sd-stage').classList.toggle('inserted', inserted);
     notifyParent({ type: 'peripheral-state', variant, sdInserted: inserted, cardSlot: activeCard });
   } else if (data.type === 'sd-list') {
@@ -479,9 +482,10 @@ try {
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
   $('#build-label').textContent = `${manifest.repository} · ${manifest.commit.slice(0, 7)} · Browser / WASM`;
-  const commitUrl = `https://github.com/${manifest.repository}/commit/${manifest.commit}`;
-  $('#source-commit-link').href = commitUrl;
-  $('#source-commit-link').textContent = `GitHub · ${manifest.commit.slice(0, 7)}`;
+  const repositoryUrl = `https://github.com/${manifest.repository}`;
+  const commitUrl = `${repositoryUrl}/commit/${manifest.commit}`;
+  $('#source-commit-link').href = repositoryUrl;
+  $('#source-commit-link').textContent = 'GitHub';
   $('#build-link').href = commitUrl;
   $('#build-link').textContent = manifest.commit.slice(0, 12);
   $('#build-details').textContent = JSON.stringify(manifest, null, 2);
@@ -492,6 +496,5 @@ try {
   }
   await start();
 } catch (error) {
-  if (!$('#source-commit-link').hasAttribute('href')) $('#source-commit-link').textContent = 'GitHub · unavailable';
   failure(`Browser build failed to load: ${error.message}`);
 }

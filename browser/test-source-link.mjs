@@ -17,13 +17,14 @@ try {
     await page.route('**/browser/runtime-worker.js', route => route.abort());
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     const link = page.locator('#source-commit-link');
-    await link.filter({ hasText: `GitHub · ${commit.slice(0, 7)}` }).waitFor();
-    if (await link.getAttribute('href') !== `https://github.com/${repository}/commit/${commit}`) {
-      throw new Error(`Wrong commit link for ${repository}`);
+    await link.filter({ hasText: 'GitHub' }).waitFor();
+    if (await link.textContent() !== 'GitHub' ||
+        await link.getAttribute('href') !== `https://github.com/${repository}`) {
+      throw new Error(`Wrong repository link for ${repository}`);
     }
     await page.close();
   }
 } finally {
   await browser.close();
 }
-console.log('Main page links both production and new DIY build namespaces to their exact commits');
+console.log('Main page links both production and new DIY build namespaces to their repositories');
