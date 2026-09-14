@@ -475,7 +475,7 @@ try {
   }
   const expectedRepo = variant === 'diy' ? 'schnuartz-ai/specter-diy' :
     variant === 'play' ? 'k9ert/specter-playground' : 'schnuartz-ai/specter-playground-schnuartz';
-  if (manifest.repository !== expectedRepo) throw new Error('Wrong firmware variant in build manifest');
+  if (manifest.repository?.toLowerCase() !== expectedRepo.toLowerCase()) throw new Error('Wrong firmware variant in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
   $('#build-label').textContent = `${manifest.repository} · ${manifest.commit.slice(0, 7)} · Browser / WASM`;
   $('#build-link').href = `${manifest.source_url}/commit/${manifest.commit}`;
