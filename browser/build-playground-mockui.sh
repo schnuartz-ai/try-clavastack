@@ -37,7 +37,8 @@ apply_if_needed() {
   fi
 }
 apply_if_needed "$FORK_SRC/f469-disco/micropython" "$ROOT/browser/v9-patches/micropython.patch"
-apply_if_needed "$FORK_SRC/f469-disco/usermods" "$ROOT/browser/v9-patches/usermods.patch"
+# This patch's paths already start with usermods/, unlike the other two.
+apply_if_needed "$FORK_SRC/f469-disco" "$ROOT/browser/v9-patches/usermods.patch"
 apply_if_needed "$FORK_SRC/f469-disco/usermods/secp256k1" "$ROOT/browser/v9-patches/secp256k1.patch"
 if [[ "$1" = schnuartz ]]; then
   python3 "$ROOT/browser/patch-playground-qstr.py" "$FORK_SRC/f469-disco/micropython"
