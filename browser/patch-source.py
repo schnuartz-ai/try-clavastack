@@ -218,13 +218,17 @@ if old in gc_source:
 elif new not in gc_source:
     raise RuntimeError(f"Unexpected GC source at {gc_file}")
 
-# Match the Unix import hook's return type to MicroPython's lexer declaration.
-replace(
+# Match both host cross-compiler and Unix port import hooks to the lexer API.
+for main_source in (
+    "f469-disco/micropython/mpy-cross/main.c",
     "f469-disco/micropython/ports/unix/main.c",
-    "uint mp_import_stat(const char *path) {",
-    "mp_import_stat_t mp_import_stat(const char *path) {",
-    1,
-)
+):
+    replace(
+        main_source,
+        "uint mp_import_stat(const char *path) {",
+        "mp_import_stat_t mp_import_stat(const char *path) {",
+        1,
+    )
 
 # Emscripten has an explicit 8 MB wasm stack. The Unix default's 40 KB
 # MicroPython guard rejects Specter's deep but legitimate import graph.
