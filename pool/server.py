@@ -4,6 +4,7 @@ Multi-Pool Allocator API for 3 simulator types, each with auto-scaling (min 2, m
 """
 
 import json
+import base64
 import logging
 import os
 import re
@@ -11,6 +12,7 @@ import subprocess
 import random
 import threading
 import time
+from urllib.parse import urlparse
 from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -57,7 +59,9 @@ MAX_INSTANCES = 5
 
 STATE_FILE = "/opt/try-clavastack/pool/state.json"
 FEEDBACK_FILE = "/opt/try-clavastack/pool/feedback.json"
+FEEDBACK_MEDIA_DIR = "/opt/try-clavastack/pool/feedback-media"
 FEEDBACK_LIMIT = 200
+FEEDBACK_MAX_IMAGE_BYTES = 2 * 1024 * 1024
 FEEDBACK_VARIANTS = {
     "diy": {"label": "Specter DIY · Device 1", "repository": "schnuartz-ai/specter-diy"},
     "play": {"label": "K9ert Playground · Device 2", "repository": "k9ert/specter-playground"},
@@ -77,6 +81,12 @@ idle_since = {}         # instance_id -> timestamp when became idle
 last_reset = {}         # instance_id -> timestamp of last reset
 feedback_lock = threading.Lock()
 feedback_items = []
+FEEDBACK_IMAGE_TYPES = {
+    'image/png': ('png', b'\x89PNG\r\n\x1a\n'),
+    'image/jpeg': ('jpg', b'\xff\xd8\xff'),
+    'image/gif': ('gif', b'GIF8'),
+    'image/webp': ('webp', b'RIFF'),
+}
 
 
 def load_state():
@@ -113,6 +123,11 @@ def load_feedback():
             variant = item.get('variant')
             if not comment or len(comment) > 5000 or variant not in FEEDBACK_VARIANTS:
                 continue
+            try:
+                likes = max(0, int(item.get('likes', 0)))
+                dislikes = max(0, int(item.get('dislikes', 0)))
+            except (TypeError, ValueError):
+                likes = dislikes = 0
             valid.append({
                 'id': str(item.get('id', '')),
                 'createdAt': str(item.get('createdAt', '')),
@@ -120,6 +135,12 @@ def load_feedback():
                 'label': FEEDBACK_VARIANTS[variant]['label'],
                 'repository': FEEDBACK_VARIANTS[variant]['repository'],
                 'comment': comment,
+                'version': str(item.get('version', 'Unknown'))[:200],
+                'browser': str(item.get('browser', 'Unknown'))[:200],
+                'status': item.get('status') if item.get('status') in {'new', 'in_progress', 'resolved'} else 'new',
+                'likes': likes,
+                'dislikes': dislikes,
+                'screenshotUrl': item.get('screenshotUrl') if isinstance(item.get('screenshotUrl'), str) else None,
             })
         feedback_items = valid[:FEEDBACK_LIMIT]
     except (OSError, ValueError, TypeError):
@@ -153,6 +174,8 @@ def create_feedback(data):
         return {'status': 'error', 'error': 'Comment cannot be empty.'}
     if len(comment) > 5000:
         return {'status': 'error', 'error': 'Comment is limited to 5000 characters.'}
+    version = str(data.get('version', 'Unknown')).strip()[:200]
+    browser = str(data.get('browser', 'Unknown')).strip()[:200]
     now = datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
     item = {
         'id': f"feedback_{int(time.time() * 1000)}_{random.randint(1000, 9999)}",
@@ -161,12 +184,89 @@ def create_feedback(data):
         'label': FEEDBACK_VARIANTS[variant]['label'],
         'repository': FEEDBACK_VARIANTS[variant]['repository'],
         'comment': comment,
+        'version': version or 'Unknown',
+        'browser': browser or 'Unknown',
+        'status': 'new',
+        'likes': 0,
+        'dislikes': 0,
+        'screenshotUrl': None,
     }
+    screenshot = data.get('screenshot') if isinstance(data, dict) else None
+    if screenshot:
+        if not isinstance(screenshot, str) or ',' not in screenshot:
+            return {'status': 'error', 'error': 'Screenshot data is invalid.'}
+        header, encoded = screenshot.split(',', 1)
+        mime = header[5:].split(';', 1)[0].lower() if header.startswith('data:') else ''
+        image_type = FEEDBACK_IMAGE_TYPES.get(mime)
+        if not image_type:
+            return {'status': 'error', 'error': 'Screenshot must be PNG, JPEG, GIF or WebP.'}
+        try:
+            image_bytes = base64.b64decode(encoded, validate=True)
+        except (ValueError, TypeError):
+            return {'status': 'error', 'error': 'Screenshot data is invalid.'}
+        if len(image_bytes) > FEEDBACK_MAX_IMAGE_BYTES or not image_bytes.startswith(image_type[1]):
+            return {'status': 'error', 'error': 'Screenshot must be a valid image up to 2 MB.'}
+        os.makedirs(FEEDBACK_MEDIA_DIR, mode=0o750, exist_ok=True)
+        filename = f"{item['id']}.{image_type[0]}"
+        with open(os.path.join(FEEDBACK_MEDIA_DIR, filename), 'wb') as image_file:
+            image_file.write(image_bytes)
+        item['screenshotUrl'] = f"/api/feedback/media/{filename}"
     with feedback_lock:
         feedback_items.insert(0, item)
         del feedback_items[FEEDBACK_LIMIT:]
         save_feedback()
         return {'status': 'ok', 'comment': item}
+
+
+def update_feedback_status(data):
+    comment_id = data.get('id') if isinstance(data, dict) else None
+    status = data.get('status') if isinstance(data, dict) else None
+    if status not in {'new', 'in_progress', 'resolved'}:
+        return {'status': 'error', 'error': 'Choose a valid status.'}
+    with feedback_lock:
+        for item in feedback_items:
+            if item.get('id') == comment_id:
+                item['status'] = status
+                save_feedback()
+                return {'status': 'ok', 'comment': item}
+    return {'status': 'error', 'error': 'Comment not found.'}
+
+
+def update_feedback_reaction(data):
+    comment_id = data.get('id') if isinstance(data, dict) else None
+    reaction = data.get('reaction') if isinstance(data, dict) else None
+    if reaction not in {'like', 'dislike'}:
+        return {'status': 'error', 'error': 'Choose like or dislike.'}
+    with feedback_lock:
+        for item in feedback_items:
+            if item.get('id') == comment_id:
+                key = 'likes' if reaction == 'like' else 'dislikes'
+                item[key] = max(0, int(item.get(key, 0))) + 1
+                save_feedback()
+                return {'status': 'ok', 'comment': item}
+    return {'status': 'error', 'error': 'Comment not found.'}
+
+
+def send_feedback_media(handler, filename):
+    match = re.fullmatch(r'(feedback_[A-Za-z0-9_-]+)\.(png|jpg|gif|webp)', filename)
+    if not match:
+        handler.send_response(404)
+        handler.end_headers()
+        return
+    path = os.path.join(FEEDBACK_MEDIA_DIR, filename)
+    if not os.path.isfile(path):
+        handler.send_response(404)
+        handler.end_headers()
+        return
+    content_type = {'png': 'image/png', 'jpg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp'}[match.group(2)]
+    with open(path, 'rb') as image_file:
+        content = image_file.read(FEEDBACK_MAX_IMAGE_BYTES + 1)
+    handler.send_response(200)
+    handler.send_header('Content-Type', content_type)
+    handler.send_header('Content-Length', str(len(content)))
+    handler.send_header('Cache-Control', 'public, max-age=31536000, immutable')
+    handler.end_headers()
+    handler.wfile.write(content)
 
 
 def is_instance_healthy(inst_id):
@@ -498,7 +598,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         cl = int(self.headers.get('Content-Length', 0))
-        if cl > 12000:
+        max_body = 4000000 if urlparse(self.path).path == '/api/feedback' else 12000
+        if cl > max_body:
             self.send_json({'error': 'Request body too large'}, 413)
             return
         body = self.rfile.read(cl).decode() if cl > 0 else '{}'
@@ -507,22 +608,31 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             data = {}
 
-        if self.path == '/api/feedback':
+        path = urlparse(self.path).path
+        if path == '/api/feedback':
             result = create_feedback(data)
             self.send_json(result, 201 if result.get('status') == 'ok' else 400)
 
-        elif self.path == '/api/allocate':
+        elif path == '/api/feedback/status':
+            result = update_feedback_status(data)
+            self.send_json(result, 200 if result.get('status') == 'ok' else 400)
+
+        elif path == '/api/feedback/reaction':
+            result = update_feedback_reaction(data)
+            self.send_json(result, 200 if result.get('status') == 'ok' else 400)
+
+        elif path == '/api/allocate':
             pool = data.get('pool', 'diy')
             self.send_json(allocate_session(pool))
 
-        elif self.path == '/api/heartbeat':
+        elif path == '/api/heartbeat':
             sid = data.get('sessionId', '')
             if not sid:
                 self.send_json({"error": "Missing sessionId"}, 400)
                 return
             self.send_json(heartbeat_session(sid))
 
-        elif self.path == '/api/release':
+        elif path == '/api/release':
             sid = data.get('sessionId', '')
             if not sid:
                 self.send_json({"error": "Missing sessionId"}, 400)
@@ -537,9 +647,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "Not found"}, 404)
 
     def do_GET(self):
-        if self.path == '/api/feedback':
+        path = urlparse(self.path).path
+        if path == '/api/feedback':
             self.send_json(get_feedback())
-        elif self.path == '/api/status':
+        elif path.startswith('/api/feedback/media/'):
+            send_feedback_media(self, path.rsplit('/', 1)[-1])
+        elif path == '/api/status':
             with lock:
                 result = {}
                 for pname, pinfo in POOLS.items():

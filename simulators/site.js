@@ -10,6 +10,7 @@ const feedbackRepositories = {
   play: 'k9ert/specter-playground',
   schnuartz: 'schnuartz-ai/specter-playground-schnuartz',
 };
+const feedbackVersions = {};
 const devices = Object.fromEntries(order.map(name => [name, document.querySelector(`[data-device="${name}"]`)]));
 const frames = Object.fromEntries(order.map(name => [name, devices[name].querySelector('iframe')]));
 const ready = new Set();
@@ -165,6 +166,7 @@ for (const name of order) {
     try {
       const pointer = await (await fetch(pointers[name], { cache: 'no-store' })).json();
       const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
+      feedbackVersions[name] = pointer.version || info.commit?.slice(0, 7) || 'Unknown';
       const link = devices[name].querySelector('.source-link');
       link.href = `${info.source_url}/commit/${info.commit}`;
       link.textContent = `GitHub · ${info.commit.slice(0, 7)}`;
@@ -178,6 +180,14 @@ const feedbackSubmit = document.querySelector('#feedback-submit');
 const feedbackSave = document.querySelector('#feedback-save');
 const feedbackStatus = document.querySelector('#feedback-status');
 const feedbackList = document.querySelector('#feedback-list');
+const feedbackScreenshot = document.querySelector('#feedback-screenshot');
+const feedbackPreview = document.querySelector('#feedback-preview');
+const feedbackApi = '/api/feedback';
+const reactionStorageKey = 'try-clavastack-feedback-reactions-v1';
+const statusLabels = { new: 'New', in_progress: 'In progress', resolved: 'Resolved' };
+let screenshotData = '';
+let ownReactions = {};
+try { ownReactions = JSON.parse(localStorage.getItem(reactionStorageKey) || '{}') || {}; } catch {}
 let savedFeedback = [];
 function renderFeedback() {
   feedbackList.replaceChildren();
@@ -202,7 +212,55 @@ function renderFeedback() {
     head.append(label, time);
     const body = document.createElement('p');
     body.textContent = item.comment;
-    entry.append(head, body);
+    const details = document.createElement('div');
+    details.className = 'feedback-item-details';
+    details.textContent = `Firmware: ${item.version || 'Unknown'} · Browser: ${item.browser || 'Unknown'}`;
+    const state = document.createElement('div');
+    state.className = 'feedback-item-state';
+    const stateLabel = document.createElement('span');
+    stateLabel.textContent = 'Status';
+    const stateSelect = document.createElement('select');
+    stateSelect.className = 'feedback-status';
+    stateSelect.setAttribute('aria-label', `Status for ${item.label}`);
+    for (const [value, text] of Object.entries(statusLabels)) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      stateSelect.append(option);
+    }
+    stateSelect.value = statusLabels[item.status] ? item.status : 'new';
+    stateSelect.addEventListener('change', () => changeFeedbackStatus(item, stateSelect));
+    state.append(stateLabel, stateSelect);
+    entry.append(head, details, body, state);
+    if (item.screenshotUrl && item.screenshotUrl.startsWith('/api/feedback/media/')) {
+      const screenshotLink = document.createElement('a');
+      screenshotLink.href = item.screenshotUrl;
+      screenshotLink.target = '_blank';
+      screenshotLink.rel = 'noopener noreferrer';
+      const screenshot = document.createElement('img');
+      screenshot.className = 'feedback-screenshot';
+      screenshot.src = item.screenshotUrl;
+      screenshot.alt = `Screenshot attached to ${item.label} feedback`;
+      screenshot.loading = 'lazy';
+      screenshotLink.append(screenshot);
+      entry.append(screenshotLink);
+    }
+    const reactions = document.createElement('div');
+    reactions.className = 'feedback-reactions';
+    for (const [reaction, symbol, label] of [['like', '👍', 'Like'], ['dislike', '👎', 'Dislike']]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = `${symbol} ${item[reaction === 'like' ? 'likes' : 'dislikes'] || 0}`;
+      button.title = label;
+      button.setAttribute('aria-label', `${label} this comment`);
+      if (ownReactions[item.id]) {
+        button.disabled = true;
+        if (ownReactions[item.id] === reaction) button.classList.add('selected');
+      }
+      button.addEventListener('click', () => reactToFeedback(item, reaction));
+      reactions.append(button);
+    }
+    entry.append(reactions);
     feedbackList.append(entry);
   }
 }
@@ -211,24 +269,96 @@ function setFeedbackStatus(message) {
 }
 async function loadFeedback() {
   try {
-    const response = await fetch('/api/feedback', { cache: 'no-store' });
+    const response = await fetch(feedbackApi, { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     savedFeedback = Array.isArray(data.comments) ? data.comments : [];
     renderFeedback();
     setFeedbackStatus(`${savedFeedback.length} shared comment${savedFeedback.length === 1 ? '' : 's'}.`);
-  } catch (error) {
+  } catch {
     setFeedbackStatus('Shared comments could not be loaded. Please try again later.');
+  }
+}
+async function changeFeedbackStatus(item, select) {
+  const previous = item.status || 'new';
+  select.disabled = true;
+  try {
+    const response = await fetch(`${feedbackApi}/status`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, status: select.value }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.comment) throw new Error(data.error || `HTTP ${response.status}`);
+    const index = savedFeedback.findIndex(candidate => candidate.id === item.id);
+    if (index >= 0) savedFeedback[index] = data.comment;
+    renderFeedback();
+    setFeedbackStatus('Status updated for everyone.');
+  } catch (error) {
+    select.value = previous;
+    setFeedbackStatus(`Status could not be updated: ${error.message}`);
+  } finally {
+    select.disabled = false;
+  }
+}
+async function reactToFeedback(item, reaction) {
+  if (ownReactions[item.id]) return;
+  try {
+    const response = await fetch(`${feedbackApi}/reaction`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, reaction }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.comment) throw new Error(data.error || `HTTP ${response.status}`);
+    const index = savedFeedback.findIndex(candidate => candidate.id === item.id);
+    if (index >= 0) savedFeedback[index] = data.comment;
+    ownReactions[item.id] = reaction;
+    try { localStorage.setItem(reactionStorageKey, JSON.stringify(ownReactions)); } catch {}
+    renderFeedback();
+  } catch (error) {
+    setFeedbackStatus(`Reaction could not be saved: ${error.message}`);
   }
 }
 function currentFeedback() {
   const device = devices[feedbackDevice.value];
   return {
+    variant: feedbackDevice.value,
     comment: feedbackMessage.value.trim(),
     label: feedbackDevice.selectedOptions[0].textContent,
     source: device.querySelector('.source-link').href,
+    version: feedbackVersions[feedbackDevice.value] || 'Loading…',
+    browser: browserLabel(),
+    screenshot: screenshotData || undefined,
   };
 }
+function browserLabel() {
+  const ua = navigator.userAgent;
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Other browser';
+  const platform = /Android/.test(ua) ? 'Android' : /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Other device';
+  return `${browser} on ${platform}`;
+}
+function clearScreenshot() {
+  screenshotData = '';
+  feedbackScreenshot.value = '';
+  feedbackPreview.hidden = true;
+  feedbackPreview.removeAttribute('src');
+}
+feedbackScreenshot.addEventListener('change', () => {
+  const file = feedbackScreenshot.files?.[0];
+  if (!file) { clearScreenshot(); return; }
+  if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+    clearScreenshot();
+    setFeedbackStatus('Screenshot must be PNG, JPEG, GIF or WebP up to 2 MB.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    screenshotData = typeof reader.result === 'string' ? reader.result : '';
+    feedbackPreview.src = screenshotData;
+    feedbackPreview.hidden = !screenshotData;
+    setFeedbackStatus('Screenshot attached to the next comment.');
+  };
+  reader.readAsDataURL(file);
+});
 async function saveCurrentFeedback() {
   const current = currentFeedback();
   if (!current.comment) return;
@@ -239,13 +369,14 @@ async function saveCurrentFeedback() {
     const response = await fetch('/api/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ variant: feedbackDevice.value, comment: current.comment, source: current.source }),
+      body: JSON.stringify(current),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.comment) throw new Error(data.error || `HTTP ${response.status}`);
     savedFeedback = [data.comment, ...savedFeedback.filter(item => item.id !== data.comment.id)];
     renderFeedback();
     feedbackMessage.value = '';
+    clearScreenshot();
     setFeedbackStatus('Comment saved and visible to everyone.');
   } catch (error) {
     setFeedbackStatus(`Comment could not be saved: ${error.message}`);
