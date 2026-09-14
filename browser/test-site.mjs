@@ -12,6 +12,14 @@ page.on('request', request => requests.push(request.url()));
 page.on('pageerror', error => errors.push(error.message));
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
+const mainPointer = await (await page.request.get(`${base}/browser/current.json`)).json();
+const mainManifest = await (await page.request.get(`${base}${mainPointer.build}build-info.json`)).json();
+const sourceLink = page.locator('#source-commit-link');
+const expectedCommitUrl = `https://github.com/${mainManifest.repository}/commit/${mainManifest.commit}`;
+if (await sourceLink.textContent() !== `GitHub · ${mainManifest.commit.slice(0, 7)}` ||
+    await sourceLink.getAttribute('href') !== expectedCommitUrl) {
+  throw new Error('Main page does not link to its exact firmware commit below Restart');
+}
 if (!await page.locator('.phone-mockup').evaluate(img => img.complete && img.naturalWidth > 0)) {
   throw new Error('Specter Shield Metal device image did not load');
 }
@@ -47,6 +55,9 @@ if (!(await readFile(await download.path())).equals(Buffer.from([0, 1, 2, 255]))
 await page.locator('#restart-btn').click();
 await page.locator('#st').getByText('Starting locally').waitFor({ timeout: 10000 });
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
+if (await sourceLink.getAttribute('href') !== expectedCommitUrl) {
+  throw new Error('Source commit link changed after local restart');
+}
 await page.locator('#sd-state').getByText('Inserted').waitFor();
 await page.locator('#sd-files').getByText('probe.bin', { exact: false }).waitFor();
 await canvas.screenshot({ path: 'test-results/specter-after-restart.png' });

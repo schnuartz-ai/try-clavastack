@@ -166,11 +166,20 @@ for (const name of order) {
     try {
       const pointer = await (await fetch(pointers[name], { cache: 'no-store' })).json();
       const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
+      if (!/^[a-f0-9]{40}$/.test(info.commit) ||
+          info.repository?.toLowerCase() !== feedbackRepositories[name] ||
+          !pointer.build.includes(`/${info.commit}/`) ||
+          pointer.version !== info.artifact_set_sha256?.slice(0, 16)) {
+        throw new Error('Build manifest mismatch');
+      }
       feedbackVersions[name] = pointer.version || info.commit?.slice(0, 7) || 'Unknown';
       const link = devices[name].querySelector('.source-link');
-      link.href = `${info.source_url}/commit/${info.commit}`;
+      link.href = `https://github.com/${info.repository}/commit/${info.commit}`;
       link.textContent = `GitHub · ${info.commit.slice(0, 7)}`;
-    } catch { devices[name].querySelector('.device-status').textContent = 'Build information unavailable'; }
+    } catch {
+      devices[name].querySelector('.source-link').textContent = 'GitHub · unavailable';
+      devices[name].querySelector('.device-status').textContent = 'Build information unavailable';
+    }
   })();
 }
 
@@ -324,7 +333,7 @@ function currentFeedback() {
     variant: feedbackDevice.value,
     comment: feedbackMessage.value.trim(),
     label: feedbackDevice.selectedOptions[0].textContent,
-    source: device.querySelector('.source-link').href,
+    source: device.querySelector('.source-link').getAttribute('href') || 'Build information unavailable',
     version: feedbackVersions[feedbackDevice.value] || 'Loading…',
     browser: browserLabel(),
     screenshot: screenshotData || undefined,
@@ -394,7 +403,7 @@ function updateFeedback() {
   feedbackSubmit.setAttribute('aria-disabled', String(!valid));
   if (!valid) { feedbackSubmit.href = '#feedback-message'; return; }
   const device = devices[feedbackDevice.value];
-  const source = device.querySelector('.source-link').href;
+  const source = device.querySelector('.source-link').getAttribute('href') || 'Build information unavailable';
   const label = feedbackDevice.selectedOptions[0].textContent;
   const body = `${comment}\n\n---\nSimulator: ${label}\nFirmware source: ${source}\n\nBrowser simulator feedback; no seed phrases or private keys included.`;
   const query = new URLSearchParams({ title: `Simulator feedback: ${label}`, body });

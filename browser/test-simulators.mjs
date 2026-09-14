@@ -13,6 +13,16 @@ await page.goto(`${base}/simulators/`);
 for (const name of ['diy', 'play', 'schnuartz']) {
   await page.locator(`[data-device="${name}"] .device-status`).getByText('Running locally', { exact: false })
     .waitFor({ timeout: 75000 });
+  const pointerPath = name === 'diy' ? '/browser/current.json' :
+    name === 'play' ? '/browser/variants/specter-playground.json' :
+    '/browser/variants/specter-playground-schnuartz.json';
+  const pointer = await (await page.request.get(`${base}${pointerPath}`)).json();
+  const manifest = await (await page.request.get(`${base}${pointer.build}build-info.json`)).json();
+  const sourceLink = page.locator(`[data-device="${name}"] .source-link`);
+  if (await sourceLink.textContent() !== `GitHub · ${manifest.commit.slice(0, 7)}` ||
+      await sourceLink.getAttribute('href') !== `https://github.com/${manifest.repository}/commit/${manifest.commit}`) {
+    throw new Error(`${name} does not link to its exact firmware commit below Restart`);
+  }
   if (!await page.locator(`[data-device="${name}"] .device-shell`)
     .evaluate(img => img.complete && img.naturalWidth > 0)) {
     throw new Error(`${name} Specter Shield Metal device image did not load`);
