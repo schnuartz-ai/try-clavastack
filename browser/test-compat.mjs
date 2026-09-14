@@ -35,9 +35,12 @@ for (const [name, engine] of Object.entries({ firefox, webkit })) {
   if (before.equals(await canvas.screenshot())) throw new Error(`${name}: pointer did not reach LVGL`);
   await page.locator('#sd-toggle').click();
   await page.locator('#sd-state').getByText('Inserted').waitFor();
+  const previousCanvas = await canvas.elementHandle();
   await page.locator('#restart-btn').click();
-  await page.locator('#st').getByText('Starting locally').waitFor();
+  await page.waitForFunction(previous => document.querySelector('#screen') !== previous,
+    previousCanvas, { timeout: 10000 });
   await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
+  await previousCanvas.dispose();
   await page.locator('#sd-state').getByText('Inserted').waitFor();
   console.log(JSON.stringify({ engine: name, boot: 'pass', canvasColors: colors.size,
     pointer: 'pass', restart: 'pass', sdState: 'pass' }));
