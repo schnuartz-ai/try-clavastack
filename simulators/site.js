@@ -170,10 +170,83 @@ for (const name of order) {
 const feedbackMessage = document.querySelector('#feedback-message');
 const feedbackDevice = document.querySelector('#feedback-device');
 const feedbackSubmit = document.querySelector('#feedback-submit');
+const feedbackSave = document.querySelector('#feedback-save');
+const feedbackClear = document.querySelector('#feedback-clear');
+const feedbackList = document.querySelector('#feedback-list');
+const feedbackStorageKey = 'try-clavastack-feedback-v1';
+let savedFeedback = [];
+try {
+  const stored = JSON.parse(localStorage.getItem(feedbackStorageKey) || '[]');
+  if (Array.isArray(stored)) {
+    savedFeedback = stored.filter(item => item && typeof item.comment === 'string' && item.comment.length >= 10 && typeof item.label === 'string').slice(0, 50);
+  }
+} catch {}
+function persistFeedback() {
+  try { localStorage.setItem(feedbackStorageKey, JSON.stringify(savedFeedback)); } catch {}
+}
+function renderFeedback() {
+  feedbackList.replaceChildren();
+  feedbackClear.hidden = savedFeedback.length === 0;
+  if (!savedFeedback.length) {
+    const empty = document.createElement('li');
+    empty.className = 'feedback-empty';
+    empty.textContent = 'No saved comments yet.';
+    feedbackList.append(empty);
+    return;
+  }
+  for (const item of savedFeedback) {
+    const entry = document.createElement('li');
+    entry.className = 'feedback-item';
+    const head = document.createElement('div');
+    head.className = 'feedback-item-head';
+    const label = document.createElement('strong');
+    label.textContent = item.label;
+    const time = document.createElement('time');
+    time.dateTime = item.createdAt;
+    const date = new Date(item.createdAt);
+    time.textContent = Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+    head.append(label, time);
+    const body = document.createElement('p');
+    body.textContent = item.comment;
+    const actions = document.createElement('div');
+    actions.className = 'feedback-item-actions';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Delete';
+    remove.addEventListener('click', () => {
+      savedFeedback = savedFeedback.filter(candidate => candidate.id !== item.id);
+      persistFeedback();
+      renderFeedback();
+    });
+    actions.append(remove);
+    entry.append(head, body, actions);
+    feedbackList.append(entry);
+  }
+}
+function currentFeedback() {
+  const device = devices[feedbackDevice.value];
+  return {
+    comment: feedbackMessage.value.trim(),
+    label: feedbackDevice.selectedOptions[0].textContent,
+    source: device.querySelector('.source-link').href,
+  };
+}
+function saveCurrentFeedback() {
+  const current = currentFeedback();
+  if (current.comment.length < 10) return;
+  const id = globalThis.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  savedFeedback.unshift({ id, createdAt: new Date().toISOString(), ...current });
+  savedFeedback = savedFeedback.slice(0, 50);
+  persistFeedback();
+  renderFeedback();
+  feedbackMessage.value = '';
+  updateFeedback();
+}
 function updateFeedback() {
   const comment = feedbackMessage.value.trim();
   document.querySelector('#feedback-count').textContent = `${feedbackMessage.value.length} / 5000 characters`;
   const valid = comment.length >= 10;
+  feedbackSave.disabled = !valid;
   feedbackSubmit.setAttribute('aria-disabled', String(!valid));
   if (!valid) { feedbackSubmit.href = '#feedback-message'; return; }
   const device = devices[feedbackDevice.value];
@@ -185,7 +258,14 @@ function updateFeedback() {
 }
 feedbackMessage.addEventListener('input', updateFeedback);
 feedbackDevice.addEventListener('change', updateFeedback);
+feedbackSave.addEventListener('click', saveCurrentFeedback);
+feedbackClear.addEventListener('click', () => {
+  savedFeedback = [];
+  persistFeedback();
+  renderFeedback();
+});
 document.querySelector('#feedback-form').addEventListener('submit', event => event.preventDefault());
+renderFeedback();
 updateFeedback();
 
 let drag;
