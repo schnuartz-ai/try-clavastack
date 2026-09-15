@@ -105,8 +105,12 @@ make -C "$PORT" -j4 \
   LDFLAGS_ARCH= \
   LDFLAGS_EXTRA="-sUSE_SDL=2 -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=65536 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sEXIT_RUNTIME=0 -sSTACK_SIZE=8388608 -sEXPORTED_RUNTIME_METHODS=FS,ccall --preload-file $ROOT/browser/runtime@/browser --preload-file $FORK_SRC/build/flash_image@/flash -Wl,--allow-multiple-definition"
 
+WASM_OPT="${WASM_OPT:-$(dirname "$(command -v emcc)")/../bin/wasm-opt}"
+python3 "$ROOT/browser/optimize-wasm.py" \
+  "$PORT/build-specter-mockui-browser/micropython.wasm" "$WASM_OPT"
+
 python3 "$ROOT/browser/normalize-glue.py" "$PORT/build-specter-mockui-browser/micropython.js"
 mkdir -p "$OUT"
 cp "$PORT/build-specter-mockui-browser"/micropython.{js,wasm,data} "$OUT/"
-python3 "$ROOT/browser/write-manifest.py" "$FORK_SRC" "$OUT" "$REPOSITORY" mockui
+BROWSER_WASM_OPTIMIZED=1 python3 "$ROOT/browser/write-manifest.py" "$FORK_SRC" "$OUT" "$REPOSITORY" mockui
 echo "MockUI browser artifacts: $OUT"

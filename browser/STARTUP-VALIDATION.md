@@ -1,5 +1,25 @@
 # Mobile startup repair — 2026-09-15
 
+## Follow-up: Playground devices 2 and 3
+
+The two LVGL 9 MockUI Playground builds showed the same Android worker error.
+Their Asyncify WASM modules contained up to 4,395 locals in one function. The
+same `coalesce-locals` and `vacuum` build step reduces that maximum to 501.
+
+- Playground (`k9ert`): artifact version `25f2913c475c6251`, WASM size
+  8,151,743 -> 6,693,343 bytes.
+- Alternative Playground (`Schnuartz`): artifact version `bba1383e8ccda8bc`,
+  WASM size 8,262,575 -> 6,804,175 bytes.
+- Both real MockUI/LVGL builds pass desktop boot, display and pointer tests.
+- Both pass Android Pixel 5, 360x740, DPR 3 boot and touch tests.
+- All three simulators pass concurrently with shared SD/Smartcard state,
+  restart and LVGL pointer input.
+- `build-playground-mockui.sh` now applies the optimization before publication,
+  and both manifests record the optimization and original WASM hashes.
+
+The original production artifacts and pointers are backed up under
+`/var/backups/try-clavastack/playground-native-stack-20260915/` before deployment.
+
 ## Follow-up: native stack fix (16:55 Berlin)
 
 The physical-device screenshot subsequently identified `RangeError: Maximum call

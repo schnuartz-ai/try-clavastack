@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { PNG } from 'pngjs';
 import { mkdir } from 'node:fs/promises';
 
@@ -57,4 +57,31 @@ for (const variant of [
   await page.close();
 }
 if (images.get('play').equals(images.get('schnuartz'))) throw new Error('Both Playground screens are identical');
+
+const mobile = await browser.newContext({ ...devices['Pixel 5'],
+  viewport: { width: 360, height: 740 }, deviceScaleFactor: 3 });
+for (const variant of [
+  { id: 'play', x: .24, y: .38 },
+  { id: 'schnuartz', x: .94, y: .03 },
+]) {
+  const page = await mobile.newPage();
+  await page.goto(`${base}/?variant=${variant.id}`);
+  await page.locator('#st').getByText('Running locally').waitFor({ timeout: 65000 });
+  const canvas = page.locator('#screen');
+  const before = await canvas.screenshot();
+  const box = await canvas.boundingBox();
+  let changed = false;
+  for (let attempt = 0; attempt < 3 && !changed; attempt++) {
+    await page.touchscreen.tap(box.x + box.width * variant.x, box.y + box.height * variant.y);
+    await page.waitForTimeout(1000);
+    changed = !before.equals(await canvas.screenshot());
+  }
+  if (!changed) {
+    throw new Error(`${variant.id}: Android-scaled touch did not reach LVGL`);
+  }
+  console.log(JSON.stringify({ variant: variant.id, android: 'Pixel 5 / DPR 3',
+    boot: 'pass', touch: 'pass' }));
+  await page.close();
+}
+await mobile.close();
 await browser.close();
