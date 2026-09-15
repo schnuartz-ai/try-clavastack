@@ -156,6 +156,11 @@ await page.locator('[data-slot="1"] small').getByText('Inserted in device 1').wa
 const resetKey = (await childFiles('diy')).find(file => file.path === 'cards/1/private.key')?.bytes;
 if (!resetKey || Buffer.from(resetKey).equals(Buffer.from(oldKey))) throw new Error('Right-click did not reset card identity');
 
+await page.locator('#demo-load').click();
+await page.locator('#demo-state').getByText('Playground demo wallets loaded', { exact: false })
+  .waitFor({ timeout: 75000 });
+if (await page.locator('#demo-load').isDisabled()) throw new Error('Demo loader stayed disabled');
+
 if (requests.some(url => /\/api\/(allocate|heartbeat)|\/novnc\//.test(url))) {
   throw new Error('Three-device mode requested VNC or session API');
 }
@@ -179,6 +184,7 @@ if (errors.length) throw new Error(errors.join('; '));
 const legacy = await (await page.request.get(`${base}/simulators/legacy/`)).text();
 if (!legacy.includes("import RFB from '/novnc/core/rfb.js'")) throw new Error('Legacy fallback missing');
 console.log(JSON.stringify({ result: 'pass', simultaneousWorkers: 3,
+  demoData: 'two seeds and six wallets loaded; DIY QR imports queued',
   sd: 'one binary card moved through three devices', smartcard: 'same private key moved through three devices',
   restart: 'local', tap: 'card to device', reset: 'right-click changed key',
   feedback: 'draft link with selected firmware source', pointer: 'gallery display to LVGL',

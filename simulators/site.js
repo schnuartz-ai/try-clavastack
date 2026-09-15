@@ -22,6 +22,12 @@ let sdOwner = null;
 let requestId = 0;
 let armed = null;
 let busy = false;
+const demoPayloads = [
+  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+  "ClavaStack Demo&wpkh([73c5da0a/84h/0h/0h]xpub6CatWdiZiodmUeTDp8LT5or8nmbKNcuyvz7WyksVFkKB4RHwCD3XyuvPEbvqAQY3rAPshWcMLoP2fMFMKHPJ4ZeZXYVUhLv1VMrjPC7PW6V/{0,1}/*)",
+  'cHNidP8BAHECAAAAAQWaIPxj7qSA0cbaKKz5Lk43V/8/FZeQw+IQ2tV6eJnbAAAAAAD9////AgfVTQUAAAAAFgAUUzfXvW1SC/+493dPMkR+9Ua1+7mAlpgAAAAAABYAFCwSoUTerJLG437IpfbWF8DgWx6kAAAAAAABAR8Kl+YFAAAAABYAFC80qhzwClOwVaKRoDp9RfCmmItSIgYDXUnszVTQCZ5DZ2J3x6bUYl1hHaiKXfSb+VF6d5Gnd6UYc8XaClQAAIABAACAAAAAgAEAAAAAAAAAACICAzra7/AYOHv1KHXP0Kgv8paA8ELhUBDLW3FrKXZzZpg2GHPF2gpUAACAAQAAgAAAAIABAAAAAgAAAAAA',
+];
+const demoLoaded = new Set();
 
 function message(name, data) {
   frames[name].contentWindow?.postMessage(data, location.origin);
@@ -163,6 +169,15 @@ addEventListener('message', event => {
   } else if (data.type === 'peripherals-snapshot' && data.variant === name) {
     const request = pending.get(data.requestId);
     if (request?.name === name) { pending.delete(data.requestId); request.resolve(data.files); }
+  } else if (data.type === 'demo-loaded') {
+    demoLoaded.add(name);
+    const state = document.querySelector('#demo-state');
+    if (demoLoaded.size === order.length) {
+      state.textContent = 'Playground demo wallets loaded. On device 1, open Scan QR three times and confirm the seed, wallet and transaction.';
+      document.querySelector('#demo-load').disabled = false;
+    } else {
+      state.textContent = `Loading demo data (${demoLoaded.size}/3 devices)…`;
+    }
   }
 });
 
@@ -210,6 +225,14 @@ for (const name of order) {
     }
   })();
 }
+
+document.querySelector('#demo-load').onclick = () => {
+  demoLoaded.clear();
+  const button = document.querySelector('#demo-load');
+  button.disabled = true;
+  document.querySelector('#demo-state').textContent = 'Loading demo data into all three devices…';
+  for (const name of order) message(name, { type: 'demo-load', payloads: demoPayloads });
+};
 
 const feedbackMessage = document.querySelector('#feedback-message');
 const feedbackDevice = document.querySelector('#feedback-device');

@@ -54,9 +54,10 @@ let forceCanvasBridge = false;
 let recoveryTimer;
 let startupPhase = 'manifest';
 let displayMode = 'unselected';
-const workerRevision = '2026-09-15.2';
+const workerRevision = '2026-09-15.3';
 let runGeneration = 0;
 let restartPromise;
+let demoMode = false;
 let startupStartedAt;
 let startupTicker;
 const snapshots = new Map();
@@ -447,7 +448,7 @@ async function start() {
     startupPhase = 'canvas-transfer';
     const offscreen = transferable ? canvas.transferControlToOffscreen() : undefined;
     send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
-      stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe }, offscreen ? [offscreen] : []);
+      stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe, demoMode }, offscreen ? [offscreen] : []);
     startupPhase = 'runtime-assets';
   } catch (error) {
     crashRecover(`${error.name}: ${error.message}\n${error.stack || ''}`, generation);
@@ -508,6 +509,18 @@ addEventListener('message', async event => {
     }
   } else if (gallery && event.data?.type === 'runtime-restart') {
     restart(false).catch(error => failure(`Restart failed: ${error.stack || error}`, runGeneration));
+  } else if (gallery && event.data?.type === 'demo-load') {
+    demoMode = true;
+    if (program === 'mockui') {
+      restart(false)
+        .then(() => notifyParent({ type: 'demo-loaded', variant, mode: 'fixtures' }))
+        .catch(error => failure(`Demo data failed: ${error.stack || error}`, runGeneration));
+    } else {
+      for (const payload of event.data.payloads || []) {
+        send({ type: 'qr', bytes: new TextEncoder().encode(payload) });
+      }
+      notifyParent({ type: 'demo-loaded', variant, mode: 'qr', count: event.data.payloads?.length || 0 });
+    }
   }
 });
 function awaitPeripherals() {
