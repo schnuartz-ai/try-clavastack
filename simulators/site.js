@@ -173,7 +173,8 @@ for (const name of order) {
       const allowedRepositories = name === 'diy' ?
         ['schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] : [feedbackRepositories[name]];
       if (!/^[a-f0-9]{40}$/.test(info.commit) ||
-          !allowedRepositories.includes(info.repository?.toLowerCase()) ||
+          !allowedRepositories.map(repository => repository.toLowerCase())
+            .includes(info.repository?.toLowerCase()) ||
           !pointer.build.includes(`/${info.commit}/`) ||
           pointer.version !== info.artifact_set_sha256?.slice(0, 16)) {
         throw new Error('Build manifest mismatch');
