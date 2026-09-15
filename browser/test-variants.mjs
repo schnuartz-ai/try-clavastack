@@ -18,7 +18,21 @@ for (const variant of [
   if (manifest.repository !== variant.repo || manifest.entrypoint !== 'mockui' ||
       !pointer.build.includes('-mockui/')) throw new Error(`${variant.id}: wrong Playground application`);
   await page.goto(`${base}/?variant=${variant.id}`);
-  await page.locator('#st').getByText('Running locally').waitFor({ timeout: 65000 });
+  try {
+    await page.locator('#st').getByText('Running locally').waitFor({ timeout: 65000 });
+  } catch (error) {
+    // Preserve the worker's complete startup evidence when a variant never
+    // reaches its ready marker; otherwise Playwright only reports a generic
+    // locator timeout and hides the actual iframe/worker failure.
+    console.error(JSON.stringify({
+      variant: variant.id,
+      pageErrors: errors,
+      status: await page.locator('#st').textContent().catch(() => null),
+      buildLabel: await page.locator('#build-label').textContent().catch(() => null),
+      error: String(error),
+    }));
+    throw error;
+  }
   await page.locator('#build-label').getByText(variant.repo, { exact: false }).waitFor();
   await page.waitForTimeout(700);
   const canvas = page.locator('#screen');
