@@ -46,20 +46,29 @@ let lastQrAt = 0;
 let startupTimer;
 let requestId = 0;
 let workerDependencyCount = null;
-let crashRetriesLeft = 2;
 let forceCanvasBridge = false;
+let recoveryTimer;
+let startupPhase = 'manifest';
+let displayMode = 'unselected';
+const workerRevision = '2026-09-15.1';
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;
 let startupTicker;
 const snapshots = new Map();
 
-const mobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-const startupTimeoutMs = mobileDevice ? 180000 : 90000;
+const startupTimeoutMs = 60000;
 
 function log(message) {
-  debug.textContent = `${String(message)}\n${debug.textContent}`.slice(0, 7000);
+  debug.textContent += `[${new Date().toISOString()}] ${String(message)}\n`;
 }
+log(JSON.stringify({ userAgent: navigator.userAgent, crossOriginIsolated,
+  hardwareConcurrency: navigator.hardwareConcurrency, deviceMemory: navigator.deviceMemory ?? 'unavailable',
+  devicePixelRatio, touch: navigator.maxTouchPoints, Worker: typeof Worker, WebAssembly: typeof WebAssembly,
+  OffscreenCanvas: typeof OffscreenCanvas, transferControlToOffscreen: typeof HTMLCanvasElement.prototype.transferControlToOffscreen,
+  canvas2D: Boolean(document.createElement('canvas').getContext('2d')), workerRevision }));
+addEventListener('error', event => log(`Page error: ${event.error?.stack || event.message}`));
+addEventListener('unhandledrejection', event => log(`Page unhandledrejection: ${event.reason?.stack || event.reason}`));
 function setStatus(message, running = false) {
   status.textContent = message;
   dot.classList.toggle('on', running);
@@ -101,8 +110,11 @@ function showLoading(stage = 'runtime', message = 'Preparing the browser runtime
 function showLoadingError(message) {
   stopLoadingClock();
   loading.classList.add('error');
-  loadingTitle.textContent = 'Specter could not start';
-  loadingLabel.textContent = String(message).split('\n', 1)[0];
+  loadingTitle.textContent = String(message).split('\n', 1)[0]
+    .replace(/(?:https?:\/\/|\/builds\/)[^\s)]+/g, url => {
+      try { return new URL(url, location.href).pathname.split('/').pop(); } catch { return url; }
+    });
+  loadingLabel.textContent = `Phase: ${startupPhase} · Display: ${displayMode} · Worker: ${workerRevision} · Build: ${version || 'unknown'}`;
   loadingBar.style.width = '100%';
   loadingBar.parentElement.setAttribute('aria-valuenow', '100');
   loadingActions.hidden = false;
@@ -112,8 +124,12 @@ function showLoadingError(message) {
 function failure(message, generation = runGeneration) {
   if (generation !== runGeneration) return;
   runGeneration++;
+  clearTimeout(recoveryTimer);
   clearStartupTimer();
   stopCamera();
+  clearTimeout(scannerStopTimer);
+  scannerActive = false;
+  screenCamera.hidden = true;
   const failedWorker = worker;
   worker = undefined;
   failedWorker?.terminate();
@@ -122,33 +138,28 @@ function failure(message, generation = runGeneration) {
   log(message);
   notifyParent({ type: 'simulator-error', variant, message });
 }
-// A worker crash (e.g. an uncaught native-stack RangeError from deep
-// recursion in the firmware) kills that worker outright - nothing left to
-// send a normal restart message to. Auto-recover a couple of times with a
-// fresh worker before giving up and showing the dead-end error UI, so a
-// one-off crash doesn't strand the visitor on a page that looks broken.
-function crashRecover(message) {
-  clearTimeout(startupTimer);
+// A failed OffscreenCanvas run gets one fresh worker using the LVGL pixel bridge.
+function crashRecover(message, generation = runGeneration) {
+  if (generation !== runGeneration) return;
+  log(`${message}\nPhase: ${startupPhase}; display: ${displayMode}; generation: ${generation}`);
+  clearStartupTimer();
+  clearTimeout(recoveryTimer);
   stopCamera();
+  clearTimeout(scannerStopTimer);
+  scannerActive = false;
+  screenCamera.hidden = true;
   worker?.terminate();
   worker = undefined;
-  // Some mobile Chromium builds expose OffscreenCanvas but cannot keep the
-  // transferred canvas alive in a Worker. Retry once through the normal
-  // Canvas pixel bridge before surfacing a hard error.
-  if (mobileDevice && !forceCanvasBridge) {
+  // Invalidate callbacks immediately, including duplicate error/abort events.
+  const recoveryGeneration = ++runGeneration;
+  if (program === 'wallet' && displayMode === 'OffscreenCanvas' && !forceCanvasBridge) {
     forceCanvasBridge = true;
-    log(`${message} - retrying with the mobile Canvas bridge`);
+    log('Retry 2/2: Canvas-Pixelbridge');
     setStatus('Switching display mode…');
-    showLoading('display', 'Switching to the mobile display bridge…', 20);
-    setTimeout(start, 500);
-    return;
-  }
-  if (crashRetriesLeft > 0) {
-    crashRetriesLeft--;
-    log(`${message} - recovering (${crashRetriesLeft} ${crashRetriesLeft === 1 ? 'retry' : 'retries'} left)`);
-    setStatus('Recovering…');
-    showLoading('runtime', 'Recovering from a worker crash…', 12);
-    setTimeout(start, 500);
+    showLoading('display', 'Switching to Canvas-Pixelbridge…', 20);
+    recoveryTimer = setTimeout(() => {
+      if (recoveryGeneration === runGeneration) start();
+    }, 250);
     return;
   }
   failure(message);
@@ -265,6 +276,8 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     loadingSteps.forEach((step, index) => { step.classList.toggle('active', index === 0); step.classList.toggle('done', false); });
     setStatus('Loading runtime');
   } else if (data.type === 'wasm-ready') {
+    startupPhase = 'firmware';
+    log(`wasm-ready; memoryBytes: ${data.memoryBytes ?? 'unavailable'}`);
     setLoadingMessage('Starting Specter firmware…');
     loadingBar.style.width = '48%';
     loadingSteps.forEach((step, index) => { step.classList.toggle('active', index === 1); step.classList.toggle('done', index < 1); });
@@ -273,20 +286,31 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     stopLoadingClock();
     loading.style.display = 'none';
     setStatus('Running locally', true);
-    crashRetriesLeft = 2; // a crash long after a healthy boot deserves fresh retries
+    startupPhase = 'running';
+    log('running');
     send({ type: 'sd-list' });
     send({ type: 'card-list' });
     notifyParent({ type: 'simulator-running', variant });
   } else if (data.type === 'log') {
+    if (/^(SPECTER_|MOCKUI_)/.test(data.message)) startupPhase = data.message;
+    if (data.message === 'SPECTER_IMPORTS_DONE' || data.message === 'SPECTER_MAIN_IMPORTED') {
+      loadingBar.style.width = '85%';
+      setLoadingMessage('Drawing the Specter display…');
+      loadingSteps.forEach((step, index) => { step.classList.toggle('active', index === 2); step.classList.toggle('done', index < 2); });
+    }
     log(data.message);
+  } else if (data.type === 'diagnostic') {
+    if (data.event === 'worker-created') startupPhase = 'worker-ready';
+    if (data.event === 'asset-request') startupPhase = `loading ${new URL(data.url, location.href).pathname.split('/').pop()}`;
+    log(JSON.stringify(data));
   } else if (data.type === 'debug') {
     if (!data.message.includes('registerOrRemoveHandler')) log(data.message);
   } else if (data.type === 'worker-error') {
     const location = data.filename ? ` (${data.filename}:${data.lineno || 0}:${data.colno || 0})` : '';
-    const detail = data.stack ? `${data.message}${location}\n${data.stack}` : `${data.message}${location}`;
-    failure(`Worker crashed: ${detail}`, generation);
+    const detail = `${data.message}${location}${data.url ? ` (${data.url})` : ''}\nSource: ${data.source || data.type}\n${data.stack || ''}`;
+    crashRecover(`${data.name || 'WorkerError'}: ${detail}`, generation);
   } else if (data.type === 'abort') {
-    crashRecover(`WebAssembly runtime stopped: ${data.message}`);
+    crashRecover(`WebAssembly.Abort: ${data.message}\n${data.stack || ''}`, generation);
   } else if (data.type === 'operation-error') {
     log(`${data.operation}: ${data.message}`);
     if (data.operation.startsWith('sd-')) $('#sd-state').textContent = `SD error: ${data.message}`;
@@ -344,58 +368,73 @@ function onWorkerMessage({ data }, generation = runGeneration) {
   }
 }
 async function start() {
-  if (!('Worker' in window)) {
-    failure('This browser needs Web Workers to run Specter locally.');
-    return;
-  }
-  const canvas = newCanvas();
-  const transferable = !forceCanvasBridge && Boolean(canvas.transferControlToOffscreen);
-  if (program === 'mockui' && !transferable) {
-    failure('This browser cannot run the Playground LVGL 9 display without OffscreenCanvas. Open the legacy Playground at /simulators/legacy/.');
-    const fallback = document.createElement('a');
-    fallback.href = '/simulators/legacy/';
-    fallback.textContent = 'Open legacy Playground';
-    loading.append(fallback);
-    return;
-  }
-  softwareContext = transferable ? undefined : canvas.getContext('2d');
-  softwareFrame = undefined;
-  if (!transferable && !softwareContext) {
-    failure('This browser cannot create a 2D display canvas.');
-    return;
-  }
-  showLoading('runtime', 'Starting Specter on this device…', 12);
-  setStatus('Starting locally');
+  clearTimeout(recoveryTimer);
   clearStartupTimer();
+  worker?.terminate();
+  worker = undefined;
   const generation = ++runGeneration;
-  const startedAt = performance.now();
-  workerDependencyCount = null;
-  // Mobile browsers may retain a worker script independently of the page
-  // shell. Tie it to the verified artifact set so a new deployment cannot
-  // combine an old worker with the current firmware manifest.
-  const workerUrl = new URL('/browser/runtime-worker.js', location.href);
-  if (version) workerUrl.searchParams.set('v', version);
-  worker = new Worker(workerUrl, { name: 'Specter DIY' });
-  worker.onmessage = event => {
-    if (generation === runGeneration) onWorkerMessage(event, generation);
-  };
-  worker.onerror = event => {
-    if (generation === runGeneration) crashRecover(`Worker crashed: ${event.message || 'unknown error'}`);
-  };
-  worker.onmessageerror = () => {
-    if (generation === runGeneration) crashRecover('Worker communication failed');
-  };
-  startupTimer = setTimeout(() => {
-    if (generation !== runGeneration) return;
-    const elapsed = Math.round((performance.now() - startedAt) / 1000);
-    const detail = workerDependencyCount > 0
-      ? `The WebAssembly runtime is still loading (${workerDependencyCount} startup ${workerDependencyCount === 1 ? 'step' : 'steps'} pending).`
-      : `The WebAssembly runtime did not report ready after ${elapsed} seconds.`;
-    failure(`${detail} The first load can take longer on a mobile connection or a low-memory device.`, generation);
-  }, startupTimeoutMs);
-  const offscreen = transferable ? canvas.transferControlToOffscreen() : undefined;
-  send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
-    stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe }, offscreen ? [offscreen] : []);
+  try {
+    if (!('Worker' in window)) {
+      failure('This browser needs Web Workers to run Specter locally.');
+      return;
+    }
+    const canvas = newCanvas();
+    const transferable = !forceCanvasBridge && Boolean(canvas.transferControlToOffscreen);
+    displayMode = transferable ? 'OffscreenCanvas' : 'Canvas-Pixelbridge';
+    startupPhase = 'worker-create';
+    if (program === 'mockui' && !transferable) {
+      failure('This browser cannot run the Playground LVGL 9 display without OffscreenCanvas. Open the legacy Playground at /simulators/legacy/.');
+      const fallback = document.createElement('a');
+      fallback.href = '/simulators/legacy/';
+      fallback.textContent = 'Open legacy Playground';
+      loading.append(fallback);
+      return;
+    }
+    softwareContext = transferable ? undefined : canvas.getContext('2d');
+    softwareFrame = undefined;
+    if (!transferable && !softwareContext) {
+      failure('This browser cannot create a 2D display canvas.');
+      return;
+    }
+    showLoading('runtime', 'Starting Specter on this device…', 12);
+    setStatus('Starting locally');
+    clearStartupTimer();
+    const startedAt = performance.now();
+    workerDependencyCount = null;
+    // Mobile browsers may retain a worker script independently of the page
+    // shell. Tie it to the verified artifact set so a new deployment cannot
+    // combine an old worker with the current firmware manifest.
+    const workerUrl = new URL('/browser/runtime-worker.js', location.href);
+    if (version) workerUrl.searchParams.set('v', version);
+    workerUrl.searchParams.set('worker', workerRevision);
+    log(`Starting ${workerUrl.href}; display: ${displayMode}; generation: ${generation}`);
+    worker = new Worker(workerUrl, { name: 'Specter DIY' });
+    worker.onmessage = event => {
+      if (generation === runGeneration) onWorkerMessage(event, generation);
+    };
+    worker.onerror = event => {
+      event.preventDefault();
+      crashRecover(`WorkerError: ${event.message || 'Worker script failed to load or process terminated'} (${event.filename || workerUrl.href}:${event.lineno || 0}:${event.colno || 0})\n${event.error?.stack || ''}`, generation);
+    };
+    worker.onmessageerror = () => {
+      crashRecover('DataCloneError: worker.onmessageerror could not deserialize a worker message', generation);
+    };
+    startupTimer = setTimeout(() => {
+      if (generation !== runGeneration) return;
+      const elapsed = Math.round((performance.now() - startedAt) / 1000);
+      const detail = workerDependencyCount > 0
+        ? `The WebAssembly runtime is still loading (${workerDependencyCount} startup ${workerDependencyCount === 1 ? 'step' : 'steps'} pending).`
+        : `The WebAssembly runtime did not report ready after ${elapsed} seconds.`;
+      crashRecover(`StartupTimeout: ${detail} Last phase: ${startupPhase}.`, generation);
+    }, startupTimeoutMs);
+    startupPhase = 'canvas-transfer';
+    const offscreen = transferable ? canvas.transferControlToOffscreen() : undefined;
+    send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
+      stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe }, offscreen ? [offscreen] : []);
+    startupPhase = 'runtime-assets';
+  } catch (error) {
+    crashRecover(`${error.name}: ${error.message}\n${error.stack || ''}`, generation);
+  }
 }
 function snapshot(generation = runGeneration) {
   if (!worker || generation !== runGeneration) return Promise.resolve(stateFiles);
@@ -412,6 +451,10 @@ function snapshot(generation = runGeneration) {
 async function restart(factory = false) {
   if (restartPromise) return restartPromise;
   restartPromise = (async () => {
+    stopCamera();
+    clearTimeout(scannerStopTimer);
+    scannerActive = false;
+    screenCamera.hidden = true;
     const generation = runGeneration;
     const previousWorker = worker;
     const files = await snapshot(generation);
@@ -421,6 +464,7 @@ async function restart(factory = false) {
     runGeneration++;
     worker = undefined;
     previousWorker?.terminate();
+    forceCanvasBridge = false;
     await start();
   })().finally(() => { restartPromise = undefined; });
   return restartPromise;
@@ -595,7 +639,10 @@ $('#camera-toggle').onclick = () => {
 $('#camera-screen-start').onclick = () => startCamera();
 $('#camera-screen-back').onclick = () => { screenCamera.hidden = true; };
 cameraSelect.onchange = () => startCamera(cameraSelect.value);
-addEventListener('pagehide', () => { stopCamera(); worker?.terminate(); });
+addEventListener('pagehide', () => {
+  runGeneration++; clearTimeout(recoveryTimer); clearStartupTimer(); stopLoadingClock();
+  stopCamera(); worker?.terminate(); worker = undefined;
+});
 
 try {
   stateFiles = await awaitPeripherals();
@@ -616,6 +663,7 @@ try {
   if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
+  log(`Firmware: ${manifest.commit}; build: ${version}; worker: ${workerRevision}`);
   $('#build-label').textContent = `${manifest.repository} · ${manifest.commit.slice(0, 7)} · Browser / WASM`;
   const repositoryUrl = `https://github.com/${manifest.repository}`;
   const commitUrl = `${repositoryUrl}/commit/${manifest.commit}`;
@@ -631,5 +679,5 @@ try {
   }
   await start();
 } catch (error) {
-  failure(`Browser build failed to load: ${error.message}`);
+  failure(`${error.name}: Browser build failed to load: ${error.message}\n${error.stack || ''}`);
 }
