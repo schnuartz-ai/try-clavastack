@@ -3,6 +3,7 @@
 from hashlib import sha256
 from pathlib import Path
 import json
+import re
 
 root = Path(__file__).resolve().parent.parent
 for pointer_file, repository in (
@@ -16,7 +17,9 @@ for pointer_file, repository in (
     build = root / pointer.lstrip('/')
     manifest = json.loads((build / 'build-info.json').read_text())
     assert manifest['repository'] == repository
-    if repository != 'Schnuartz/specter-diy':
+    if repository == 'Schnuartz/specter-diy':
+        assert re.fullmatch(r'\d+\.\d+\.\d+(?:-rc\d+)?', manifest['firmware_version'])
+    else:
         assert manifest['entrypoint'] == 'mockui' and '-mockui/' in pointer
     assert manifest['commit'] in pointer
     assert current['version'] == manifest['artifact_set_sha256'][:16]

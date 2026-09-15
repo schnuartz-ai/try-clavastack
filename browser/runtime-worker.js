@@ -6,6 +6,21 @@ let scannerActive = false;
 let program = 'wallet';
 self.screen = { width: 480, height: 800 };
 const send = (type, details = {}) => postMessage({ type, ...details });
+self.addEventListener('error', event => {
+  send('worker-error', {
+    message: event.message || 'Unhandled worker error',
+    stack: event.error?.stack,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  });
+});
+self.addEventListener('unhandledrejection', event => {
+  send('worker-error', {
+    message: String(event.reason),
+    stack: event.reason?.stack,
+  });
+});
 
 function relativePath(name) {
   if (typeof name !== 'string' || !name || name.startsWith('/') ||

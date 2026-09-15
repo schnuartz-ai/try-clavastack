@@ -10,6 +10,17 @@ const errors = [];
 page.on('request', request => requests.push(request.url()));
 page.on('pageerror', error => errors.push(error.message));
 await page.goto(`${base}/simulators/`);
+for (const [name, title, subtitle] of [
+  ['diy', 'Specter DIY', null],
+  ['play', 'Playground', 'Specter 3.0 Draft Marco'],
+  ['schnuartz', 'Alternative Playground', 'Specter 3.0 Draft Schnuartz'],
+]) {
+  const device = page.locator(`[data-device="${name}"]`);
+  if (await device.locator('h2').textContent() !== title ||
+      (subtitle !== null && await device.locator('.subtitle').textContent() !== subtitle)) {
+    throw new Error(`${name} simulator label mismatch`);
+  }
+}
 for (const name of ['diy', 'play', 'schnuartz']) {
   await page.locator(`[data-device="${name}"] .device-status`).getByText('Running locally', { exact: false })
     .waitFor({ timeout: 75000 });
@@ -18,6 +29,11 @@ for (const name of ['diy', 'play', 'schnuartz']) {
     '/browser/variants/specter-playground-schnuartz.json';
   const pointer = await (await page.request.get(`${base}${pointerPath}`)).json();
   const manifest = await (await page.request.get(`${base}${pointer.build}build-info.json`)).json();
+  if (name === 'diy' && (!/^\d+\.\d+\.\d+(?:-rc\d+)?$/.test(manifest.firmware_version) ||
+      await page.locator('[data-device="diy"] .subtitle').textContent() !==
+        `newest v${manifest.firmware_version} Firmware`)) {
+    throw new Error('DIY firmware version label is not derived from its build manifest');
+  }
   const sourceLink = page.locator(`[data-device="${name}"] .source-link`);
   if (await sourceLink.textContent() !== `GitHub · ${manifest.commit.slice(0, 7)}` ||
       await sourceLink.getAttribute('href') !== `https://github.com/${manifest.repository}/commit/${manifest.commit}`) {
@@ -29,6 +45,9 @@ for (const name of ['diy', 'play', 'schnuartz']) {
   }
   const frame = page.frameLocator(`[data-device="${name}"] iframe`);
   await frame.locator('#screen').waitFor();
+}
+if (await page.locator('.pin-hint').textContent() !== 'A PIN may already be selected: “21”.') {
+  throw new Error('PIN hint text mismatch');
 }
 await page.waitForTimeout(1200);
 for (const name of ['diy', 'play', 'schnuartz']) {

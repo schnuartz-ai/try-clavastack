@@ -23,7 +23,7 @@ let armed = null;
 let busy = false;
 
 function message(name, data) {
-  frames[name].contentWindow.postMessage(data, location.origin);
+  frames[name].contentWindow?.postMessage(data, location.origin);
 }
 function command(name, commandData) {
   message(name, { type: 'peripheral-command', command: commandData });
@@ -144,12 +144,16 @@ addEventListener('message', event => {
     ready.add(name);
     devices[name].querySelector('.device-status').textContent = 'Running locally · drag cards here';
   } else if (data.type === 'simulator-error') {
+    ready.delete(name);
     devices[name].querySelector('.device-status').textContent = data.message;
   } else if (data.type === 'peripherals-snapshot' && data.variant === name) {
     const request = pending.get(data.requestId);
     if (request?.name === name) { pending.delete(data.requestId); request.resolve(data.files); }
   }
 });
+
+// Recover startup messages sent by cached child frames before this module registered its listener.
+for (const name of order) message(name, { type: 'gallery-parent-ready' });
 
 for (const name of order) {
   devices[name].querySelector('.device-hitbox').onclick = () => {
@@ -175,6 +179,13 @@ for (const name of order) {
         throw new Error('Build manifest mismatch');
       }
       feedbackVersions[name] = pointer.version || info.commit?.slice(0, 7) || 'Unknown';
+      if (name === 'diy') {
+        if (!/^\d+\.\d+\.\d+(?:-rc\d+)?$/.test(info.firmware_version)) {
+          throw new Error('Missing firmware version in build manifest');
+        }
+        devices[name].querySelector('.subtitle').textContent =
+          `newest v${info.firmware_version} Firmware`;
+      }
       const link = devices[name].querySelector('.source-link');
       link.href = `https://github.com/${info.repository}/commit/${info.commit}`;
       link.textContent = `GitHub · ${info.commit.slice(0, 7)}`;

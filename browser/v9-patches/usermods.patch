@@ -31,8 +31,9 @@ index 4044a80..01a9b09 100644
  #endif
  
 +#ifdef __EMSCRIPTEN__
-+/* Feed the real LVGL v9 SDL input device from the scaled browser pointer. */
-+extern void lv_sdl_mouse_handler(SDL_Event *event);
++/* Queue input for LVGL's SDL timer, on the active MicroPython call stack.
++ * Calling LVGL here can run Python/GC while Asyncify has suspended main,
++ * starting a second unwind and corrupting the saved continuation. */
 +EMSCRIPTEN_KEEPALIVE void browser_pointer(int x, int y, int down) {
 +  if (!s_mouse || !s_disp) return;
 +  SDL_Event event;
@@ -43,8 +44,7 @@ index 4044a80..01a9b09 100644
 +  event.button.button = SDL_BUTTON_LEFT;
 +  event.button.x = x;
 +  event.button.y = y;
-+  lv_sdl_mouse_handler(&event);
-+  lv_indev_read(s_mouse);
++  SDL_PushEvent(&event);
 +}
 +#endif
 +

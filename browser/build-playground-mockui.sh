@@ -12,13 +12,29 @@ esac
 FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/${REPOSITORY#*/}}"
 EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
 OUT="$ROOT/builds/${REPOSITORY}-mockui/$SOURCE_SHA"
-if [[ ! -d "$FORK_SRC/.git" ]]; then
+if [[ ! -e "$FORK_SRC/.git" ]]; then
   mkdir -p "$(dirname "$FORK_SRC")"
   git clone "https://github.com/$REPOSITORY.git" "$FORK_SRC"
   git -C "$FORK_SRC" checkout "$SOURCE_SHA"
 fi
 test "$(git -C "$FORK_SRC" rev-parse HEAD)" = "$SOURCE_SHA" || { echo "Wrong fork commit" >&2; exit 1; }
-git -C "$FORK_SRC" submodule update --init --recursive
+# Only the firmware build inputs are needed here.  A fully recursive checkout
+# also downloads every optional MicroPython port library, which makes a clean
+# browser build unnecessarily slow and can leave it stuck in unrelated git
+# metadata operations.
+if [[ "${SKIP_SUBMODULE_UPDATE:-0}" != 1 ]]; then
+  git -C "$FORK_SRC" submodule update --init bootloader f469-disco
+fi
+if [[ "${SKIP_SUBMODULE_UPDATE:-0}" != 1 ]] && [[ -e "$FORK_SRC/f469-disco/.git" ]] && git -C "$FORK_SRC/f469-disco" rev-parse --git-dir >/dev/null 2>&1; then
+  git -C "$FORK_SRC/f469-disco" submodule update --init \
+    micropython usermods/secp256k1 usermods/udisplay_f469/lvgl
+  # The bundled uhashlib user module uses axTLS' AES implementation.  Other
+  # MicroPython port libraries are disabled by the flags below and are not
+  # build inputs for this browser target.
+  git -C "$FORK_SRC/f469-disco/micropython" submodule update --init lib/axtls
+else
+  echo "Using populated f469-disco sources without a valid nested Git dir" >&2
+fi
 
 apply_if_needed() {
   local repo="$1" patch="$2"
@@ -38,11 +54,17 @@ apply_if_needed() {
 }
 apply_if_needed "$FORK_SRC/f469-disco/micropython" "$ROOT/browser/v9-patches/micropython.patch"
 # This patch's paths already start with usermods/, unlike the other two.
+# Upgrade an existing build workspace that still has the direct-call bridge.
+if grep -q 'lv_sdl_mouse_handler(&event);' "$FORK_SRC/f469-disco/usermods/udisplay_f469/lv_sdl_hal/SDL/modSDL.c"; then
+  apply_if_needed "$FORK_SRC/f469-disco" "$ROOT/browser/v9-patches/browser-pointer-events.patch"
+fi
 apply_if_needed "$FORK_SRC/f469-disco" "$ROOT/browser/v9-patches/usermods.patch"
 apply_if_needed "$FORK_SRC/f469-disco/usermods/secp256k1" "$ROOT/browser/v9-patches/secp256k1.patch"
 if [[ "$1" = schnuartz ]]; then
   python3 "$ROOT/browser/patch-playground-qstr.py" "$FORK_SRC/f469-disco/micropython"
 fi
+python3 "$ROOT/browser/limit-lvgl.py" \
+  "$FORK_SRC/f469-disco/usermods/udisplay_f469/lvgl/lvgl.mk"
 
 if ! command -v emcc >/dev/null; then
   test -f "$EMSDK_ENV" || { echo "Emscripten 3.1.74 required" >&2; exit 1; }
@@ -59,6 +81,9 @@ PORT="$FORK_SRC/f469-disco/micropython/ports/unix"
 if [[ "${BROWSER_CLEAN:-1}" = 1 ]]; then
   make -C "$PORT" BUILD=build-specter-mockui-browser PROG=micropython.js clean
 fi
+# Stackless keeps recursive Python bytecode calls in heap code states. This
+# avoids exhausting the browser engine's JS/WASM call stack before
+# MicroPython's linear-memory cstack check can raise an exception.
 make -C "$PORT" -j4 \
   BUILD=build-specter-mockui-browser PROG=micropython.js \
   CC=emcc LD=emcc AR=emar STRIP=true SIZE=true \
@@ -67,7 +92,7 @@ make -C "$PORT" -j4 \
   MICROPY_USE_READLINE=1 \
   USER_C_MODULES="$FORK_SRC/f469-disco/usermods" \
   FROZEN_MANIFEST="$FORK_SRC/browser.manifest.py" \
-  CFLAGS_EXTRA="-DMICROPY_NLR_SETJMP=1 -DMODULE_DISPLAY_ENABLED=1 -DMODULE_HASHLIB_ENABLED=1 -DMICROPY_PY_HASHLIB=0 -DSTATIC=static -Wno-error -sUSE_SDL=2 -ffile-prefix-map=$FORK_SRC=/specter-playground" \
+  CFLAGS_EXTRA="-DMICROPY_NLR_SETJMP=1 -DMICROPY_STACKLESS=1 -DMICROPY_STACKLESS_STRICT=1 -DMODULE_DISPLAY_ENABLED=1 -DMODULE_HASHLIB_ENABLED=1 -DMICROPY_PY_HASHLIB=0 -DSTATIC=static -Wno-error -sUSE_SDL=2 -ffile-prefix-map=$FORK_SRC=/specter-playground" \
   LDFLAGS_ARCH= \
   LDFLAGS_EXTRA="-sUSE_SDL=2 -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=65536 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sEXIT_RUNTIME=0 -sSTACK_SIZE=8388608 -sEXPORTED_RUNTIME_METHODS=FS,ccall --preload-file $ROOT/browser/runtime@/browser --preload-file $FORK_SRC/build/flash_image@/flash -Wl,--allow-multiple-definition"
 
