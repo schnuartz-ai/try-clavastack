@@ -31,7 +31,11 @@ if [[ "${SKIP_SUBMODULE_UPDATE:-0}" != 1 ]] && [[ -e "$FORK_SRC/f469-disco/.git"
   # The bundled uhashlib user module uses axTLS' AES implementation.  Other
   # MicroPython port libraries are disabled by the flags below and are not
   # build inputs for this browser target.
-  git -C "$FORK_SRC/f469-disco/micropython" submodule update --init lib/axtls
+  git -C "$FORK_SRC/f469-disco/micropython" submodule update --init \
+    lib/axtls lib/mbedtls lib/micropython-lib
+  # secp256k1-embedded vendors the actual cryptography library as another
+  # submodule; the user module includes its sources during qstr extraction.
+  git -C "$FORK_SRC/f469-disco/usermods/secp256k1" submodule update --init secp256k1
 else
   echo "Using populated f469-disco sources without a valid nested Git dir" >&2
 fi
