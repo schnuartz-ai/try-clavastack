@@ -58,7 +58,6 @@ const workerRevision = '2026-09-15.3';
 let runGeneration = 0;
 let restartPromise;
 let demoMode = false;
-let demoRestartPending = false;
 let startupStartedAt;
 let startupTicker;
 const snapshots = new Map();
@@ -306,10 +305,6 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     send({ type: 'sd-list' });
     send({ type: 'card-list' });
     notifyParent({ type: 'simulator-running', variant });
-    if (demoRestartPending) {
-      demoRestartPending = false;
-      notifyParent({ type: 'demo-loaded', variant, mode: 'fixtures' });
-    }
   } else if (data.type === 'log') {
     if (/^(SPECTER_|MOCKUI_)/.test(data.message)) startupPhase = data.message;
     if (data.message === 'SPECTER_IMPORTS_DONE' || data.message === 'SPECTER_MAIN_IMPORTED') {
@@ -517,13 +512,9 @@ addEventListener('message', async event => {
   } else if (gallery && event.data?.type === 'demo-load') {
     demoMode = true;
     if (program === 'mockui') {
-      demoRestartPending = true;
-      notifyParent({ type: 'demo-loading', variant });
       restart(false)
-        .catch(error => {
-          demoRestartPending = false;
-          failure(`Demo data failed: ${error.stack || error}`, runGeneration);
-        });
+        .then(() => notifyParent({ type: 'demo-loaded', variant, mode: 'fixtures' }))
+        .catch(error => failure(`Demo data failed: ${error.stack || error}`, runGeneration));
     } else {
       for (const payload of event.data.payloads || []) {
         send({ type: 'qr', bytes: new TextEncoder().encode(payload) });

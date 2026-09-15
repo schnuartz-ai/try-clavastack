@@ -166,9 +166,6 @@ addEventListener('message', event => {
   } else if (data.type === 'simulator-error') {
     ready.delete(name);
     devices[name].querySelector('.device-status').textContent = data.message;
-  } else if (data.type === 'demo-loading') {
-    ready.delete(name);
-    devices[name].querySelector('.device-status').textContent = 'Loading demo wallets…';
   } else if (data.type === 'peripherals-snapshot' && data.variant === name) {
     const request = pending.get(data.requestId);
     if (request?.name === name) { pending.delete(data.requestId); request.resolve(data.files); }
