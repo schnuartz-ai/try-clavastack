@@ -163,6 +163,16 @@ if (mobileBefore.equals(await mobileCanvas.screenshot())) {
 }
 await mobile.close();
 
+const canvasBridgeMobile = await browser.newContext({ viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const canvasBridgePage = await canvasBridgeMobile.newPage();
+await canvasBridgePage.addInitScript(() => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'transferControlToOffscreen', { value: undefined, configurable: true });
+});
+await canvasBridgePage.goto(base);
+await canvasBridgePage.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
+await canvasBridgeMobile.close();
+
 await page.goto(`${base}/?legacy=1`, { waitUntil: 'domcontentloaded' });
 await page.waitForURL('**/legacy/');
 if (!(await page.locator('body').textContent()).includes('Restart Simulator')) {

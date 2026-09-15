@@ -47,6 +47,7 @@ let startupTimer;
 let requestId = 0;
 let workerDependencyCount = null;
 let crashRetriesLeft = 2;
+let forceCanvasBridge = false;
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;
@@ -131,6 +132,17 @@ function crashRecover(message) {
   stopCamera();
   worker?.terminate();
   worker = undefined;
+  // Some mobile Chromium builds expose OffscreenCanvas but cannot keep the
+  // transferred canvas alive in a Worker. Retry once through the normal
+  // Canvas pixel bridge before surfacing a hard error.
+  if (mobileDevice && !forceCanvasBridge) {
+    forceCanvasBridge = true;
+    log(`${message} - retrying with the mobile Canvas bridge`);
+    setStatus('Switching display mode…');
+    showLoading('display', 'Switching to the mobile display bridge…', 20);
+    setTimeout(start, 500);
+    return;
+  }
   if (crashRetriesLeft > 0) {
     crashRetriesLeft--;
     log(`${message} - recovering (${crashRetriesLeft} ${crashRetriesLeft === 1 ? 'retry' : 'retries'} left)`);
@@ -274,7 +286,7 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     const detail = data.stack ? `${data.message}${location}\n${data.stack}` : `${data.message}${location}`;
     failure(`Worker crashed: ${detail}`, generation);
   } else if (data.type === 'abort') {
-    failure(data.message);
+    crashRecover(`WebAssembly runtime stopped: ${data.message}`);
   } else if (data.type === 'operation-error') {
     log(`${data.operation}: ${data.message}`);
     if (data.operation.startsWith('sd-')) $('#sd-state').textContent = `SD error: ${data.message}`;
@@ -337,7 +349,7 @@ async function start() {
     return;
   }
   const canvas = newCanvas();
-  const transferable = Boolean(canvas.transferControlToOffscreen);
+  const transferable = !forceCanvasBridge && Boolean(canvas.transferControlToOffscreen);
   if (program === 'mockui' && !transferable) {
     failure('This browser cannot run the Playground LVGL 9 display without OffscreenCanvas. Open the legacy Playground at /simulators/legacy/.');
     const fallback = document.createElement('a');
@@ -364,9 +376,15 @@ async function start() {
   const workerUrl = new URL('/browser/runtime-worker.js', location.href);
   if (version) workerUrl.searchParams.set('v', version);
   worker = new Worker(workerUrl, { name: 'Specter DIY' });
-  worker.onmessage = onWorkerMessage;
-  worker.onerror = event => crashRecover(`Worker crashed: ${event.message || 'unknown error'}`);
-  worker.onmessageerror = () => crashRecover('Worker communication failed');
+  worker.onmessage = event => {
+    if (generation === runGeneration) onWorkerMessage(event, generation);
+  };
+  worker.onerror = event => {
+    if (generation === runGeneration) crashRecover(`Worker crashed: ${event.message || 'unknown error'}`);
+  };
+  worker.onmessageerror = () => {
+    if (generation === runGeneration) crashRecover('Worker communication failed');
+  };
   startupTimer = setTimeout(() => {
     if (generation !== runGeneration) return;
     const elapsed = Math.round((performance.now() - startedAt) / 1000);
@@ -594,7 +612,7 @@ try {
     throw new Error('Build manifest mismatch');
   }
   const expectedRepos = variant === 'diy' ? ['schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
-    variant === 'play' ? ['k9ert/specter-playground'] : ['schnuartz-ai/specter-playground-schnuartz'];
+    variant === 'play' ? ['k9ert/specter-playground'] : ['Schnuartz/specter-playground'];
   if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
