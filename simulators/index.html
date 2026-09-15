@@ -19,11 +19,6 @@
     .intro { color:var(--muted); line-height:1.5; margin:0 0 17px; }
     .warning { background:#2b1a21; border:1px solid #b85b68; border-radius:12px; padding:13px 17px; margin-bottom:20px; color:#f1dfe2; font-size:13px; line-height:1.45; }
     .warning strong { color:#ff929c; margin-right:8px; }
-    .demo-loader { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:0 0 20px; padding:16px 18px; border:1px solid #3f6f91; border-radius:13px; background:linear-gradient(135deg,#102b40,#101b2a); }
-    .demo-loader h2 { margin:0 0 4px; font-size:18px; }
-    .demo-loader p { margin:0; color:var(--muted); font-size:12px; line-height:1.45; }
-    .demo-loader button { flex:0 0 auto; border:1px solid #7dcafa; border-radius:9px; background:#1f99e5; color:#03131f; padding:11px 16px; font-weight:800; cursor:pointer; }
-    .demo-loader button:disabled { opacity:.55; cursor:wait; }
     .device-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; }
     .device { min-width:0; background:transparent; padding:10px 8px 14px; text-align:center; }
     .device.drop-target { filter:drop-shadow(0 0 13px #47b5e777); }
@@ -106,7 +101,7 @@
     footer { background:#0b1624; border-top:1px solid #35506d; text-align:center; padding:22px; font-size:12px; color:var(--muted); }
     footer .footer-imprint { color:var(--blue); font-weight:400; }
     @media(max-width:1000px) { .device-grid { overflow-x:auto; grid-template-columns:repeat(3,minmax(285px,1fr)); padding-bottom:8px; } .device-frame { width:min(100%,265px); } }
-    @media(max-width:700px) { main { padding:16px 10px 30px; } .demo-loader { align-items:stretch; flex-direction:column; } .media-grid { grid-template-columns:1fr; } .memory-tray { gap:5px; } .memory-token .card-art { padding:6px; } .memory-token .card-art strong { font-size:9px; } }
+    @media(max-width:700px) { main { padding:16px 10px 30px; } .media-grid { grid-template-columns:1fr; } .memory-tray { gap:5px; } .memory-token .card-art { padding:6px; } .memory-token .card-art strong { font-size:9px; } }
   </style>
 </head>
 <body>
@@ -128,10 +123,6 @@
         <div class="media-group"><h3>Virtual MemoryCards</h3><div class="memory-tray"><button class="media-token memory-token" type="button" data-media="card" data-slot="1"><span class="card-art"><strong>MemoryCard 1</strong></span><small>Not inserted</small></button><button class="media-token memory-token" type="button" data-media="card" data-slot="2"><span class="card-art"><strong>MemoryCard 2</strong></span><small>Not inserted</small></button><button class="media-token memory-token" type="button" data-media="card" data-slot="3"><span class="card-art"><strong>MemoryCard 3</strong></span><small>Not inserted</small></button></div><p class="drop-help">Drag onto a Specter or tap a card, then tap a device. Right-click a card to reset it. Restart the receiving firmware when switching its Smartcard storage.</p></div>
       </div>
       <p class="drop-help" id="transfer-state" role="status">Cards are ejected. Drag one onto a device.</p>
-    </section>
-    <section class="demo-loader" aria-labelledby="demo-heading">
-      <div><h2 id="demo-heading">Compare the same demo wallets</h2><p>Loads two public test seeds and six wallet types into both Playground drafts. Device 1 receives a test seed, matching wallet descriptor and example transaction through Specter's local QR scanner path.</p><p id="demo-state" role="status" aria-live="polite">No demo data loaded.</p></div>
-      <button id="demo-load" type="button">Load demo data into all 3</button>
     </section>
     <section class="feedback" aria-labelledby="feedback-heading"><h2 id="feedback-heading">Your feedback helps improve the simulator</h2><p class="feedback-intro">Tell us what happened, what you expected, and which device you were using.</p><form class="feedback-form" id="feedback-form"><label for="feedback-device">Simulator</label><select id="feedback-device"><option value="diy">Specter DIY · Device 1</option><option value="play">K9ert Playground · Device 2</option><option value="schnuartz">Schnuartz Playground · Device 3</option></select><label for="feedback-message">Your comment</label><textarea id="feedback-message" minlength="1" maxlength="5000" placeholder="For example: I inserted an SD card, opened Wallets, and expected to see…" required></textarea><label for="feedback-screenshot">Screenshot (optional, max. 2 MB)</label><input id="feedback-screenshot" type="file" accept="image/png,image/jpeg,image/gif,image/webp"><img id="feedback-preview" class="feedback-preview" alt="Screenshot preview" hidden><div class="feedback-actions"><span id="feedback-count">0 / 5000 characters</span><button id="feedback-save" type="button" disabled>Save comment</button><a id="feedback-submit" href="#feedback-message" target="_blank" rel="noopener noreferrer" aria-disabled="true">Continue on GitHub ↗</a></div><p class="feedback-note">Saved comments are shared with everyone on this page. GitHub requires at least 10 characters for the issue draft. Please do not include seed phrases, private keys, or personal data.</p></form><div class="saved-feedback" aria-labelledby="saved-feedback-heading"><div class="saved-feedback-head"><h3 id="saved-feedback-heading">Saved comments</h3></div><p class="feedback-note" id="feedback-status" role="status" aria-live="polite">Loading shared comments…</p><ol class="feedback-list" id="feedback-list"><li class="feedback-empty">No saved comments yet.</li></ol></div><p class="feedback-note">Playground devices use their original MockUI prototypes; some wallet and media functions are not implemented in those forks.</p></section>
   </main>

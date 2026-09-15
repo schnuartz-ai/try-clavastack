@@ -6,7 +6,7 @@ let scannerActive = false;
 let program = 'wallet';
 self.screen = { width: 480, height: 800 };
 const send = (type, details = {}) => postMessage({ type, ...details });
-const workerRevision = '2026-09-15.3';
+const workerRevision = '2026-09-15.2';
 const SD_CAPACITY_BYTES = 8_000_000_000;
 const SD_ENOSPC = 51;
 let fatalReported = false;
@@ -359,7 +359,6 @@ onmessage = async ({ data }) => {
         }
         if (data.sdInserted) fs.writeFile('/bridge/sd-inserted', new Uint8Array([1]));
         if (data.cardSlot) fs.writeFile('/bridge/card-slot', new Uint8Array([cardSlot(data.cardSlot)]));
-        if (data.demoMode) fs.writeFile('/bridge/demo-mode', new Uint8Array([1]));
       }],
       print: message => {
         send('log', { message });
