@@ -29,6 +29,7 @@ for (const variant of [
       pageErrors: errors,
       status: await page.locator('#st').textContent().catch(() => null),
       buildLabel: await page.locator('#build-label').textContent().catch(() => null),
+      debug: await page.locator('#debug-log').textContent().catch(() => null),
       error: String(error),
     }));
     throw error;
