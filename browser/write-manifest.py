@@ -65,9 +65,14 @@ pointer = {
     "build": "/" + str(output.relative_to(Path(__file__).resolve().parent.parent)).replace('\\', '/') + "/",
     "version": artifact_set[:16],
 }
-pointer_name = "current.json" if repository.lower() in ("schnuartz/specter-diy", "schnuartz-ai/specter-diy") else (
-    "variants/" + repository.split("/")[1] + ".json"
-)
+repository_key = repository.lower()
+if repository_key in ("schnuartz/specter-diy", "schnuartz-ai/specter-diy"):
+    pointer_name = "current.json"
+elif repository_key == "schnuartz/specter-playground":
+    # Keep the two same-named Playground forks addressable independently.
+    pointer_name = "variants/specter-playground-schnuartz.json"
+else:
+    pointer_name = "variants/" + repository.split("/")[1] + ".json"
 pointer_path = Path(__file__).resolve().parent / pointer_name
 pointer_path.parent.mkdir(parents=True, exist_ok=True)
 pointer_path.write_text(json.dumps(pointer, indent=2) + "\n")
