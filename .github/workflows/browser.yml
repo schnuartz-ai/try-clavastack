@@ -55,7 +55,9 @@ jobs:
             test-results/*.png
             builds/**/build-info.json
       - name: Upload tested browser builds
-        if: success()
+        # Keep failed-run builds available for startup diagnostics. They are
+        # never deployed automatically; deployment still requires a green run.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: browser-builds
