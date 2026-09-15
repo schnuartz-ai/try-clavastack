@@ -4,7 +4,8 @@
     "test:pointer-gc": "node browser/test-pointer-gc.mjs",
     "test:browser": "node browser/test-site.mjs && node browser/test-source-link.mjs && node browser/test-qr.mjs && node browser/test-camera.mjs && node browser/test-card.mjs && node browser/test-variants.mjs && node browser/test-simulators.mjs",
     "test:compat": "node browser/test-compat.mjs && node browser/test-gallery-compat.mjs",
-    "test:startup": "node browser/test-startup.mjs"
+    "test:startup": "node browser/test-startup.mjs",
+    "test:native-stack": "node browser/test-native-stack.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0",

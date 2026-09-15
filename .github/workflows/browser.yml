@@ -42,6 +42,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/specter-static.log 2>&1 &
+      - name: Check real firmware with Android-sized native worker stacks
+        run: npm run test:native-stack
       - name: Run browser, SD and QR smoke tests
         env:
           CI: 'true'

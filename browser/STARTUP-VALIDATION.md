@@ -1,6 +1,52 @@
 # Mobile startup repair — 2026-09-15
 
-## Proven defects and remaining uncertainty
+## Follow-up: native stack fix (16:55 Berlin)
+
+The physical-device screenshot subsequently identified `RangeError: Maximum call
+stack size exceeded` after `SPECTER_IMPORTS_DONE`, in Canvas-Pixelbridge mode.
+The earlier display recovery was not sufficient to fix it.
+
+A real V8 worker with `resourceLimits.stackSizeMb=0.5` reproduces that exact
+failure with the original production WASM (no injected exception). The original
+module has up to 9,073 locals in a function, 792,593 total. The build did not
+coalesce the locals left by the Asyncify transformation. These locals increase
+native VM frame size; the Emscripten `STACK_SIZE` controls a different stack in
+linear memory and does not fix native call-stack exhaustion.
+
+The pinned SDK's `wasm-opt` (`version 120 / version_120_b-93-g52bc45fc3`) now runs
+`--coalesce-locals --vacuum` after linking. Maximum locals fall to 403, total to
+60,779; WASM size falls from 9,010,046 to 5,752,059 bytes. Firmware Python, its
+import ordering, JS runtime, data package, exports and display architecture are
+unchanged. No pre-import workaround from the investigation was shipped.
+
+New production artifact version: **7cf9cea302b2abf9**.
+WASM SHA256: `b70dfac2ce83bbf18802ba87b51df0c13fbc366bf7de6344f50cf8dce3e8190a`.
+The firmware commit remains `89431c644cc300c55b53220d262a31be02353969`.
+
+Validation of this new build:
+
+- Original WASM fails `test-native-stack.mjs` at 512 KiB immediately after imports.
+- Optimized WASM passes at both 512 and 384 KiB, including multiple Asyncify
+  suspend/resume cycles, LVGL frames and pointer input. The fork's 64M-heap worker
+  also passes against the optimized production artifact using `TEST_BUILD_DIR`.
+- Full `npm run test:browser`, 14 startup scenarios and `test-compat.mjs`: pass.
+- Public `test-site.mjs`: pass with cross-origin isolation, SD and restart.
+- Public Brave run of all 14 startup scenarios: pass. Live JS/WASM/data hashes
+  match the new manifest; WASM returns HTTP 200 and `application/wasm`.
+- Both repositories' build scripts now include the optimization and a locals
+  ceiling check. Their CI includes the real native-stack regression test.
+- No physical-device success is claimed until the user confirms the new build.
+
+Backup before deployment:
+`/var/backups/try-clavastack/mobile-native-stack-20260915/` contains the original
+WASM, manifest, pointer and Caddyfile. Caddy validated before replacement. The
+new manifest hashes and pointer version were generated together; the new query
+version bypasses the old immutable asset cache.
+
+The following section records the earlier diagnostic repair and its then-known
+limitations; the stack cause above supersedes its original uncertainty.
+
+## Earlier diagnostic repair: proven defects and uncertainty
 
 The website handled `worker-error` with immediate terminal failure, bypassing its
 OffscreenCanvas recovery. Native `worker.onerror` and WASM abort used a different
