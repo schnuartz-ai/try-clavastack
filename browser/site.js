@@ -13,6 +13,12 @@ const canvasBox = $('#screen-overlay');
 const status = $('#st');
 const dot = $('#dot');
 const loading = $('#loading');
+const loadingTitle = loading.querySelector('[data-loading-title]');
+const loadingLabel = loading.querySelector('[data-loading-label]');
+const loadingBar = loading.querySelector('[data-loading-bar]');
+const loadingTimer = loading.querySelector('[data-loading-timer]');
+const loadingActions = loading.querySelector('[data-loading-actions]');
+const loadingSteps = [...loading.querySelectorAll('[data-loading-step]')];
 const debug = $('#debug-log');
 const fileList = $('#sd-files');
 const picker = $('#sd-picker');
@@ -39,9 +45,12 @@ let lastQr = '';
 let lastQrAt = 0;
 let startupTimer;
 let requestId = 0;
-let startupStartedAt = 0;
 let workerDependencyCount = null;
 let crashRetriesLeft = 2;
+let runGeneration = 0;
+let restartPromise;
+let startupStartedAt;
+let startupTicker;
 const snapshots = new Map();
 
 const mobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
@@ -54,25 +63,61 @@ function setStatus(message, running = false) {
   status.textContent = message;
   dot.classList.toggle('on', running);
 }
-function failure(message) {
-  clearTimeout(startupTimer);
-  stopCamera();
-  worker?.terminate();
-  worker = undefined;
-  setStatus('Simulator error');
+function clearStartupTimer() {
+  if (startupTimer !== undefined) clearTimeout(startupTimer);
+  startupTimer = undefined;
+}
+function stopLoadingClock() {
+  if (startupTicker !== undefined) clearInterval(startupTicker);
+  startupTicker = undefined;
+}
+function updateLoadingClock() {
+  if (startupStartedAt === undefined) return;
+  loadingTimer.textContent = `Elapsed ${((performance.now() - startupStartedAt) / 1000).toFixed(1)} s`;
+}
+function startLoadingClock() {
+  stopLoadingClock();
+  startupStartedAt = performance.now();
+  updateLoadingClock();
+  startupTicker = setInterval(updateLoadingClock, 100);
+}
+function showLoading(stage = 'runtime', message = 'Preparing the browser runtime…', progress = 12) {
+  loading.classList.remove('error');
+  loadingTitle.textContent = 'Starting Specter Simulator';
+  loadingLabel.textContent = message;
+  loadingActions.hidden = true;
+  loadingBar.style.width = `${progress}%`;
+  loadingBar.parentElement.setAttribute('aria-valuenow', String(progress));
+  const order = { runtime: 0, firmware: 1, display: 2 };
+  const active = order[stage] ?? 0;
+  loadingSteps.forEach((step, index) => {
+    step.classList.toggle('active', index === active);
+    step.classList.toggle('done', index < active);
+  });
   loading.style.display = 'flex';
-  loading.replaceChildren();
-  const text = document.createElement('p');
-  text.textContent = message;
-  const actions = document.createElement('p');
-  const details = document.createElement('a');
-  details.href = '#technical-details';
-  details.textContent = 'Open Technical details';
-  const legacy = document.createElement('a');
-  legacy.href = '/legacy/';
-  legacy.textContent = 'Use Legacy mode';
-  actions.append(details, ' · ', legacy);
-  loading.append(text, actions);
+  startLoadingClock();
+}
+function showLoadingError(message) {
+  stopLoadingClock();
+  loading.classList.add('error');
+  loadingTitle.textContent = 'Specter could not start';
+  loadingLabel.textContent = String(message).split('\n', 1)[0];
+  loadingBar.style.width = '100%';
+  loadingBar.parentElement.setAttribute('aria-valuenow', '100');
+  loadingActions.hidden = false;
+  loadingSteps.forEach(step => { step.classList.remove('active'); step.classList.add('done'); });
+  loading.style.display = 'flex';
+}
+function failure(message, generation = runGeneration) {
+  if (generation !== runGeneration) return;
+  runGeneration++;
+  clearStartupTimer();
+  stopCamera();
+  const failedWorker = worker;
+  worker = undefined;
+  failedWorker?.terminate();
+  setStatus('Simulator error');
+  showLoadingError(message);
   log(message);
   notifyParent({ type: 'simulator-error', variant, message });
 }
@@ -90,8 +135,7 @@ function crashRecover(message) {
     crashRetriesLeft--;
     log(`${message} - recovering (${crashRetriesLeft} ${crashRetriesLeft === 1 ? 'retry' : 'retries'} left)`);
     setStatus('Recovering…');
-    loading.style.display = 'flex';
-    loading.innerHTML = '<div class="spinner"></div><span data-loading-label>Recovering from a crash…</span>';
+    showLoading('runtime', 'Recovering from a worker crash…', 12);
     setTimeout(start, 500);
     return;
   }
@@ -194,21 +238,27 @@ function renderCards(slots) {
   }
 }
 function setLoadingMessage(message) {
-  const label = loading.querySelector('[data-loading-label]');
-  if (label) label.textContent = message;
+  loadingLabel.textContent = message;
 }
-function onWorkerMessage({ data }) {
+function onWorkerMessage({ data }, generation = runGeneration) {
+  if (generation !== runGeneration) return;
   if (data.type === 'loading-progress') {
     workerDependencyCount = data.remaining;
     const steps = data.remaining === 1 ? 'startup step' : 'startup steps';
     setLoadingMessage(data.remaining > 0
       ? `Loading Specter runtime… (${data.remaining} ${steps} remaining)`
       : 'Starting Specter firmware…');
+    loadingBar.style.width = data.remaining > 0 ? '28%' : '48%';
+    loadingBar.parentElement.setAttribute('aria-valuenow', data.remaining > 0 ? '28' : '48');
+    loadingSteps.forEach((step, index) => { step.classList.toggle('active', index === 0); step.classList.toggle('done', false); });
     setStatus('Loading runtime');
   } else if (data.type === 'wasm-ready') {
     setLoadingMessage('Starting Specter firmware…');
+    loadingBar.style.width = '48%';
+    loadingSteps.forEach((step, index) => { step.classList.toggle('active', index === 1); step.classList.toggle('done', index < 1); });
   } else if (data.type === 'running') {
-    clearTimeout(startupTimer);
+    clearStartupTimer();
+    stopLoadingClock();
     loading.style.display = 'none';
     setStatus('Running locally', true);
     crashRetriesLeft = 2; // a crash long after a healthy boot deserves fresh retries
@@ -219,6 +269,10 @@ function onWorkerMessage({ data }) {
     log(data.message);
   } else if (data.type === 'debug') {
     if (!data.message.includes('registerOrRemoveHandler')) log(data.message);
+  } else if (data.type === 'worker-error') {
+    const location = data.filename ? ` (${data.filename}:${data.lineno || 0}:${data.colno || 0})` : '';
+    const detail = data.stack ? `${data.message}${location}\n${data.stack}` : `${data.message}${location}`;
+    failure(`Worker crashed: ${detail}`, generation);
   } else if (data.type === 'abort') {
     failure(data.message);
   } else if (data.type === 'operation-error') {
@@ -298,46 +352,65 @@ async function start() {
     failure('This browser cannot create a 2D display canvas.');
     return;
   }
-  loading.style.display = 'flex';
-  loading.innerHTML = '<div class="spinner"></div><span data-loading-label>Starting Specter on this device…</span>';
+  showLoading('runtime', 'Starting Specter on this device…', 12);
   setStatus('Starting locally');
-  startupStartedAt = performance.now();
+  clearStartupTimer();
+  const generation = ++runGeneration;
+  const startedAt = performance.now();
   workerDependencyCount = null;
   worker = new Worker('/browser/runtime-worker.js', { name: 'Specter DIY' });
   worker.onmessage = onWorkerMessage;
   worker.onerror = event => crashRecover(`Worker crashed: ${event.message || 'unknown error'}`);
   worker.onmessageerror = () => crashRecover('Worker communication failed');
   startupTimer = setTimeout(() => {
-    const elapsed = Math.round((performance.now() - startupStartedAt) / 1000);
+    if (generation !== runGeneration) return;
+    const elapsed = Math.round((performance.now() - startedAt) / 1000);
     const detail = workerDependencyCount > 0
       ? `The WebAssembly runtime is still loading (${workerDependencyCount} startup ${workerDependencyCount === 1 ? 'step' : 'steps'} pending).`
       : `The WebAssembly runtime did not report ready after ${elapsed} seconds.`;
-    failure(`${detail} The first load can take longer on a mobile connection or a low-memory device.`);
+    failure(`${detail} The first load can take longer on a mobile connection or a low-memory device.`, generation);
   }, startupTimeoutMs);
   const offscreen = transferable ? canvas.transferControlToOffscreen() : undefined;
   send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
     stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe }, offscreen ? [offscreen] : []);
 }
-function snapshot() {
-  if (!worker) return Promise.resolve(stateFiles);
+function snapshot(generation = runGeneration) {
+  if (!worker || generation !== runGeneration) return Promise.resolve(stateFiles);
   return new Promise(resolve => {
     const id = ++requestId;
     const timeout = setTimeout(() => { snapshots.delete(id); resolve(stateFiles); }, 3000);
-    snapshots.set(id, files => { clearTimeout(timeout); resolve(files); });
+    snapshots.set(id, files => {
+      clearTimeout(timeout);
+      resolve(generation === runGeneration ? files : stateFiles);
+    });
     send({ type: 'snapshot', requestId: id });
   });
 }
 async function restart(factory = false) {
-  stateFiles = await snapshot();
-  if (factory) stateFiles = stateFiles.filter(file => file.path.startsWith('sd/') || file.path.startsWith('cards/'));
-  worker?.terminate();
-  worker = undefined;
-  await start();
+  if (restartPromise) return restartPromise;
+  restartPromise = (async () => {
+    const generation = runGeneration;
+    const previousWorker = worker;
+    const files = await snapshot(generation);
+    if (generation !== runGeneration) return;
+    stateFiles = factory ? files.filter(file => file.path.startsWith('sd/') || file.path.startsWith('cards/')) : files;
+    clearStartupTimer();
+    runGeneration++;
+    worker = undefined;
+    previousWorker?.terminate();
+    await start();
+  })().finally(() => { restartPromise = undefined; });
+  return restartPromise;
 }
 let restoreResolve;
+let peripheralRetryTimer;
 addEventListener('message', async event => {
   if (!embedded || event.source !== parent || event.origin !== location.origin) return;
-  if (event.data?.type === 'peripherals-provide' && restoreResolve) {
+  if (gallery && event.data?.type === 'gallery-parent-ready') {
+    if (restoreResolve) notifyParent({ type: 'child-awaiting-peripherals', variant });
+    if (status.textContent === 'Running locally') notifyParent({ type: 'simulator-running', variant });
+  } else if (event.data?.type === 'peripherals-provide' && restoreResolve) {
+    clearInterval(peripheralRetryTimer);
     restoreResolve(event.data.files || []);
     restoreResolve = undefined;
   } else if (event.data?.type === 'peripherals-export') {
@@ -350,14 +423,20 @@ addEventListener('message', async event => {
       send(command);
     }
   } else if (gallery && event.data?.type === 'runtime-restart') {
-    restart(false);
+    restart(false).catch(error => failure(`Restart failed: ${error.stack || error}`, runGeneration));
   }
 });
 function awaitPeripherals() {
   if (!embedded) return Promise.resolve([]);
   return new Promise(resolve => {
     restoreResolve = resolve;
-    notifyParent({ type: 'child-awaiting-peripherals', variant });
+    const announce = () => notifyParent({ type: 'child-awaiting-peripherals', variant });
+    announce();
+    clearInterval(peripheralRetryTimer);
+    peripheralRetryTimer = setInterval(() => {
+      if (!restoreResolve) { clearInterval(peripheralRetryTimer); return; }
+      announce();
+    }, 250);
   });
 }
 if (embedded) {
@@ -455,8 +534,18 @@ function scanFrame() {
   cameraLoop = requestAnimationFrame(scanFrame);
 }
 
-$('#restart-btn').onclick = () => restart(false);
-$('#factory-btn').onclick = () => restart(true);
+function reportRestartFailure(error) {
+  failure(`Restart failed: ${error.stack || error}`);
+}
+$('#restart-btn').onclick = () => restart(false).catch(reportRestartFailure);
+$('#factory-btn').onclick = () => restart(true).catch(reportRestartFailure);
+loading.querySelector('[data-loading-retry]').onclick = () => restart(false).catch(reportRestartFailure);
+loading.querySelector('[data-loading-details]').onclick = event => {
+  event.preventDefault();
+  const details = $('#technical-details');
+  details.open = true;
+  details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
 $('#sd-toggle').onclick = () => send({ type: inserted ? 'sd-eject' : 'sd-insert' });
 $('#sd-clear').onclick = () => send({ type: 'sd-clear' });
 $('#sd-add').onclick = () => picker.click();
