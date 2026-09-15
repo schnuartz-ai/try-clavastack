@@ -16,6 +16,7 @@ const frames = Object.fromEntries(order.map(name => [name, devices[name].querySe
 const ready = new Set();
 const pending = new Map();
 const mediaFiles = new Map();
+const SD_CAPACITY_BYTES = 8_000_000_000;
 const cardOwners = new Map([[1, null], [2, null], [3, null]]);
 let sdOwner = null;
 let requestId = 0;
@@ -42,6 +43,11 @@ function snapshot(name) {
 }
 function prefix(kind, slot) { return kind === 'sd' ? 'sd/' : `cards/${slot}/`; }
 function saveMedia(files, pathPrefix) {
+  if (pathPrefix === 'sd/') {
+    const usedBytes = files.filter(file => file.path.startsWith(pathPrefix))
+      .reduce((total, file) => total + file.bytes.byteLength, 0);
+    if (usedBytes > SD_CAPACITY_BYTES) throw new Error('Virtual SD card exceeds its 8 GB capacity');
+  }
   for (const path of [...mediaFiles.keys()]) if (path.startsWith(pathPrefix)) mediaFiles.delete(path);
   for (const file of files) if (file.path.startsWith(pathPrefix)) mediaFiles.set(file.path, file.bytes);
 }
@@ -51,6 +57,12 @@ function filesFor(pathPrefix) {
 }
 function locationLabel(owner) { return owner ? `Inserted in device ${numbers[owner]}` : 'Not inserted'; }
 function report(text) { document.querySelector('#transfer-state').textContent = text; }
+function formatBytes(bytes) {
+  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(bytes === SD_CAPACITY_BYTES ? 0 : 2)} GB`;
+  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(1)} KB`;
+  return `${bytes} B`;
+}
 function render() {
   document.querySelector('#sd-location').textContent = locationLabel(sdOwner);
   for (const slot of [1, 2, 3]) {
@@ -67,6 +79,8 @@ function render() {
   const list = document.querySelector('#sd-files');
   list.replaceChildren();
   const sdFiles = filesFor('sd/');
+  const usedBytes = sdFiles.reduce((total, file) => total + file.bytes.byteLength, 0);
+  document.querySelector('#sd-capacity').textContent = `8 GB capacity · ${formatBytes(usedBytes)} used · ${formatBytes(SD_CAPACITY_BYTES - usedBytes)} free`;
   if (!sdFiles.length) { const empty = document.createElement('li'); empty.textContent = 'No files on card'; list.append(empty); }
   for (const file of sdFiles) {
     const row = document.createElement('li');
@@ -492,6 +506,14 @@ drop.ondragover = event => { if (event.dataTransfer.types.includes('Files')) eve
 drop.ondrop = event => { event.preventDefault(); addFiles(event.dataTransfer.files); };
 function addFiles(files) {
   perform(async () => {
+    const sizes = new Map(filesFor('sd/').map(file => [file.path, file.bytes.byteLength]));
+    let projected = [...sizes.values()].reduce((total, size) => total + size, 0);
+    for (const file of files) {
+      const path = `sd/${file.name}`;
+      projected = projected - (sizes.get(path) || 0) + file.size;
+      sizes.set(path, file.size);
+    }
+    if (projected > SD_CAPACITY_BYTES) throw new Error('Virtual SD card is full: imported files would exceed its 8 GB capacity');
     for (const file of files) {
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (sdOwner) command(sdOwner, { type: 'sd-import', name: file.name, bytes });
