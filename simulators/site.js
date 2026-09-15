@@ -22,6 +22,8 @@ let sdOwner = null;
 let requestId = 0;
 let armed = null;
 let busy = false;
+let demoAssignment = null;
+let demoSensitivePhrases = [];
 
 function message(name, data) {
   frames[name].contentWindow?.postMessage(data, location.origin);
@@ -101,12 +103,23 @@ function render() {
     actions.append(download, remove); row.append(label, actions); list.append(row);
   }
 }
+function cardHasFirmwareSeed(slot) {
+  return filesFor(`cards/${slot}/`).some(file => file.path === `cards/${slot}/secret.bin`);
+}
+function renderDemoCards() {
+  for (const slot of [1, 2]) {
+    const label = document.querySelector(`#demo-card-${slot}`);
+    const assigned = demoAssignment?.[slot];
+    const confirmed = cardHasFirmwareSeed(slot);
+    label.textContent = `MemoryCard ${slot}: ${confirmed ? 'contains a firmware-stored secret; assignment not verified' : assigned ? `${assigned} assigned; confirmation required in Specter` : 'no confirmed seed'}`;
+  }
+}
 async function perform(action) {
   if (busy) return;
   busy = true;
   try { await action(); }
   catch (error) { report(`Transfer error: ${error.message}`); }
-  finally { busy = false; render(); }
+  finally { busy = false; render(); renderDemoCards(); }
 }
 async function detach(kind, slot) {
   const owner = kind === 'sd' ? sdOwner : cardOwners.get(slot);
@@ -399,6 +412,10 @@ feedbackScreenshot.addEventListener('change', () => {
 async function saveCurrentFeedback() {
   const current = currentFeedback();
   if (!current.comment) return;
+  if (demoSensitivePhrases.some(phrase => current.comment.toLowerCase().includes(phrase))) {
+    setFeedbackStatus('Demo seed data cannot be included in shared feedback.');
+    return;
+  }
   feedbackSave.disabled = true;
   feedbackSave.textContent = 'Saving…';
   setFeedbackStatus('Saving comment for everyone…');
@@ -426,7 +443,8 @@ function updateFeedback() {
   const comment = feedbackMessage.value.trim();
   document.querySelector('#feedback-count').textContent = `${feedbackMessage.value.length} / 5000 characters`;
   const hasComment = comment.length > 0;
-  const valid = comment.length >= 10;
+  const containsDemoData = demoSensitivePhrases.some(phrase => comment.toLowerCase().includes(phrase));
+  const valid = comment.length >= 10 && !containsDemoData;
   feedbackSave.disabled = !hasComment;
   feedbackSubmit.setAttribute('aria-disabled', String(!valid));
   if (!valid) { feedbackSubmit.href = '#feedback-message'; return; }
@@ -523,6 +541,65 @@ function addFiles(files) {
     report(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
   });
 }
+const demoStatus = document.querySelector('#demo-status');
+const demoButton = document.querySelector('#demo-load');
+demoButton.onclick = () => perform(async () => {
+  const target = document.querySelector('#demo-target').value;
+  if (!ready.has(target)) {
+    demoStatus.textContent = `Device ${numbers[target]} is still starting. Wait for Running locally, then try again.`;
+    return;
+  }
+  if (target !== 'diy') {
+    demoStatus.textContent = `Device ${numbers[target]} does not implement a confirmed seed, wallet, or Smartcard import path in this draft.`;
+    return;
+  }
+  demoButton.disabled = true;
+  demoStatus.textContent = 'Loading public demo data locally…';
+  try {
+    const { createDemoFiles } = await import('/simulators/demo-data.js');
+    const demo = createDemoFiles(document.querySelector('#demo-primary').value);
+    demoSensitivePhrases = Object.values(demo.roots).flatMap(root =>
+      [root.mnemonic, ...root.children].map(phrase => phrase.toLowerCase()));
+    if (sdOwner && sdOwner !== target) await detach('sd', null);
+    let projected = filesFor('sd/').reduce((total, file) => total + file.bytes.byteLength, 0);
+    for (const file of demo.files) {
+      const path = `sd/${file.name}`;
+      const old = mediaFiles.get(path)?.byteLength || 0;
+      projected += file.bytes.byteLength - old;
+      if (projected > SD_CAPACITY_BYTES) throw new Error('Virtual SD card is full');
+    }
+    for (const file of demo.files) {
+      const path = `sd/${file.name}`;
+      mediaFiles.set(path, file.bytes);
+    }
+    if (sdOwner === target) {
+      for (const file of demo.files) command(target, { type: 'sd-import', name: file.name, bytes: file.bytes });
+      saveMedia(await snapshot(target), 'sd/');
+    } else {
+      await move('sd', null, target);
+    }
+    // Initializing a card creates only its virtual JavaCard identity. Specter itself
+    // must write the mnemonic after the user confirms its regular storage flow.
+    for (const slot of [1, 2]) {
+      if (!filesFor(`cards/${slot}/`).some(file => file.path === `cards/${slot}/private.key`)) {
+        await move('card', slot, target);
+        await detach('card', slot);
+      }
+    }
+    await move('card', 1, target);
+    demoAssignment = { 1: demo.roots[demo.primary].label, 2: demo.roots[demo.secondary].label };
+    clearScreenshot();
+    feedbackScreenshot.disabled = true;
+    feedbackScreenshot.title = 'Screenshots are disabled after loading seed demo data';
+    updateFeedback();
+    demoStatus.textContent = `${demo.files.length} demo files passed to Device 1 through the SD interface. MemoryCard 1 is inserted. In Specter, switch to Testnet, import the assigned seed from SD, then use Smartcard storage → Save key to the card. Repeat with MemoryCard 2; only Specter can confirm completion.`;
+  } catch (error) {
+    demoStatus.textContent = `Demo import error: ${error.message}`;
+    throw error;
+  } finally {
+    demoButton.disabled = false;
+  }
+});
 document.querySelector('#sd-refresh').onclick = () => perform(async () => {
   if (sdOwner) saveMedia(await snapshot(sdOwner), 'sd/');
   report('SD files refreshed from Specter.');
@@ -533,3 +610,4 @@ document.querySelector('#sd-clear').onclick = () => perform(async () => {
   report('Virtual SD card cleared.');
 });
 render();
+renderDemoCards();

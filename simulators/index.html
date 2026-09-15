@@ -36,6 +36,16 @@
     .device-footer button:hover,.tool-btn:hover { border-color:#8acaff; }
     .device-status { color:#8cdbaf; font-size:11px; min-height:15px; margin-top:6px; }
     .media-desk { margin-top:20px; padding:18px; border:1px solid var(--line); border-radius:17px; background:#101b2a; }
+    .demo-data { margin-top:20px; padding:18px; border:1px solid #7c5b24; border-radius:17px; background:#211a0f; }
+    .demo-data h2 { margin:0 0 6px; font-size:19px; }
+    .demo-data p { margin:5px 0 12px; color:#e3d3b7; font-size:12px; line-height:1.5; }
+    .demo-controls { display:flex; flex-wrap:wrap; gap:10px; align-items:end; }
+    .demo-controls label { display:grid; gap:5px; color:#f5ead6; font-size:12px; }
+    .demo-controls select { min-height:39px; padding:7px 10px; border:1px solid #876e47; border-radius:7px; background:#100d08; color:#fff; font:inherit; }
+    .demo-controls button { min-height:39px; padding:8px 13px; border:1px solid #d59c3c; border-radius:7px; background:#a96c0a; color:#fff; font:inherit; font-weight:700; cursor:pointer; }
+    .demo-controls button:disabled { opacity:.55; cursor:wait; }
+    .demo-status { min-height:18px; margin-top:11px !important; color:#ffe0a6 !important; }
+    .demo-card-state { display:flex; flex-wrap:wrap; gap:12px; margin-top:7px; color:#d9c8aa; font-size:11px; }
     .desk-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
     .desk-head h2 { margin:0; font-size:19px; }
     .desk-head p { color:var(--muted); font-size:12px; margin:0; }
@@ -116,6 +126,17 @@
       <article class="device" data-device="schnuartz"><h2>Alternative Playground</h2><p class="subtitle">Specter 3.0 Draft Schnuartz</p><div class="device-frame"><img class="device-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe title="Alternative Playground firmware" src="/?embedded=1&amp;gallery=1&amp;variant=schnuartz" allow="camera"></iframe><div class="device-hitbox" data-target="schnuartz" aria-label="Insert selected card into device 3"></div></div><div class="device-footer"><button class="restart-device" type="button">Restart</button><a class="source-link">GitHub · loading…</a></div><div class="device-status" role="status">Starting locally…</div></article>
     </section>
     <p class="drop-help pin-hint">A PIN may already be selected: “21”.</p>
+    <section class="demo-data" aria-labelledby="demo-heading">
+      <h2 id="demo-heading">Public demo data</h2>
+      <p><strong>Unsafe test seeds:</strong> 11× ghost + machine and 11× zoo + wrong. The click loads the two roots, their BIP85 child seeds, and matching wallet descriptors locally. Testnet examples come first; clearly marked mainnet examples are included for display testing only.</p>
+      <div class="demo-controls">
+        <label>Seed for MemoryCard 1<select id="demo-primary"><option value="ghost">ghost ×11 + machine</option><option value="zoo">zoo ×11 + wrong</option></select></label>
+        <label>Target<select id="demo-target"><option value="diy">Device 1 · Specter DIY</option><option value="play">Device 2 · Playground</option><option value="schnuartz">Device 3 · Alternative Playground</option></select></label>
+        <button id="demo-load" type="button">Import demo data</button>
+      </div>
+      <p class="demo-status" id="demo-status" role="status" aria-live="polite">Nothing is loaded until you click the button.</p>
+      <div class="demo-card-state"><span id="demo-card-1">MemoryCard 1: no confirmed seed</span><span id="demo-card-2">MemoryCard 2: no confirmed seed</span></div>
+    </section>
     <section class="media-desk" aria-label="Shared removable media">
       <div class="desk-head"><h2>Removable media</h2><p>One 8 GB SD card · Three independent MemoryCards · Stored only in this browser tab</p></div>
       <div class="media-grid">
