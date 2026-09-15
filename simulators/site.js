@@ -173,7 +173,7 @@ addEventListener('message', event => {
     demoLoaded.add(name);
     const state = document.querySelector('#demo-state');
     if (demoLoaded.size === order.length) {
-      state.textContent = 'Playground demo wallets loaded. On device 1, choose Import recovery phrase → QR scanner once, then Scan QR twice; confirm the seed, wallet and transaction.';
+      state.textContent = 'Playground demo wallets loaded. On device 1, open Scan QR three times and confirm the seed, wallet and transaction.';
       document.querySelector('#demo-load').disabled = false;
     } else {
       state.textContent = `Loading demo data (${demoLoaded.size}/3 devices)…`;
