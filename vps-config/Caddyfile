@@ -6,6 +6,8 @@ try.clavastack.com {
 		Cross-Origin-Embedder-Policy "require-corp"
 		Cross-Origin-Resource-Policy "same-origin"
 	}
+	@browserShell path / /index.html /browser/site.js /browser/runtime-worker.js /simulators/ /simulators/index.html /simulators/site.js
+	header @browserShell Cache-Control "no-cache"
 
 	@versionedBuild path_regexp versioned ^/builds/.+/micropython\.(js|wasm|data)$
 	header @versionedBuild Cache-Control "public, max-age=31536000, immutable"

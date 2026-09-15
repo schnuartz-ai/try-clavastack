@@ -138,7 +138,7 @@ await missingCameraPage.locator('#camera-state').getByText('Camera unavailable: 
 await missingCameraPage.close();
 
 const crashPage = await browser.newPage();
-await crashPage.route('**/browser/runtime-worker.js', route => route.abort());
+await crashPage.route('**/browser/runtime-worker.js*', route => route.abort());
 await crashPage.goto(base);
 await crashPage.locator('#st').getByText('Simulator error').waitFor({ timeout: 15000 });
 if (!await crashPage.locator('[data-loading-actions]').isVisible()) throw new Error('Loading error actions are not visible');

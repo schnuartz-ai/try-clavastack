@@ -358,7 +358,12 @@ async function start() {
   const generation = ++runGeneration;
   const startedAt = performance.now();
   workerDependencyCount = null;
-  worker = new Worker('/browser/runtime-worker.js', { name: 'Specter DIY' });
+  // Mobile browsers may retain a worker script independently of the page
+  // shell. Tie it to the verified artifact set so a new deployment cannot
+  // combine an old worker with the current firmware manifest.
+  const workerUrl = new URL('/browser/runtime-worker.js', location.href);
+  if (version) workerUrl.searchParams.set('v', version);
+  worker = new Worker(workerUrl, { name: 'Specter DIY' });
   worker.onmessage = onWorkerMessage;
   worker.onerror = event => crashRecover(`Worker crashed: ${event.message || 'unknown error'}`);
   worker.onmessageerror = () => crashRecover('Worker communication failed');
