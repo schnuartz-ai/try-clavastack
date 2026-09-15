@@ -9,7 +9,10 @@ case "${1:-}" in
   schnuartz) REPOSITORY=Schnuartz/specter-playground; SOURCE_SHA=6626a4671256a82bc890790af3c1335161981d8a ;;
   *) echo "Usage: $0 k9ert|schnuartz" >&2; exit 2 ;;
 esac
-FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/${REPOSITORY#*/}}"
+# Both forks use the repository name `specter-playground`; include the owner
+# so a clean build cannot accidentally reuse the other fork's checkout.
+CHECKOUT_KEY="${REPOSITORY//\//-}"
+FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/$CHECKOUT_KEY}"
 EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
 OUT="$ROOT/builds/${REPOSITORY}-mockui/$SOURCE_SHA"
 if [[ ! -e "$FORK_SRC/.git" ]]; then

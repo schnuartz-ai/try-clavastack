@@ -14,7 +14,8 @@ case "${1:-}" in
   *) echo "Usage: $0 k9ert|schnuartz" >&2; exit 2 ;;
 esac
 PLATFORM_SHA=eb8397d2b53bfe43cec0571f8efa235aa352d8ec
-FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/${REPOSITORY#*/}}"
+CHECKOUT_KEY="${REPOSITORY//\//-}"
+FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/$CHECKOUT_KEY}"
 PLATFORM_SRC="${PLATFORM_SRC:-$ROOT/.browser-work/specter-diy}"
 EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
 OUT="$ROOT/builds/$REPOSITORY/$SOURCE_SHA"
