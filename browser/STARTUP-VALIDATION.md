@@ -35,7 +35,9 @@ Validation of this new build:
   match the new manifest; WASM returns HTTP 200 and `application/wasm`.
 - Both repositories' build scripts now include the optimization and a locals
   ceiling check. Their CI includes the real native-stack regression test.
-- No physical-device success is claimed until the user confirms the new build.
+- The user confirmed after deployment: "Der Simulator startet jetzt." Startup
+  on the affected physical Android phone is therefore confirmed. Other physical
+  phones and Safari iOS have not been independently tested.
 
 Backup before deployment:
 `/var/backups/try-clavastack/mobile-native-stack-20260915/` contains the original
@@ -138,4 +140,5 @@ before a reload.
 Reload https://try.clavastack.com on the affected phone. If startup still fails,
 use Technical details to retrieve the error/stack and preceding startup markers.
 Worker/device/asset diagnostics are displayed locally and are not uploaded.
-Physical Android acceptance remains open until that test is reported.
+The user subsequently confirmed startup on the affected Android phone with the
+native-stack fix; see the follow-up above.
