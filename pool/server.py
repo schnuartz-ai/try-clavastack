@@ -65,7 +65,7 @@ FEEDBACK_MAX_IMAGE_BYTES = 2 * 1024 * 1024
 FEEDBACK_VARIANTS = {
     "diy": {"label": "Specter DIY · Device 1", "repository": "schnuartz-ai/specter-diy"},
     "play": {"label": "K9ert Playground · Device 2", "repository": "k9ert/specter-playground"},
-    "schnuartz": {"label": "Schnuartz Playground · Device 3", "repository": "schnuartz-ai/specter-playground-schnuartz"},
+    "schnuartz": {"label": "Schnuartz Playground · Device 3", "repository": "Schnuartz/specter-playground"},
 }
 RESTART_SCRIPT = "/opt/try-clavastack/pool/restart-simulator.sh"
 SESSION_TIMEOUT = 600          # 10 min inactivity timeout (no heartbeat = session dies)

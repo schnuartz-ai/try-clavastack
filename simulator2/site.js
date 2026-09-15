@@ -8,7 +8,7 @@ const pointers = {
 const feedbackRepositories = {
   diy: 'schnuartz-ai/specter-diy',
   play: 'k9ert/specter-playground',
-  schnuartz: 'schnuartz-ai/specter-playground-schnuartz',
+  schnuartz: 'Schnuartz/specter-playground',
 };
 const feedbackVersions = {};
 const devices = Object.fromEntries(order.map(name => [name, document.querySelector(`[data-device="${name}"]`)]));

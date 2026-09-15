@@ -9,7 +9,7 @@ root = Path(__file__).resolve().parent.parent
 for pointer_file, repository in (
     ('current.json', 'Schnuartz/specter-diy'),
     ('variants/specter-playground.json', 'k9ert/specter-playground'),
-    ('variants/specter-playground-schnuartz.json', 'schnuartz-ai/specter-playground-schnuartz'),
+    ('variants/specter-playground-schnuartz.json', 'Schnuartz/specter-playground'),
 ):
     current = json.loads((root / 'browser' / pointer_file).read_text())
     pointer = current['build']

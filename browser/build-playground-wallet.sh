@@ -9,7 +9,7 @@ case "${1:-}" in
     REPOSITORY=k9ert/specter-playground
     SOURCE_SHA=2b5c1acf95e4ba4b5faa04a07c64cf8164d65ce4 ;;
   schnuartz)
-    REPOSITORY=schnuartz-ai/specter-playground-schnuartz
+    REPOSITORY=Schnuartz/specter-playground
     SOURCE_SHA=c553caf1edbedfbe7c4161408518b315d31cfc51 ;;
   *) echo "Usage: $0 k9ert|schnuartz" >&2; exit 2 ;;
 esac

@@ -8,7 +8,7 @@ await mkdir('test-results', { recursive: true });
 const images = new Map();
 for (const variant of [
   { id: 'play', repo: 'k9ert/specter-playground', pointer: '/browser/variants/specter-playground.json', x: .24, y: .38 },
-  { id: 'schnuartz', repo: 'schnuartz-ai/specter-playground-schnuartz', pointer: '/browser/variants/specter-playground-schnuartz.json', x: .94, y: .03 },
+  { id: 'schnuartz', repo: 'Schnuartz/specter-playground', pointer: '/browser/variants/specter-playground-schnuartz.json', x: .94, y: .03 },
 ]) {
   const page = await browser.newPage({ viewport: { width: 850, height: 1000 } });
   const errors = [];

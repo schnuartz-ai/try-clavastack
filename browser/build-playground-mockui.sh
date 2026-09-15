@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:-}" in
   k9ert) REPOSITORY=k9ert/specter-playground; SOURCE_SHA=2b5c1acf95e4ba4b5faa04a07c64cf8164d65ce4 ;;
-  schnuartz) REPOSITORY=schnuartz-ai/specter-playground-schnuartz; SOURCE_SHA=5d3e5ba2f667d035bd2375b370fb6fc7c33da458 ;;
+  schnuartz) REPOSITORY=Schnuartz/specter-playground; SOURCE_SHA=6626a4671256a82bc890790af3c1335161981d8a ;;
   *) echo "Usage: $0 k9ert|schnuartz" >&2; exit 2 ;;
 esac
 FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/${REPOSITORY#*/}}"

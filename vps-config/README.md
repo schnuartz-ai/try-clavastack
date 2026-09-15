@@ -27,7 +27,7 @@ Multi-user simulator pool with 3 simulator types, auto-scaling (min 2, max 5 per
 |------|------|---------------|-----------|----------|
 | `diy` | `cryptoadvance/specter-diy` | `:99`–`:103` | 5900–5904 | 6080–6084 |
 | `play` | `k9ert/specter-playground` | `:110`–`:114` | 5910–5914 | 6090–6094 |
-| `schnuartz` | `schnuartz-ai/specter-playground-schnuartz` | `:120`–`:124` | 5920–5924 | 6100–6104 |
+| `schnuartz` | `Schnuartz/specter-playground` | `:120`–`:124` | 5920–5924 | 6100–6104 |
 
 ## API Endpoints
 
