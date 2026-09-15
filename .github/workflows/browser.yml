@@ -54,3 +54,16 @@ jobs:
           path: |
             test-results/*.png
             builds/**/build-info.json
+      - name: Upload tested browser builds
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-builds
+          compression-level: 0
+          path: |
+            builds/**/*.js
+            builds/**/*.wasm
+            builds/**/*.data
+            builds/**/build-info.json
+            browser/current.json
+            browser/variants/*.json
