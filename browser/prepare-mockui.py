@@ -39,7 +39,10 @@ if _browser_demo:
         Wallet(label="Inheritance", descriptor="fancy script", required_fingerprints=["73c5da0a"]),
     ]
     for _demo_wallet in _demo_wallets:
-        specter_state.register_wallet(_demo_wallet, imported=True)
+        # Both forks support this display flag, while their `imported`
+        # parameter has incompatible semantics.
+        _demo_wallet.has_been_exported = True
+        specter_state.register_wallet(_demo_wallet)
     try:
         specter_state.set_active_seed(_demo_seed)
         specter_state.set_active_wallet(_demo_wallets[0])
