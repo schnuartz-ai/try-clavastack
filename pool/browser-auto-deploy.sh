@@ -10,8 +10,9 @@ STATE_FILE="$STATE_DIR/browser-last-deployed-run"
 exec 9>/run/lock/try-browser-auto-deploy.lock
 flock -n 9 || exit 0
 
-RUN_ID=$(gh run list --repo "$REPOSITORY" --workflow "$WORKFLOW" --branch main \
-  --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+RUN_ID=$(gh run list --repo "$REPOSITORY" --workflow "$WORKFLOW" --limit 20 \
+  --json databaseId,headBranch,status,conclusion \
+  --jq '[.[] | select(.headBranch == "main" and .status == "completed" and .conclusion == "success")][0].databaseId // empty')
 test -n "$RUN_ID" || exit 0
 
 if [[ -f "$STATE_FILE" && "$(cat "$STATE_FILE")" == "$RUN_ID" ]]; then
