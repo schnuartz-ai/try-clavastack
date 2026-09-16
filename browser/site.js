@@ -60,6 +60,7 @@ let restartPromise;
 let startupStartedAt;
 let startupTicker;
 const snapshots = new Map();
+let demoImportBusy = false;
 
 const startupTimeoutMs = 60000;
 
@@ -271,6 +272,46 @@ function renderCards(slots) {
     hint.textContent = activeCard === slot ? 'Click to remove' : 'Click to insert';
     row.append(card, hint);
     tray.append(row);
+  }
+}
+async function importDemoData() {
+  const button = $('#demo-load');
+  const report = $('#demo-status');
+  if (demoImportBusy) return;
+  if (startupPhase !== 'running' || !worker) {
+    report.textContent = 'Specter is still starting. Wait for Running locally, then try again.';
+    return;
+  }
+  demoImportBusy = true;
+  button.disabled = true;
+  report.textContent = 'Loading public demo files locally…';
+  try {
+    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-2of3-cards');
+    const demo = createDemoFiles($('#demo-primary').value);
+    let projected = sdUsedBytes;
+    for (const file of demo.files) {
+      projected += file.bytes.byteLength - (sdFileSizes.get(file.name) || 0);
+      if (projected > SD_CAPACITY_BYTES) throw new Error('Virtual SD card is full');
+    }
+    for (const file of demo.files) send({ type: 'sd-import', name: file.name, bytes: file.bytes });
+    if (!inserted) send({ type: 'sd-insert' });
+    stateFiles = await snapshot();
+    const hasCard = slot => stateFiles.some(file => file.path === `cards/${slot}/private.key`);
+    for (const slot of [1, 2]) {
+      if (hasCard(slot)) continue;
+      send({ type: 'card-insert', slot });
+      stateFiles = await snapshot();
+      send({ type: 'card-remove' });
+      stateFiles = await snapshot();
+    }
+    send({ type: 'card-insert', slot: 1 });
+    stateFiles = await snapshot();
+    report.textContent = `${demo.files.length} files are on the inserted SD card. First switch Specter to Testnet. MemoryCard 1 is inserted for ${demo.roots[demo.primary].label}; use Import recovery phrase and its 01-… seed file, then Settings → Smartcard storage → Save key to the card. Insert MemoryCard 2 in the tray, choose Open SD card file and the 03-${demo.secondary}-HOST-IMPORT.txt file, confirm it, then save that key to card 2. Only Specter's confirmations write seeds to cards.`;
+  } catch (error) {
+    report.textContent = `Demo import error: ${error.message}`;
+  } finally {
+    demoImportBusy = false;
+    button.disabled = false;
   }
 }
 function setLoadingMessage(message) {
@@ -641,6 +682,7 @@ loading.querySelector('[data-loading-details]').onclick = event => {
 $('#sd-toggle').onclick = () => send({ type: inserted ? 'sd-eject' : 'sd-insert' });
 $('#sd-clear').onclick = () => send({ type: 'sd-clear' });
 $('#sd-add').onclick = () => picker.click();
+$('#demo-load').onclick = importDemoData;
 picker.onchange = () => { importFiles(picker.files); picker.value = ''; };
 $('#sd-drop').ondragover = event => { event.preventDefault(); $('#sd-drop').classList.add('dragging'); };
 $('#sd-drop').ondragleave = () => $('#sd-drop').classList.remove('dragging');

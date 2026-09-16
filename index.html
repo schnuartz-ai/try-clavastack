@@ -288,6 +288,12 @@
     .sim-panel a { color: var(--specter-primary); }
     .sim-panel details { margin-top: 10px; }
     .sim-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; max-height: 180px; overflow: auto; }
+    .demo-import { border:1px solid #80632f; background:#211a0f; }
+    .demo-import strong { color:#ffe0a6; }
+    .demo-import label { display:block; color:#f2dfbd; margin-top:8px; }
+    .demo-import select { width:100%; }
+    .demo-import #demo-load { width:100%; background:#9b650e; border-color:#d69a36; font-weight:700; }
+    .demo-import #demo-status { color:#ffe0a6; font-size:12px; overflow-wrap:anywhere; }
     #sd-drop { border: 1px dashed #536174; border-radius: 8px; padding: 10px; margin-top: 7px; }
     #sd-drop.dragging { border-color: var(--specter-primary); }
     #sd-files { list-style: none; max-height: 180px; overflow: auto; }
@@ -437,6 +443,14 @@
     <h2>Simulator <span style="font-size:11px;color:#7c9">Running locally in your browser</span></h2>
     <p id="build-label">Loading build information…</p>
     <p id="isolation-warning" hidden>Browser isolation headers are missing. This deployment may fail to run; check COOP, COEP and CORP in Technical details.</p>
+    <div class="peripheral-card demo-import">
+      <h3>Public demo data</h3>
+      <p><strong>Unsafe public test seeds only.</strong> Loads Ghost, Zoo, their BIP85 children, Testnet wallets and the Ghost + Zoo + public-only Mirror 2-of-3 multisig. Mirror's seed is never stored. Specter must confirm each seed before it is saved to a card.</p>
+      <label for="demo-primary">Seed prepared for MemoryCard 1</label>
+      <select id="demo-primary"><option value="ghost">ghost ×11 + machine</option><option value="zoo">zoo ×11 + wrong</option></select>
+      <button id="demo-load" type="button">Import demo data</button>
+      <p id="demo-status" role="status" aria-live="polite">Nothing is loaded until you click.</p>
+    </div>
     <div class="peripheral-card">
       <h3>Virtual SD card <span id="sd-state">Ejected</span></h3>
       <div id="sd-stage" class="sd-stage"><div class="sd-card-control"><button id="sd-toggle" type="button" aria-label="Insert 8 GB SD card" aria-pressed="false" title="Click to insert SD card"><img class="sd-card-graphic" src="/assets/sd-card-8gb.png" alt="8 GB microSD card"></button><small id="sd-hint">Click to insert</small></div><span><strong id="sd-capacity">8 GB capacity · 0 B used · 8 GB free</strong><br>Session-only · files stay in this tab</span></div>
