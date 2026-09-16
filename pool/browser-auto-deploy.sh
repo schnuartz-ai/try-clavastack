@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPOSITORY="schnuartz-ai/try-clavastack"
-WORKFLOW="browser.yml"
+WORKFLOW="official-browser-firmware.yml"
 WEBROOT="/var/www/try-clavastack"
 STATE_DIR="/var/lib/try-clavastack"
 STATE_FILE="$STATE_DIR/browser-last-deployed-run"
@@ -20,7 +20,7 @@ fi
 
 WORK_DIR=$(mktemp -d /tmp/try-browser-auto-deploy.XXXXXX)
 trap 'rm -rf -- "$WORK_DIR"' EXIT
-gh run download "$RUN_ID" --repo "$REPOSITORY" --name browser-builds --dir "$WORK_DIR"
+gh run download "$RUN_ID" --repo "$REPOSITORY" --name official-browser-builds --dir "$WORK_DIR"
 
 POINTER="$WORK_DIR/browser/current.json"
 test -f "$POINTER"
@@ -64,4 +64,3 @@ done
 install -m 0644 "$POINTER" "$WEBROOT/browser/current.json"
 install -d -m 0755 "$STATE_DIR"
 printf '%s\n' "$RUN_ID" > "$STATE_FILE"
-
