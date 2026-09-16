@@ -18,6 +18,7 @@ source = Path(sys.argv[1]).resolve()
 for host_only in (
     source / "f469-disco/libs/common/embit/examples",
     source / "f469-disco/libs/common/embit/tests",
+    source / "f469-disco/libs/common/embit/tools",
 ):
     if host_only.is_dir():
         shutil.rmtree(host_only)
