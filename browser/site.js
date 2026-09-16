@@ -347,7 +347,7 @@ async function importDemoData() {
   button.disabled = true;
   report.textContent = 'Loading public demo files locally…';
   try {
-    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-organized-demo');
+    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-multisig-psbt');
     const demo = createDemoFiles();
     let projected = sdUsedBytes;
     for (const file of demo.files) {

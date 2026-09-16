@@ -12,7 +12,7 @@ for (const name of ['02-ghost-bip85-child-0.txt', '02-ghost-bip85-child-1.txt',
   '02-zoo-bip85-child-0.txt', '02-zoo-bip85-child-1.txt']) {
   if (decode(file(name)).split(/\s+/).length !== 12) throw new Error(`Invalid child seed ${name}`);
 }
-if (demo.files.length !== 10) throw new Error(`Expected 10 focused demo files, got ${demo.files.length}`);
+if (demo.files.length !== 11) throw new Error(`Expected 11 focused demo files, got ${demo.files.length}`);
 if (demo.files.some(candidate => /HOST-IMPORT|mainnet|addresses|verify/i.test(candidate.name))) {
   throw new Error('Removed host, Mainnet or redundant address files returned');
 }
@@ -55,10 +55,39 @@ if (!multisig.descriptor.startsWith('wsh(sortedmulti(2,') ||
 if ('mirror' in demo.roots || demo.files.some(candidate => /mirror.*seed/i.test(candidate.name))) {
   throw new Error('Mirror must remain public-only');
 }
-for (const name of ['testnet-ghost-payment-low-fee.psbt', 'testnet-ghost-payment-high-fee.psbt']) {
+for (const name of ['testnet-ghost-payment-low-fee.psbt', 'testnet-ghost-payment-high-fee.psbt',
+  'testnet-multisig-unsigned.psbt']) {
   if (!Buffer.from(decode(file(name)), 'base64').subarray(0, 5).equals(Buffer.from([0x70, 0x73, 0x62, 0x74, 0xff]))) {
     throw new Error(`Invalid PSBT ${name}`);
   }
+}
+const unsignedMultisig = Buffer.from(decode(file('testnet-multisig-unsigned.psbt')), 'base64');
+let offset = 5;
+const compactSize = () => {
+  const prefix = unsignedMultisig[offset++];
+  if (prefix < 0xfd) return prefix;
+  if (prefix === 0xfd) { const value = unsignedMultisig.readUInt16LE(offset); offset += 2; return value; }
+  throw new Error('Unexpected large compact size in demo PSBT');
+};
+const map = () => {
+  const entries = [];
+  while (unsignedMultisig[offset] !== 0) {
+    const keyLength = compactSize();
+    const key = unsignedMultisig.subarray(offset, offset += keyLength);
+    const valueLength = compactSize();
+    const value = unsignedMultisig.subarray(offset, offset += valueLength);
+    entries.push({ key, value });
+  }
+  offset++;
+  return entries;
+};
+map();
+const inputEntries = map();
+const fingerprints = inputEntries.filter(entry => entry.key[0] === 0x06)
+  .map(entry => entry.value.subarray(0, 4).toString('hex')).sort();
+if (inputEntries.some(entry => entry.key[0] === 0x02) ||
+    fingerprints.join(',') !== ['3f635a63', '74d682c3', '8c24a510'].sort().join(',')) {
+  throw new Error('Multisig PSBT must be unsigned and contain all three cosigner derivations');
 }
 console.log(JSON.stringify({ result: 'pass', files: demo.files.length, multisig: '2-of-3',
   mirror: 'public-only', cards: demo.cards.map(card => `${card.id}:plain:PIN-${card.pin}`) }));

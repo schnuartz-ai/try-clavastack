@@ -12,7 +12,7 @@ if (process.env.TEST_LOCAL_CHANGES === '1') {
   for (const [url, path, contentType] of [
     [`${base}/`, 'index.html', 'text/html'],
     [`${base}/browser/site.js`, 'browser/site.js', 'text/javascript'],
-    [`${base}/browser/demo-data.js?v=20260916-organized-demo`, 'browser/demo-data.js', 'text/javascript'],
+    [`${base}/browser/demo-data.js?v=20260916-multisig-psbt`, 'browser/demo-data.js', 'text/javascript'],
   ]) await page.route(url, async route => route.fulfill({ contentType,
     headers: { 'Cross-Origin-Resource-Policy': 'same-origin' }, body: await readFile(path) }));
 }
@@ -41,9 +41,10 @@ if (requests.some(url => url.includes('/browser/demo-data.js'))) throw new Error
 const workerCount = await page.evaluate(() => window.__workerCount);
 const canvas = await page.locator('#screen').elementHandle();
 await page.locator('#demo-load').click();
-await page.locator('#demo-status').getByText('10 focused Testnet files', { exact: false }).waitFor({ timeout: 30000 });
+await page.locator('#demo-status').getByText('11 focused Testnet files', { exact: false }).waitFor({ timeout: 30000 });
 for (const name of ['01-ghost-PUBLIC-TEST-SEED.txt', '02-zoo-bip85-child-1.txt',
-  'testnet-ghost-zoo-mirror-2of3.json', 'testnet-ghost-payment-high-fee.psbt']) {
+  'testnet-ghost-zoo-mirror-2of3.json', 'testnet-ghost-payment-high-fee.psbt',
+  'testnet-multisig-unsigned.psbt']) {
   await page.locator('#sd-files').getByText(name, { exact: false }).waitFor();
 }
 await page.locator('#sd-picker').setInputFiles({ name: 'payment.signed.demo.psbt',
