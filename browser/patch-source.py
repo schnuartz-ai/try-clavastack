@@ -5,9 +5,22 @@ This deliberately does not edit Specter's application Python. Source patterns ar
 checked so an upstream revision cannot silently receive a partial patch.
 """
 from pathlib import Path
+import shutil
 import sys
 
 source = Path(sys.argv[1]).resolve()
+
+# The official repository also ships host-only examples under the shared
+# embit library. They are not part of Specter's firmware, and recent examples
+# use Python 3 syntax that this firmware's older mpy-cross compiler cannot
+# parse. Keep the runtime library and remove only those non-firmware examples
+# before the browser frozen manifest is compiled.
+for host_only in (
+    source / "f469-disco/libs/common/embit/examples",
+    source / "f469-disco/libs/common/embit/tests",
+):
+    if host_only.is_dir():
+        shutil.rmtree(host_only)
 
 
 def replace(path, old, new, expected):
