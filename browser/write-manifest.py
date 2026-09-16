@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 source, output = (Path(p).resolve() for p in sys.argv[1:3])
-repository = sys.argv[3] if len(sys.argv) > 3 else "Schnuartz/specter-diy"
+repository = sys.argv[3] if len(sys.argv) > 3 else "cryptoadvance/specter-diy"
 
 
 def git(*args):
@@ -52,7 +52,7 @@ manifest = {
     "built_at": datetime.now(timezone.utc).isoformat(),
     "artifacts": artifacts,
 }
-if repository.lower() in ("schnuartz/specter-diy", "schnuartz-ai/specter-diy"):
+if repository.lower() in ("cryptoadvance/specter-diy", "schnuartz/specter-diy", "schnuartz-ai/specter-diy"):
     manifest["firmware_version"] = specter_firmware_version()
 if len(sys.argv) > 4 and sys.argv[4] == "mockui":
     manifest["application"] = "MockUI"
@@ -69,7 +69,7 @@ pointer = {
     "version": artifact_set[:16],
 }
 repository_key = repository.lower()
-if repository_key in ("schnuartz/specter-diy", "schnuartz-ai/specter-diy"):
+if repository_key in ("cryptoadvance/specter-diy", "schnuartz/specter-diy", "schnuartz-ai/specter-diy"):
     pointer_name = "current.json"
 elif repository_key == "schnuartz/specter-playground":
     # Keep the two same-named Playground forks addressable independently.

@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:8765';
 const browser = await chromium.launch(process.env.CI ? { headless: true } : { channel: 'chrome', headless: true });
 try {
-  for (const repository of ['Schnuartz/specter-diy', 'schnuartz-ai/specter-diy']) {
+  for (const repository of ['cryptoadvance/specter-diy', 'Schnuartz/specter-diy', 'schnuartz-ai/specter-diy']) {
     const page = await browser.newPage();
     const commit = '0123456789abcdef0123456789abcdef01234567';
     const version = 'fedcba9876543210';

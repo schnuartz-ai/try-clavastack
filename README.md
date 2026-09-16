@@ -15,7 +15,7 @@ SDL software renderer → OffscreenCanvas → device screen cutout
                          or LVGL framebuffer → Worker pixel bridge → Canvas
 ```
 
-The source build follows the latest `master` commit of [`Schnuartz/specter-diy`](https://github.com/Schnuartz/specter-diy), using Emscripten 3.1.74. Version-addressed assets live under `builds/Schnuartz/specter-diy/<commit>/`. [`browser/current.json`](browser/current.json) selects the latest tested production build and appends an artifact-hash query to immutable asset URLs; each generated `build-info.json` records source, toolchain, timestamp, artifact sizes, and SHA256 hashes. Assets are built from source and ignored by Git, then published with the static site. Set `SPECTER_SOURCE_SHA` for a reproducible historical build.
+The source build follows the latest `master` commit of the official [`cryptoadvance/specter-diy`](https://github.com/cryptoadvance/specter-diy), using Emscripten 3.1.74. Version-addressed assets live under `builds/cryptoadvance/specter-diy/<commit>/`. [`browser/current.json`](browser/current.json) selects the latest tested production build and appends an artifact-hash query to immutable asset URLs; each generated `build-info.json` records source, toolchain, timestamp, artifact sizes, and SHA256 hashes. Assets are built from source and ignored by Git, then published with the static site. Set `SPECTER_SOURCE_SHA` for a reproducible historical build.
 
 ## Build and test
 

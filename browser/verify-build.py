@@ -7,7 +7,7 @@ import re
 
 root = Path(__file__).resolve().parent.parent
 for pointer_file, repository in (
-    ('current.json', 'Schnuartz/specter-diy'),
+    ('current.json', 'cryptoadvance/specter-diy'),
     ('variants/specter-playground.json', 'k9ert/specter-playground'),
     ('variants/specter-playground-schnuartz.json', 'Schnuartz/specter-playground'),
 ):
@@ -17,7 +17,7 @@ for pointer_file, repository in (
     build = root / pointer.lstrip('/')
     manifest = json.loads((build / 'build-info.json').read_text())
     assert manifest['repository'] == repository
-    if repository == 'Schnuartz/specter-diy':
+    if repository in ('cryptoadvance/specter-diy', 'Schnuartz/specter-diy'):
         assert re.fullmatch(r'\d+\.\d+\.\d+(?:-rc\d+)?', manifest['firmware_version'])
     else:
         assert manifest['entrypoint'] == 'mockui' and '-mockui/' in pointer
