@@ -35,6 +35,15 @@ for (const name of ['testnet-ghost-legacy.json', 'testnet-ghost-taproot.json',
   'testnet-verify-ghost-address.txt']) {
   if (!file(name)) throw new Error(`Missing demo scenario ${name}`);
 }
+const multisig = JSON.parse(decode(file('testnet-ghost-zoo-mirror-2of3.json')));
+if (!multisig.descriptor.startsWith('wsh(sortedmulti(2,') ||
+    !multisig.descriptor.includes('[74d682c3/48h/1h/0h/2h]') ||
+    (multisig.descriptor.match(/tpub/g) || []).length !== 3) {
+  throw new Error('Mirror public cosigner is missing from the 2-of-3 multisig');
+}
+if ('mirror' in demo.roots || demo.files.some(candidate => /mirror.*seed/i.test(candidate.name))) {
+  throw new Error('Mirror must remain a public-only cosigner');
+}
 for (const name of ['testnet-ghost-payment-low-fee.psbt', 'testnet-ghost-payment-high-fee.psbt']) {
   if (!Buffer.from(decode(file(name)), 'base64').subarray(0, 5).equals(Buffer.from([0x70, 0x73, 0x62, 0x74, 0xff]))) {
     throw new Error(`Invalid PSBT fixture ${name}`);
