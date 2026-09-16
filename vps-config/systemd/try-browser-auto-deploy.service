@@ -5,5 +5,5 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+Environment=HOME=/root
 ExecStart=/opt/try-clavastack/pool/browser-auto-deploy.sh
-
