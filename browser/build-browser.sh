@@ -1,24 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Rebuild the browser runtime from a pinned Specter tree. Set SPECTER_SRC to an
-# already checked-out, clean source tree when iterating locally.
+# Rebuild the browser runtime from the latest Specter tree. Set
+# SPECTER_SOURCE_SHA when a reproducible historical build is needed, or set
+# SPECTER_SRC to an already checked-out source tree when iterating locally.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_REPO="https://github.com/Schnuartz/specter-diy.git"
-SOURCE_SHA="89431c644cc300c55b53220d262a31be02353969"
+SOURCE_BRANCH="${SPECTER_SOURCE_BRANCH:-master}"
+SOURCE_SHA="${SPECTER_SOURCE_SHA:-}"
 SPECTER_SRC="${SPECTER_SRC:-$ROOT/.browser-work/specter-diy}"
 EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
-OUT="$ROOT/builds/Schnuartz/specter-diy/$SOURCE_SHA"
 
 if [[ ! -d "$SPECTER_SRC/.git" ]]; then
   mkdir -p "$(dirname "$SPECTER_SRC")"
-  git clone "$SOURCE_REPO" "$SPECTER_SRC"
-  git -C "$SPECTER_SRC" checkout "$SOURCE_SHA"
+  git clone --branch "$SOURCE_BRANCH" "$SOURCE_REPO" "$SPECTER_SRC"
+else
+  git -C "$SPECTER_SRC" remote set-url origin "$SOURCE_REPO"
 fi
-test "$(git -C "$SPECTER_SRC" rev-parse HEAD)" = "$SOURCE_SHA" || {
-  echo "Specter checkout is not at the pinned commit $SOURCE_SHA" >&2
+
+# Resolve the upstream branch on every build. The generated artifacts remain
+# immutable and are addressed by this resolved commit, so the current pointe
+# can safely move to the newest tested firmware.
+if [[ -z "$SOURCE_SHA" ]]; then
+  SOURCE_SHA="$(git ls-remote "$SOURCE_REPO" "refs/heads/$SOURCE_BRANCH" | awk 'NR == 1 {print $1}')"
+  if [[ -z "$SOURCE_SHA" ]]; then
+    echo "Could not resolve latest Specter commit on $SOURCE_BRANCH" >&2
+    exit 1
+  fi
+fi
+git -C "$SPECTER_SRC" fetch --force origin "$SOURCE_SHA"
+git -C "$SPECTER_SRC" checkout --force "$SOURCE_SHA"
+if [[ "$(git -C "$SPECTER_SRC" rev-parse HEAD)" != "$SOURCE_SHA" ]]; then
+  echo "Specter checkout did not reach $SOURCE_SHA" >&2
   exit 1
-}
+fi
+OUT="$ROOT/builds/Schnuartz/specter-diy/$SOURCE_SHA"
 git -C "$SPECTER_SRC" submodule update --init --recursive
 
 if ! command -v emcc >/dev/null; then

@@ -15,7 +15,7 @@ SDL software renderer → OffscreenCanvas → device screen cutout
                          or LVGL framebuffer → Worker pixel bridge → Canvas
 ```
 
-The source build is pinned to [`Schnuartz/specter-diy@89431c6`](https://github.com/Schnuartz/specter-diy/commit/89431c644cc300c55b53220d262a31be02353969), using Emscripten 3.1.74. Version-addressed assets live under `builds/Schnuartz/specter-diy/<commit>/`. [`browser/current.json`](browser/current.json) selects the production build and appends an artifact-hash query to immutable asset URLs; each generated `build-info.json` records source, toolchain, timestamp, artifact sizes, and SHA256 hashes. Assets are built from source and ignored by Git, then published with the static site.
+The source build follows the latest `master` commit of [`Schnuartz/specter-diy`](https://github.com/Schnuartz/specter-diy), using Emscripten 3.1.74. Version-addressed assets live under `builds/Schnuartz/specter-diy/<commit>/`. [`browser/current.json`](browser/current.json) selects the latest tested production build and appends an artifact-hash query to immutable asset URLs; each generated `build-info.json` records source, toolchain, timestamp, artifact sizes, and SHA256 hashes. Assets are built from source and ignored by Git, then published with the static site. Set `SPECTER_SOURCE_SHA` for a reproducible historical build.
 
 ## Build and test
 
@@ -61,4 +61,4 @@ Current browser support is aimed at current Chromium and Firefox versions with W
 
 ## Phase 2 TODO
 
-CI can later build artifacts per PR SHA and publish `pr/<number>/` static previews. The versioned build directory and manifest already support that layout. PR automation, fork approval, and a branch/commit selector are **not** part of this phase.
+CI builds the latest Specter `master` source on pushes, pull requests, and the scheduled update run. The versioned build directory and manifest keep each resolved commit addressable, while `SPECTER_SOURCE_SHA` remains available for reproducible historical builds. Publishing the tested artifact to the VPS still requires the deployment step described in [`SETUP.md`](SETUP.md).

@@ -3,6 +3,9 @@ name: Browser simulator
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
 
 jobs:
   browser:
