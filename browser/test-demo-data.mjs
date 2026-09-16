@@ -1,7 +1,7 @@
 import { createDemoFiles } from './demo-data.js';
 import { createDecipheriv, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
-const demo = createDemoFiles('ghost');
+const demo = createDemoFiles();
 const decode = file => new TextDecoder().decode(file.bytes).trim();
 const file = name => demo.files.find(candidate => candidate.name === name);
 if (decode(file('01-ghost-PUBLIC-TEST-SEED.txt')) !== 'ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost machine' ||

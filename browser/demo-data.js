@@ -14,8 +14,8 @@ const roots = {
     label: 'Zoo test seed',
     mnemonic: 'zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong',
     cardSecret: 'CXNkaXkAAAAAAD8sdNlUbm41JgXQ/1CkcQUGFsD6uOUVk4GS9HiNeTmDrEGAcpdMq6YFJ//eq8LsQ5nbAD3z+45ZlboQGoxkZTS2aLcU05dhsPmZHad7KNki',
-    pin: '5678',
-    pinDigest: '+GOLl5svT3k92229GX4O4lp6bqMrCuIvXjxdEZ2DnnU=',
+    pin: '21',
+    pinDigest: 'b0tmEhJfs6Da7NJ5nf1snCmUJP2SD5swgRCiwfvY9EM=',
     children: [
       'salt option burden habit silent tone breeze fade idle dilemma subway mix',
       'also voice raise tray tree detail exchange run start still cube actual',
@@ -27,9 +27,9 @@ const wallets = [
   ['testnet-ghost-zoo-mirror-2of3.json', 'Testnet Ghost + Zoo + Mirror 2-of-3', 'wsh(sortedmulti(2,[8c24a510/48h/1h/0h/2h]tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx/{0,1}/*,[3f635a63/48h/1h/0h/2h]tpubDFPtPArj4GzBEFHohegg1Xatrc1Fi9oSox5LzuSRX91miwQxuUrEpBxpvDRsmZYJKYFhgdK3UStsjC8JKXfUbMinjFqiEM4uNwzVaCaHpys/{0,1}/*,[74d682c3/48h/1h/0h/2h]tpubDFj1hZAYMiqqHgrVQ98sLcStdrnAhNx74ynU6QFDULUhyp1BDeyz6E76HPN16t1fswttuwijEsMnskuZPtCvtdbHt74Rs8Vfk3JsM86wah7/{0,1}/*))#syw6qp8z', 'tb1qem2p9awpmhyts2rrg7wxnze0qm4znep7zl032qwrh0yy4m36364qhza3rn'],
 ];
 
-export function createDemoFiles(primary = 'ghost') {
-  if (!(primary in roots)) throw new Error('Unknown demo seed');
-  const secondary = primary === 'ghost' ? 'zoo' : 'ghost';
+export function createDemoFiles() {
+  const primary = 'ghost';
+  const secondary = 'zoo';
   const files = [];
   const add = (name, text) => files.push({ name, bytes: new TextEncoder().encode(text) });
   add('00-CLAVASTACK-DEMO-README.txt', [

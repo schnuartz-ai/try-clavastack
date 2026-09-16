@@ -236,7 +236,28 @@ function renderFiles(files, capacityBytes = SD_CAPACITY_BYTES, usedBytes) {
     fileList.append(empty);
     return;
   }
-  for (const file of files) {
+  const group = path => {
+    const name = path.toLowerCase();
+    if (name.endsWith('.psbt') && (/\.signed(?:\.[^.]+)?\.psbt$/.test(name) || name.includes('.completed.'))) {
+      return { rank: 0, label: 'Signed transactions' };
+    }
+    if (name.endsWith('.psbt')) return { rank: 1, label: 'PSBT' };
+    if (name.endsWith('.txt')) return { rank: 2, label: 'Text' };
+    if (name.endsWith('.json')) return { rank: 3, label: 'JSON' };
+    return { rank: 4, label: 'Other files' };
+  };
+  const sorted = [...files].sort((a, b) => group(a.path).rank - group(b.path).rank ||
+    a.path.localeCompare(b.path, undefined, { sensitivity: 'base' }));
+  let previousGroup;
+  for (const file of sorted) {
+    const currentGroup = group(file.path);
+    if (currentGroup.label !== previousGroup) {
+      const heading = document.createElement('li');
+      heading.className = 'sd-group';
+      heading.textContent = currentGroup.label;
+      fileList.append(heading);
+      previousGroup = currentGroup.label;
+    }
     const row = document.createElement('li');
     const label = document.createElement('span');
     label.textContent = `${file.path} (${file.size} B)`;
@@ -316,6 +337,7 @@ async function refreshCardStatus(showBusy = true) {
 async function importDemoData() {
   const button = $('#demo-load');
   const report = $('#demo-status');
+  report.hidden = false;
   if (demoImportBusy) return;
   if (startupPhase !== 'running' || !worker) {
     report.textContent = 'Specter is still starting. Wait for Running locally, then try again.';
@@ -325,8 +347,8 @@ async function importDemoData() {
   button.disabled = true;
   report.textContent = 'Loading public demo files locally…';
   try {
-    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-provisioned-cards');
-    const demo = createDemoFiles($('#demo-primary').value);
+    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-organized-demo');
+    const demo = createDemoFiles();
     let projected = sdUsedBytes;
     for (const file of demo.files) {
       projected += file.bytes.byteLength - (sdFileSizes.get(file.name) || 0);
