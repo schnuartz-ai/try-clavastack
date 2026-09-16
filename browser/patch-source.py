@@ -29,6 +29,20 @@ for host_only in (
 for host_only_file in (source / "f469-disco/libs/common/embit/src/embit/util").glob("ctypes_*.py"):
     host_only_file.unlink()
 
+# Upstream embit uses the standard desktop ``src/embit`` package layout now,
+# while this MicroPython frozen manifest expects packages directly below
+# ``libs/common``. Stage only the actual firmware package at that location so
+# imports such as ``embit.bip39`` keep their normal name.
+embit_root = source / "f469-disco/libs/common/embit"
+embit_package = embit_root / "src/embit"
+if embit_package.is_dir():
+    staged_embit = source / "f469-disco/libs/common/.embit-firmware-package"
+    if staged_embit.exists():
+        shutil.rmtree(staged_embit)
+    shutil.copytree(embit_package, staged_embit)
+    shutil.rmtree(embit_root)
+    staged_embit.rename(embit_root)
+
 
 def replace(path, old, new, expected):
     target = source / path
