@@ -22,6 +22,12 @@ for host_only in (
     if host_only.is_dir():
         shutil.rmtree(host_only)
 
+# ctypes backends are used by the desktop tooling only; Specter uses the
+# native secp256k1 module in the firmware. They also rely on Python-3-only
+# syntax that cannot be parsed by the firmware compiler.
+for host_only_file in (source / "f469-disco/libs/common/embit/src/embit/util").glob("ctypes_*.py"):
+    host_only_file.unlink()
+
 
 def replace(path, old, new, expected):
     target = source / path
