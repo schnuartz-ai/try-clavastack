@@ -185,7 +185,7 @@ for (const name of order) {
       const pointer = await (await fetch(pointers[name], { cache: 'no-store' })).json();
       const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
       const allowedRepositories = name === 'diy' ?
-        ['schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] : [feedbackRepositories[name]];
+        ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] : [feedbackRepositories[name]];
       if (!/^[a-f0-9]{40}$/.test(info.commit) ||
           !allowedRepositories.map(repository => repository.toLowerCase())
             .includes(info.repository?.toLowerCase()) ||
