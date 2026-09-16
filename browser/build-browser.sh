@@ -51,7 +51,7 @@ test "$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 python3 "$ROOT/browser/patch-source.py" "$SPECTER_SRC"
 cat > "$SPECTER_SRC/browser.manifest.py" <<'EOF'
 freeze('f469-disco/usermods/udisplay_f469/display_unixport')
-freeze('f469-disco/libs/common')
+freeze('browser-freeze/common')
 freeze('src')
 EOF
 # This older MicroPython records a stack marker from a local variable by design.

@@ -10,38 +10,24 @@ import sys
 
 source = Path(sys.argv[1]).resolve()
 
-# The official repository also ships host-only examples under the shared
-# embit library. They are not part of Specter's firmware, and recent examples
-# use Python 3 syntax that this firmware's older mpy-cross compiler cannot
-# parse. Keep the runtime library and remove only those non-firmware examples
-# before the browser frozen manifest is compiled.
-for host_only in (
-    source / "f469-disco/libs/common/embit/examples",
-    source / "f469-disco/libs/common/embit/tests",
-    source / "f469-disco/libs/common/embit/tools",
-):
-    if host_only.is_dir():
-        shutil.rmtree(host_only)
-
-# ctypes backends are used by the desktop tooling only; Specter uses the
-# native secp256k1 module in the firmware. They also rely on Python-3-only
-# syntax that cannot be parsed by the firmware compiler.
-for host_only_file in (source / "f469-disco/libs/common/embit/src/embit/util").glob("ctypes_*.py"):
-    host_only_file.unlink()
-
-# Upstream embit uses the standard desktop ``src/embit`` package layout now,
-# while this MicroPython frozen manifest expects packages directly below
-# ``libs/common``. Stage only the actual firmware package at that location so
-# imports such as ``embit.bip39`` keep their normal name.
-embit_root = source / "f469-disco/libs/common/embit"
-embit_package = embit_root / "src/embit"
-if embit_package.is_dir():
-    staged_embit = source / "f469-disco/libs/common/.embit-firmware-package"
-    if staged_embit.exists():
-        shutil.rmtree(staged_embit)
-    shutil.copytree(embit_package, staged_embit)
-    shutil.rmtree(embit_root)
-    staged_embit.rename(embit_root)
+# Keep the official source/submodule tree intact for its native tests. Build a
+# separate frozen-module tree containing only firmware modules. Upstream embit
+# uses a desktop ``src/embit`` layout now, while MicroPython expects packages
+# directly below the frozen root.
+common_source = source / "f469-disco/libs/common"
+frozen_common = source / "browser-freeze/common"
+if frozen_common.parent.exists():
+    shutil.rmtree(frozen_common.parent)
+frozen_common.mkdir(parents=True)
+for module in ("asyncio", "microur"):
+    shutil.copytree(common_source / module, frozen_common / module)
+for module in ("bcur.py", "lvqr.py"):
+    shutil.copy2(common_source / module, frozen_common / module)
+shutil.copytree(
+    common_source / "embit/src/embit",
+    frozen_common / "embit",
+    ignore=shutil.ignore_patterns("ctypes_*.py"),
+)
 
 
 def replace(path, old, new, expected):
