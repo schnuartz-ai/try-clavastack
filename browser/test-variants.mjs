@@ -28,13 +28,13 @@ for (const variant of [
       variant: variant.id,
       pageErrors: errors,
       status: await page.locator('#st').textContent().catch(() => null),
-      buildLabel: await page.locator('#build-label').textContent().catch(() => null),
+      buildLabel: await page.locator('#build-repository-link').textContent().catch(() => null),
       debug: await page.locator('#debug-log').textContent().catch(() => null),
       error: String(error),
     }));
     throw error;
   }
-  await page.locator('#build-label').getByText(variant.repo, { exact: false }).waitFor();
+  await page.locator('#build-repository-link').getByText(variant.repo, { exact: false }).waitFor();
   await page.waitForTimeout(700);
   const canvas = page.locator('#screen');
   const before = await canvas.screenshot({ path: `test-results/${variant.id}-mockui-screen.png` });

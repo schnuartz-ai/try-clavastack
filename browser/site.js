@@ -1,30 +1,3 @@
-const legacyWorkerCleanupKey = 'specter-legacy-worker-cleanup';
-async function removeLegacyServiceWorkers() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    if (!registrations.length) {
-      sessionStorage.removeItem(legacyWorkerCleanupKey);
-      return;
-    }
-    const wasControlled = Boolean(navigator.serviceWorker.controller);
-    await Promise.all(registrations.map(registration => registration.unregister()));
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map(name => caches.delete(name)));
-    }
-    if (wasControlled && !sessionStorage.getItem(legacyWorkerCleanupKey)) {
-      sessionStorage.setItem(legacyWorkerCleanupKey, '1');
-      location.reload();
-      await new Promise(() => {});
-    }
-    sessionStorage.removeItem(legacyWorkerCleanupKey);
-  } catch (error) {
-    console.warn('Legacy service worker cleanup failed:', error);
-  }
-}
-await removeLegacyServiceWorkers();
-
 const $ = selector => document.querySelector(selector);
 const params = new URLSearchParams(location.search);
 const embedded = params.get('embedded') === '1' && window.parent !== window;
@@ -91,38 +64,8 @@ let startupStartedAt;
 let startupTicker;
 const snapshots = new Map();
 let demoImportBusy = false;
-let runtimeConfigured = false;
-let pageWasSuspended = false;
-let activationPromise;
-let successfulRuns = 0;
-let automaticStartupRetryUsed = false;
 
 const startupTimeoutMs = 60000;
-
-function waitForPageActivation() {
-  if (document.readyState === 'complete' && document.visibilityState === 'visible') return Promise.resolve();
-  if (activationPromise) return activationPromise;
-  activationPromise = new Promise(resolve => {
-    const ready = () => {
-      if (document.readyState !== 'complete' || document.visibilityState !== 'visible') return;
-      removeEventListener('load', ready);
-      document.removeEventListener('visibilitychange', ready);
-      activationPromise = undefined;
-      resolve();
-    };
-    addEventListener('load', ready);
-    document.addEventListener('visibilitychange', ready);
-    ready();
-  });
-  return activationPromise;
-}
-async function startWhenPageActive(reason) {
-  await waitForPageActivation();
-  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  if (!runtimeConfigured || worker || restartPromise) return;
-  log(`Starting after page activation (${reason}).`);
-  await start();
-}
 
 function log(message) {
   debug.textContent += `[${new Date().toISOString()}] ${String(message)}\n`;
@@ -188,10 +131,7 @@ function showLoadingError(message) {
 }
 function failure(message, generation = runGeneration) {
   if (generation !== runGeneration) return;
-  const canRetryAutomatically = runtimeConfigured && successfulRuns === 0 &&
-    !automaticStartupRetryUsed && 'Worker' in window;
   runGeneration++;
-  const recoveryGeneration = runGeneration;
   clearTimeout(recoveryTimer);
   clearStartupTimer();
   stopCamera();
@@ -201,21 +141,9 @@ function failure(message, generation = runGeneration) {
   const failedWorker = worker;
   worker = undefined;
   failedWorker?.terminate();
-  log(message);
-  if (canRetryAutomatically) {
-    automaticStartupRetryUsed = true;
-    setStatus('Retrying startup');
-    showLoading('runtime', 'Retrying Specter startup…', 12);
-    log('Automatic cold-start retry 1/1.');
-    recoveryTimer = setTimeout(() => {
-      if (recoveryGeneration !== runGeneration) return;
-      startWhenPageActive('automatic cold-start recovery')
-        .catch(error => failure(`Automatic retry failed: ${error.stack || error}`));
-    }, 350);
-    return;
-  }
   setStatus('Simulator error');
   showLoadingError(message);
+  log(message);
   notifyParent({ type: 'simulator-error', variant, message });
 }
 // A failed OffscreenCanvas run gets one fresh worker using the LVGL pixel bridge.
@@ -458,7 +386,6 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     loading.style.display = 'none';
     setStatus('Running locally', true);
     startupPhase = 'running';
-    successfulRuns++;
     log('running');
     send({ type: 'sd-list' });
     send({ type: 'card-list' });
@@ -833,18 +760,8 @@ $('#camera-screen-start').onclick = () => startCamera();
 $('#camera-screen-back').onclick = () => { screenCamera.hidden = true; };
 cameraSelect.onchange = () => startCamera(cameraSelect.value);
 addEventListener('pagehide', () => {
-  pageWasSuspended = true;
   runGeneration++; clearTimeout(recoveryTimer); clearStartupTimer(); stopLoadingClock();
   stopCamera(); worker?.terminate(); worker = undefined;
-});
-addEventListener('pageshow', event => {
-  if (!runtimeConfigured || worker || (!pageWasSuspended && !event.persisted)) return;
-  pageWasSuspended = false;
-  startWhenPageActive('page restore').catch(error => failure(`Resume failed: ${error.stack || error}`));
-});
-document.addEventListener('resume', () => {
-  if (!runtimeConfigured || worker) return;
-  startWhenPageActive('browser resume').catch(error => failure(`Resume failed: ${error.stack || error}`));
 });
 
 function firstBuildValue(...values) {
@@ -927,7 +844,6 @@ try {
   if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
-  runtimeConfigured = true;
   log(`Firmware: ${manifest.commit}; build: ${version}; worker: ${workerRevision}`);
   // Build presentation is optional UI. It must never prevent the firmware from starting.
   try {
@@ -940,7 +856,7 @@ try {
     if (isolationWarning) isolationWarning.hidden = false;
     log('Cross-origin isolation missing: check COOP, COEP and CORP response headers.');
   }
-  await startWhenPageActive('initial load');
+  await start();
 } catch (error) {
   failure(`${error.name}: Browser build failed to load: ${error.message}\n${error.stack || ''}`);
 }

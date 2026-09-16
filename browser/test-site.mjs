@@ -12,14 +12,12 @@ page.on('request', request => requests.push(request.url()));
 page.on('pageerror', error => errors.push(error.message));
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
-if (!(await page.locator('#sd-capacity').textContent()).includes('8 GB capacity')) {
-  throw new Error('Main simulator does not expose the 8 GB SD capacity');
-}
+if (await page.locator('#sd-capacity').count()) throw new Error('Removed SD capacity text is visible');
 const mainPointer = await (await page.request.get(`${base}/browser/current.json`)).json();
 const mainManifest = await (await page.request.get(`${base}${mainPointer.build}build-info.json`)).json();
 const sourceLink = page.locator('#source-commit-link');
 const expectedRepositoryUrl = `https://github.com/${mainManifest.repository}`;
-if (await sourceLink.textContent() !== 'GitHub' ||
+if (!(await sourceLink.textContent()).startsWith('GitHub') ||
     await sourceLink.getAttribute('href') !== expectedRepositoryUrl) {
   throw new Error('Main page does not link to its firmware repository below Restart');
 }
@@ -52,8 +50,8 @@ await page.locator('#sd-picker').setInputFiles({
   name: 'probe.bin', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 1, 2, 255]),
 });
 await page.locator('#sd-files').getByText('probe.bin', { exact: false }).waitFor();
-if (!(await page.locator('#sd-capacity').textContent()).includes('4 B used')) {
-  throw new Error('Main simulator did not update SD usage');
+if (!(await page.locator('#sd-files button').first().getAttribute('title')).includes('(4 B)')) {
+  throw new Error('Download tooltip does not expose the file size');
 }
 const downloadPromise = page.waitForEvent('download');
 await page.locator('#sd-files button').first().click();
@@ -117,32 +115,6 @@ if (!probe.logs.includes('SD_PROBE_PRESENT True') ||
   throw new Error(`Specter SD platform read/write failed: ${probe.logs.join('; ')}`);
 }
 
-const deniedPage = await browser.newPage();
-await deniedPage.addInitScript(() => Object.defineProperty(navigator, 'mediaDevices', {
-  configurable: true,
-  value: {
-    getUserMedia: () => Promise.reject(new DOMException('Denied for test', 'NotAllowedError')),
-    enumerateDevices: () => Promise.resolve([]),
-  },
-}));
-await deniedPage.goto(base);
-await deniedPage.locator('#camera-toggle').click();
-await deniedPage.locator('#camera-state').getByText('Camera permission denied').waitFor();
-await deniedPage.close();
-
-const missingCameraPage = await browser.newPage();
-await missingCameraPage.addInitScript(() => Object.defineProperty(navigator, 'mediaDevices', {
-  configurable: true,
-  value: {
-    getUserMedia: () => Promise.reject(new DOMException('No camera found', 'NotFoundError')),
-    enumerateDevices: () => Promise.resolve([]),
-  },
-}));
-await missingCameraPage.goto(base);
-await missingCameraPage.locator('#camera-toggle').click();
-await missingCameraPage.locator('#camera-state').getByText('Camera unavailable: No camera found').waitFor();
-await missingCameraPage.close();
-
 const crashPage = await browser.newPage();
 await crashPage.route('**/browser/runtime-worker.js*', route => route.abort());
 await crashPage.goto(base);
@@ -179,15 +151,9 @@ await canvasBridgePage.goto(base);
 await canvasBridgePage.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
 await canvasBridgeMobile.close();
 
-await page.goto(`${base}/?legacy=1`, { waitUntil: 'domcontentloaded' });
-await page.waitForURL('**/legacy/');
-if (!(await page.locator('body').textContent()).includes('Restart Simulator')) {
-  throw new Error('Legacy page did not load');
-}
 console.log(JSON.stringify({ result: 'pass', canvasColors: colors.size,
   crossOriginIsolated: isolated,
   pointer: 'changed Specter screen', sd: 'import/export/restart/Specter platform read+write',
-  mobileTouch: 'changed Specter screen', cameraDenied: 'handled', noCamera: 'handled',
-  workerCrash: 'handled', legacy: 'loaded',
+  mobileTouch: 'changed Specter screen', workerCrash: 'handled',
   legacyRequestsInBrowserMode: 0 }, null, 2));
 await browser.close();

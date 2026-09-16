@@ -22,12 +22,12 @@ await rows.nth(1).locator('.smartcard-graphic').click();
 await rows.nth(1).getByText('Inserted').waitFor();
 page.once('dialog', dialog => dialog.accept());
 await rows.nth(1).locator('.smartcard-graphic').click({ button: 'right' });
-await rows.nth(1).locator('.smartcard-graphic small').getByText('MemoryCard', { exact: true }).waitFor();
+await rows.nth(1).getByText('Click to insert', { exact: true }).waitFor();
 await rows.nth(0).locator('.smartcard-graphic').click();
 await rows.nth(0).getByText('Inserted').waitFor();
 await restartAndWait(page.locator('#restart-btn'));
 await rows.nth(0).getByText('Inserted').waitFor();
-await page.locator('.sim-panel details summary').click();
+await page.locator('#technical-details summary').click();
 await restartAndWait(page.locator('#factory-btn'));
 await rows.nth(0).getByText('Inserted').waitFor();
 const logs = await page.evaluate(async () => {

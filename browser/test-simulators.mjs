@@ -101,10 +101,7 @@ async function childFiles(name) {
 await page.locator('#sd-picker').setInputFiles({ name: 'transfer.bin', mimeType: 'application/octet-stream',
   buffer: Buffer.from([0, 1, 2, 255]) });
 await page.locator('#sd-files').getByText('transfer.bin', { exact: false }).waitFor();
-if (!(await page.locator('#sd-capacity').textContent()).includes('8 GB capacity') ||
-    !(await page.locator('#sd-capacity').textContent()).includes('4 B used')) {
-  throw new Error('Shared SD card does not expose its 8 GB capacity and usage');
-}
+if (await page.locator('#sd-capacity').count()) throw new Error('Removed shared SD capacity text is visible');
 await drag(page.locator('#sd-token'), 'diy');
 await page.locator('#sd-location').getByText('Inserted in device 1').waitFor();
 const first = await childFiles('diy');

@@ -34,14 +34,14 @@ const positions = await page.evaluate(() => ({
 if (positions.demo < positions.hardware) throw new Error('Demo panel is not below the hardware link');
 if (await page.locator('.cta-section, #demo-primary').count()) throw new Error('Removed marketing or demo selector is still present');
 if (await page.locator('.demo-import details').evaluate(element => element.open)) throw new Error('Demo description starts expanded');
-if (!await page.locator('.hardware-link').getByText('You can buy the hardware you were seeing', { exact: false }).count()) {
+if (!await page.locator('.hardware-link').getByText('Everything above is a simulation of', { exact: false }).count()) {
   throw new Error('Subtle ClavaStack hardware link is missing');
 }
 if (requests.some(url => url.includes('/browser/demo-data.js'))) throw new Error('Demo data loaded before click');
 const workerCount = await page.evaluate(() => window.__workerCount);
 const canvas = await page.locator('#screen').elementHandle();
 await page.locator('#demo-load').click();
-await page.locator('#demo-status').getByText('11 focused Testnet files', { exact: false }).waitFor({ timeout: 30000 });
+await page.locator('#demo-load').getByText('Import Demo Data Again', { exact: true }).waitFor({ timeout: 30000 });
 for (const name of ['01-ghost-PUBLIC-TEST-SEED.txt', '02-zoo-bip85-child-1.txt',
   'testnet-ghost-zoo-mirror-2of3.json', 'testnet-ghost-payment-high-fee.psbt',
   'testnet-multisig-unsigned.psbt']) {
@@ -56,11 +56,9 @@ if (groups.join('|') !== 'Signed transactions|PSBT|Text|JSON') {
 }
 await page.locator('#sd-state').getByText('Inserted', { exact: true }).waitFor();
 await page.locator('#card-slots > div').nth(0).getByText('Inserted', { exact: true }).waitFor();
-await page.locator('#card-status-refresh').click();
-for (const [slot, label, pin] of [[0, 'Ghost test seed', 'PIN 1234'], [1, 'Zoo test seed', 'PIN 21']]) {
+for (const [slot, seed, pin] of [[0, 'ghost-seed', 'PIN: 1234'], [1, 'zoo-seed', 'PIN: 21']]) {
   const details = page.locator('#card-slots > div').nth(slot).locator('.card-details');
-  await details.getByText(label, { exact: false }).waitFor();
-  await details.getByText('Seedphrase · Plain text', { exact: false }).waitFor();
+  await details.getByText(seed, { exact: false }).waitFor();
   await details.getByText(pin, { exact: false }).waitFor();
 }
 if (await page.evaluate(() => window.__workerCount) !== workerCount) throw new Error('Demo import created or restarted a worker');

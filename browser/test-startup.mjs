@@ -44,7 +44,7 @@ async function scenario(name, setup, expected = 'running', extra) {
       assert.match(await page.locator('[data-loading-timer]').textContent(), /Elapsed \d+\.\d+ s/);
       await page.locator('[data-loading-details]').click();
       assert.equal(await page.locator('#technical-details').evaluate(el => el.open), true);
-      assert.ok(await page.locator('[data-loading-actions] a[href*="legacy"]').count());
+      assert.equal(await page.locator('[data-loading-actions] a[href*="legacy"]').count(), 0);
     } else {
       for (const marker of ['wasm-ready', 'SPECTER_BROWSER_BOOT', 'SPECTER_IMPORTS_DONE', 'SPECTER_MAIN_IMPORTED', 'running']) assert.ok(log.includes(marker), marker);
       assert.match(log, /asset-response.*micropython.wasm.*status":200/);

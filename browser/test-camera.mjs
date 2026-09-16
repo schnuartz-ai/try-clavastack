@@ -47,11 +47,7 @@ if (firmwareQrHex !== Buffer.from(text).toString('hex')) {
 }
 await page.waitForFunction(() => window.__qrSends >= 1, null, { timeout: 5000 });
 if (await page.evaluate(() => window.__qrSends) > 10) throw new Error('Repeated QR frames flooded the worker');
-await page.locator('#camera-toggle').click();
-await page.locator('#camera-toggle').getByText('Hide backup preview').waitFor();
-await page.locator('#camera-preview').waitFor({ state: 'visible' });
-await page.locator('#camera-toggle').click();
-await page.locator('#camera-state').getByText('Camera off').waitFor();
+await page.locator('#camera-panel').waitFor({ state: 'hidden' });
 const denied = await browser.newPage();
 await denied.addInitScript(() => Object.defineProperty(navigator, 'mediaDevices', {
   configurable: true,
@@ -59,7 +55,7 @@ await denied.addInitScript(() => Object.defineProperty(navigator, 'mediaDevices'
 }));
 await denied.goto(`${base}/?probe=qr`);
 await denied.locator('#camera-screen').waitFor({ state: 'visible', timeout: 15000 });
-await denied.locator('#camera-state').getByText('Camera permission denied').waitFor();
+await denied.waitForFunction(() => document.querySelector('#debug-log').textContent.includes('Camera permission denied'));
 await denied.locator('#camera-screen-start').waitFor({ state: 'visible' });
 await denied.close();
 console.log(JSON.stringify({ result: 'pass', camera: 'fake webcam to browser decoder to Specter QRHost',
