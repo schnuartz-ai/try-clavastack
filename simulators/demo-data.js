@@ -23,7 +23,7 @@ const wallets = [
   ['testnet-ghost-taproot.json', 'Testnet Ghost Taproot', 'tr([8c24a510/86h/1h/0h]tpubDCtEgiqMKExrg9AJa37NjeCXNKQ57DwbwFYGznGfJszGt1be4GaWMnuyCA9Uk697efUbtogcMeyFiwmNyDzfyrGFRf3KSKPLhj6FkqLgUXi/{0,1}/*)#atzyqdly', 'tb1pkzxv85mtawuhte3fm0h5z5waegf2epjt428xgfgs7up6p93jqzts36dfz0'],
   ['testnet-ghost-account-2.json', 'Testnet Ghost Account 2', 'wpkh([8c24a510/84h/1h/1h]tpubDC4DsqH5rqHqjWindNDCnGNZucunzFgnQAqLZaAMbcRCq1qP3g9dtQSMyexJeyDd1ZzoP8nCxhaHeLT31fTdQeEknCs828m7KDWujKdSPbq/{0,1}/*)#hlkdcp3d', 'tb1q64fu9p0wf5gedyu7fzsdwrzjc97032fhdy9rz8'],
   ['testnet-zoo-watch-only.json', 'Testnet Zoo Watch-only', 'wpkh([3f635a63/84h/1h/0h]tpubDCgYNDYFCZpc5H8LExm81BQd8YcpJndx14YXjFV5XZrFxexwZKMVAycjDvmdLJELb6NgeVAM4UyGbqVqqdATXQh5FnYkS4C9DkzmFc9A86Z/{0,1}/*)#fu206e2q', 'tb1qc74th7kymdhva56ntt26yzzsn5ujz2wtqcyjz8'],
-  ['testnet-ghost-zoo-mirror-2of3.json', 'Testnet Ghost + Zoo + Mirror 2-of-3', 'wsh(sortedmulti(2,[8c24a510/48h/1h/0h/2h]tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx/{0,1}/*,[3f635a63/48h/1h/0h/2h]tpubDFPtPArj4GzBEFHohegg1Xatrc1Fi9oSox5LzuSRX91miwQxuUrEpBxpvDRsmZYJKYFhgdK3UStsjC8JKXfUbMinjFqiEM4uNwzVaCaHpys/{0,1}/*,[74d682c3/48h/1h/0h/2h]tpubDFj1hZAYMiqqHgrVQ98sLcStdrnAhNx74ynU6QFDULUhyp1BDeyz6E76HPN16t1fswttuwijEsMnskuZPtCvtdbHt74Rs8Vfk3JsM86wah7/{0,1}/*))#syw6qp8z', 'tb1qem2p9awpmhyts2rrg7wxnze0qm4znep7zl032qwrh0yy4m36364qhza3rn'],
+  ['testnet-ghost-zoo-2of2.json', 'Testnet Ghost + Zoo 2-of-2', 'wsh(sortedmulti(2,[8c24a510/48h/1h/0h/2h]tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx/{0,1}/*,[3f635a63/48h/1h/0h/2h]tpubDFPtPArj4GzBEFHohegg1Xatrc1Fi9oSox5LzuSRX91miwQxuUrEpBxpvDRsmZYJKYFhgdK3UStsjC8JKXfUbMinjFqiEM4uNwzVaCaHpys/{0,1}/*))#rh703fa4', 'tb1qdspgdqxu86lmuxp6e62wz0pnprr9dxv6htej8qy4rnkdsmee7ckqyqfd87'],
   ['testnet-ghost-zoo-timelock.json', 'Testnet Ghost + Zoo Timelock', 'wsh(or_d(pk([8c24a510/48h/1h/0h/2h]tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx/{0,1}/*),and_v(v:pk([3f635a63/48h/1h/0h/2h]tpubDFPtPArj4GzBEFHohegg1Xatrc1Fi9oSox5LzuSRX91miwQxuUrEpBxpvDRsmZYJKYFhgdK3UStsjC8JKXfUbMinjFqiEM4uNwzVaCaHpys/{0,1}/*),older(52560))))#vm6u0e6e', 'tb1qzkm59q72k8hussxvt60u3lmfl2n8vjgef385j2rtmm7zyjuach7qq5vpw2'],
   ['mainnet-ghost-native-segwit.json', 'Mainnet Ghost Native SegWit (test data)', 'wpkh([8c24a510/84h/0h/0h]xpub6CjsHfiuBnHMPBkxThQ4DDjTw2Qq3VMEVcPBoMBGejZGkj3WQR15LeJLmymPpSzYHX21C8SdFWHgMw2RUBdAQ2Aj4MMS93a68mxPQeS8oHr/{0,1}/*)#dwfgu6ex', 'bc1qwq5rv3p3vp4duhejkd9l88m7umudte4fur4c6q'],
   ['mainnet-zoo-watch-only.json', 'Mainnet Zoo Watch-only (test data)', 'wpkh([3f635a63/84h/0h/0h]xpub6CYYYw6h668PkCSXxH9yxBG32zCMEb6N9DuVY8Ax8U7RSV86qKrrhjJfS6nL5jSoikLpd1Qw9qgHv5vyRi7V4nfV3ymLfGpFShsYsFmQiT8/{0,1}/*)#k8vzy50p', 'bc1qk0a9hr7wjfxeenz9nwenw9flhq0tmsf6vsgnn2'],
@@ -39,8 +39,6 @@ export function createDemoFiles(primary = 'ghost') {
     '',
     `MemoryCard 1 assignment: ${roots[primary].label}`,
     `MemoryCard 2 assignment: ${roots[secondary].label}`,
-    '2-of-3 multisig: Ghost + Zoo + public-only Mirror cosigner (fingerprint 74d682c3).',
-    'The Mirror mnemonic is deliberately not included or stored.',
     'The card seed is written only after you confirm Save key to the card in Specter DIY.',
     'Testnet wallet files are the primary examples. Mainnet files are included only for display comparisons.',
   ].join('\n'));
