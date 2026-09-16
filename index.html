@@ -81,8 +81,8 @@
       }
     }
 
-    .hardware-link { width:100%; max-width:380px; text-align:center; color:#8191a3; font-size:11px; }
-    .hardware-link a { color:#98a9ba; text-underline-offset:3px; }
+    .hardware-link { width:100%; max-width:580px; text-align:center; color:var(--specter-light-secondary); font-size:14px; line-height:1.45; }
+    .hardware-link a { color:var(--specter-primary); font-weight:700; text-underline-offset:3px; }
 
     /* The LVGL canvas sits UNDER the existing device mockup image. */
     #screen-overlay {
@@ -154,21 +154,25 @@
 
     /* Restart button */
     .restart-btn {
-      display: block;
-      width: 100%;
-      max-width: 380px;
-      padding: 14px;
-      border-radius: 9999px;
-      font-size: 15px;
+      display: inline-flex;
+      width: auto;
+      max-width: none;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 8px 12px;
+      border-radius: 7px;
+      font-size: 12px;
       font-weight: 600;
       text-align: center;
       background: transparent;
       color: var(--specter-coral);
-      border: 2px solid var(--specter-coral);
+      border: 1px solid var(--specter-coral);
       cursor: pointer;
-      min-height: 48px;
+      min-height: 36px;
       transition: background 0.2s;
     }
+    .restart-btn svg { width: 15px; height: 15px; flex: none; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
     .restart-btn:hover, .restart-btn:active {
       background: rgba(255,122,122,.1);
     }
@@ -212,7 +216,7 @@
       background: var(--specter-dark-secondary); color: var(--specter-light-secondary);
       font-size: 13px; line-height: 1.45;
     }
-    .warning { border: 1px solid var(--specter-coral); }
+    .warning { max-width:280px; border: 1px solid var(--specter-coral); }
     .warning strong { color: var(--specter-coral); display: block; margin-bottom: 4px; }
     .sim-panel h2 { color: var(--specter-light); font-size: 15px; margin-bottom: 8px; }
     .sim-panel h3 { color: var(--specter-light); font-size: 13px; margin: 12px 0 6px; }
@@ -226,13 +230,20 @@
     .sim-panel a { color: var(--specter-primary); }
     .sim-panel details { margin-top: 10px; }
     .sim-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; max-height: 180px; overflow: auto; }
-    .demo-import { width:100%; max-width:380px; border:1px solid #80632f; border-radius:12px; background:#211a0f; color:var(--specter-light-secondary); padding:14px; font-size:13px; line-height:1.45; }
+    .technical-details { width:100%; max-width:380px; color:var(--specter-light-secondary); font-size:12px; line-height:1.45; }
+    .technical-details summary { cursor:pointer; color:var(--specter-light-secondary); }
+    .technical-details p { margin:8px 0; }
+    .technical-details a { color:var(--specter-primary); }
+    .technical-details pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; max-height:180px; overflow:auto; }
+    .card-tray .card-hint { color:#aab8c8; display:block; font-size:10px; margin-top:5px; text-align:center; }
+    .card-tray .card-details { color:#d8e6f3; display:block; font-size:9px; line-height:1.35; margin-top:5px; min-height:0; overflow-wrap:anywhere; text-align:center; white-space:pre-line; }
+    .demo-import { width:100%; max-width:380px; border:1px solid #3b4a5e; border-radius:10px; background:var(--specter-dark-secondary); color:var(--specter-light-secondary); padding:14px; font-size:13px; line-height:1.45; }
     .demo-import p { margin:5px 0; }
-    .demo-import strong { color:#ffe0a6; }
+    .demo-import strong { color:var(--specter-light); }
     .demo-import button { background:var(--specter-dark-accent); color:var(--specter-light); border:1px solid #536174; border-radius:6px; padding:8px; cursor:pointer; min-height:36px; }
-    .demo-import #demo-load { width:100%; background:#9b650e; border-color:#d69a36; font-weight:700; }
-    .demo-import #demo-status { color:#ffe0a6; font-size:12px; overflow-wrap:anywhere; }
-    .demo-import details { margin-top:8px; color:#c9b994; }
+    .demo-import #demo-load { width:auto; background:var(--specter-dark-accent); border-color:#536174; font-weight:700; }
+    .demo-import #demo-load:hover { border-color:var(--specter-primary); }
+    .demo-import details { margin-top:8px; color:var(--specter-light-secondary); }
     .demo-import summary { cursor:pointer; font-size:11px; }
     #sd-drop { border: 1px dashed #536174; border-radius: 8px; padding: 10px; margin-top: 7px; }
     #sd-drop.dragging { border-color: var(--specter-primary); }
@@ -265,14 +276,16 @@
     .sd-stage span { line-height:1.45; }
     .card-tray { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0; }
     .card-tray > div { min-width:0; }
-    .smartcard-graphic { background:linear-gradient(145deg,#fff,#d9e1e7); color:#13263a; border-radius:9px; aspect-ratio:1.55; padding:8px; box-shadow:0 5px 14px #0005; display:flex; flex-direction:column; justify-content:space-between; transition:transform .25s ease,box-shadow .25s ease; }
-    .smartcard-graphic::before { content:'▦'; color:#b7a56a; font-size:18px; line-height:1; }
-    .smartcard-graphic strong { font-size:10px; }
+    .smartcard-graphic { position:relative; overflow:hidden; background:transparent; color:#13263a; border-radius:9px; aspect-ratio:1.55; padding:0; box-shadow:0 5px 14px #0005; display:block; transition:transform .25s ease,box-shadow .25s ease; }
+    .smartcard-photo { position:absolute; left:-12.5%; top:50%; width:125%; height:auto; transform:translateY(-50%); pointer-events:none; user-select:none; }
+    .smartcard-graphic strong { position:absolute; left:8%; bottom:9%; z-index:1; color:#13263a; font-size:10px; text-shadow:0 1px 1px #fff9; }
     .card-tray .inserted .smartcard-graphic { transform:translateY(-6px); box-shadow:0 8px 18px #1f99e578; outline:2px solid #1f99e5; }
-    .sim-panel .smartcard-graphic { cursor:pointer; border:0; width:100%; text-align:left; margin:0; background:linear-gradient(145deg,#fff,#d9e1e7); color:#13263a; }
+    .sim-panel .smartcard-graphic { cursor:pointer; border:0; width:100%; text-align:left; margin:0; color:#13263a; }
     .sim-panel .smartcard-graphic:hover { border:0; box-shadow:0 7px 18px #1f99e579; }
-    .card-tray .card-hint { color:#aab8c8; display:block; font-size:10px; margin-top:6px; text-align:center; }
-    .card-tray .card-details { color:#d8e6f3; display:block; font-size:10px; line-height:1.35; margin-top:5px; min-height:0; text-align:center; white-space:pre-line; }
+    .card-tray .card-status { position:absolute; right:8%; bottom:9%; z-index:1; color:#13263a; display:block; font-size:10px; font-weight:700; margin:0; min-height:0; text-align:right; text-shadow:0 1px 1px #fff9; }
+    .camera-heading { display:flex; align-items:center; gap:7px; }
+    .camera-status-dot { width:8px; height:8px; border-radius:50%; background:#4c5; box-shadow:0 0 0 3px #4c52, 0 0 12px #4c5; }
+    .camera-status-dot[hidden] { display:none; }
     @media (max-width:600px) { .card-tray { gap:5px; } .smartcard-graphic { padding:5px; } }
 
     footer {
@@ -300,13 +313,14 @@
     .gallery .phone-wrapper .phone-mockup { display:none; }
     .gallery #screen-overlay { left:0; top:0; width:100%; height:100%; border-radius:0; }
     @media (min-width:900px) {
-      .page { display:grid; grid-template-columns:380px 380px; grid-template-areas:'warning warning' 'device peripherals' 'restart peripherals' 'hardware hardware' 'demo demo'; gap:16px 22px; width:100%; max-width:822px; margin:auto; align-items:start; }
-      .warning { grid-area:warning; max-width:none; }
+      .page { display:grid; grid-template-columns:380px 380px; grid-template-areas:'warning warning' 'device peripherals' 'restart peripherals' 'hardware hardware' 'demo demo' 'technical technical'; gap:16px 22px; width:100%; max-width:822px; margin:auto; align-items:start; }
+      .warning { grid-area:warning; max-width:280px; justify-self:center; }
       .phone-wrapper { grid-area:device; }
       .device-actions { grid-area:restart; }
       .sim-panel { grid-area:peripherals; }
-      .hardware-link { grid-area:hardware; justify-self:center; }
+      .hardware-link { grid-area:hardware; justify-self:center; margin-top:16px; }
       .demo-import { grid-area:demo; justify-self:center; }
+      .technical-details { grid-area:technical; justify-self:center; }
       .embedded .page { grid-template-columns:330px 380px; max-width:760px; }
       .gallery .page { display:block; max-width:none; }
     }
@@ -339,7 +353,6 @@
 
   <div class="warning" role="note">
     <strong>NEVER ENTER A REAL SEED PHRASE.</strong>
-    This simulator runs on an internet-connected computer or phone. It has none of the security or air-gap guarantees of a physical Specter. Use test seeds only.
   </div>
 
   <!-- The real Specter LVGL display renders inside the existing device frame. -->
@@ -367,7 +380,6 @@
           <div class="loading-actions" data-loading-actions hidden>
             <button type="button" data-loading-retry>Retry</button>
             <a href="#technical-details" data-loading-details>Technical details</a>
-            <a href="/legacy/" data-loading-legacy>Legacy mode</a>
           </div>
         </div>
       </div>
@@ -378,56 +390,56 @@
 
   <div class="device-actions">
     <button class="restart-btn" id="restart-btn">
-      &#x1F504; Restart Simulator
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3.9L3 10"></path><path d="M3 4v6h6"></path><path d="M4 13a8 8 0 0 0 14.9 3.9L21 14"></path><path d="M21 20v-6h-6"></path></svg>
+      Restart Simulator
     </button>
     <a id="source-commit-link" class="source-commit-link" href="https://github.com/Schnuartz/specter-diy" target="_blank" rel="noopener noreferrer">GitHub</a>
   </div>
 
   <section class="sim-panel" aria-label="Simulator and peripherals">
-    <h2>Simulator <span style="font-size:11px;color:#7c9">Running locally in your browser</span></h2>
-    <p id="build-label">Loading build information…</p>
+    <h2>Simulator</h2>
     <p id="isolation-warning" hidden>Browser isolation headers are missing. This deployment may fail to run; check COOP, COEP and CORP in Technical details.</p>
     <div class="peripheral-card">
       <h3>Virtual SD card <span id="sd-state">Ejected</span></h3>
-      <div id="sd-stage" class="sd-stage"><div class="sd-card-control"><button id="sd-toggle" type="button" aria-label="Insert 8 GB SD card" aria-pressed="false" title="Click to insert SD card"><img class="sd-card-graphic" src="/assets/sd-card-8gb.png" alt="8 GB microSD card"></button><small id="sd-hint">Click to insert</small></div><span><strong id="sd-capacity">8 GB capacity · 0 B used · 8 GB free</strong><br>Session-only · files stay in this tab</span></div>
+      <div id="sd-stage" class="sd-stage"><div class="sd-card-control"><button id="sd-toggle" type="button" aria-label="Insert SD card" aria-pressed="false" title="Click to insert SD card"><img class="sd-card-graphic" src="/assets/sd-card-8gb.png" alt="microSD card"></button><small id="sd-hint">Click to insert</small></div></div>
       <button id="sd-add">Add files</button>
       <button id="sd-clear">Clear card</button>
       <input id="sd-picker" type="file" multiple hidden>
       <div id="sd-drop">Drop files here, or use Add files.</div>
-      <ul id="sd-files"><li>No files on the virtual card</li></ul>
+      <ul id="sd-files"></ul>
     </div>
-    <h3>Camera / QR scanner</h3>
-    <p id="camera-state">Camera off</p>
-    <button id="camera-toggle">Show backup preview</button>
-    <select id="camera-select" aria-label="Select camera" hidden></select>
-    <video id="camera-preview" autoplay playsinline muted hidden></video>
+    <div id="camera-panel" hidden>
+      <h3 class="camera-heading">Camera / QR scanner <span id="camera-status-dot" class="camera-status-dot" hidden aria-label="Camera active"></span></h3>
+      <button id="camera-toggle" hidden>Show backup preview</button>
+      <select id="camera-select" aria-label="Select camera" hidden></select>
+      <video id="camera-preview" autoplay playsinline muted hidden></video>
+    </div>
     <div id="card-panel" hidden>
-      <h3>Virtual Smartcards</h3>
-      <p>Click a card to insert or remove it. Saved seed format appears below it after refresh. Real PIN digits cannot be recovered; known public demo PINs are shown. Demo labels belong to this simulator because the MemoryCard applet has no name field.</p>
+      <h3>Virtual Smart Cards</h3>
       <div id="card-slots" class="card-tray"></div>
-      <button id="card-status-refresh" type="button">Refresh card status</button>
     </div>
-    <details id="technical-details">
-      <summary>Technical details</summary>
-      <p>Source commit: <a id="build-link" href="#">Loading…</a></p>
-      <p>Restart keeps simulated flash, SD and Smartcard contents in this tab. Factory reset wipes flash and keeps peripherals. Clear, eject or reset them separately.</p>
-      <button id="factory-btn">Factory reset simulated flash</button>
-      <p><a href="/legacy/">Legacy VNC simulator</a></p>
-      <pre id="build-details"></pre>
-      <pre id="debug-log"></pre>
-    </details>
   </section>
 
-  <p class="hardware-link">You can buy the hardware you were seeing at <a href="https://clavastack.com">ClavaStack</a>.</p>
+  <p class="hardware-link">Everything above is a simulation of <a href="https://clavastack.com" target="_blank" rel="noopener noreferrer">hardware you can buy</a>.</p>
 
   <section class="demo-import" aria-label="Public demo data">
-    <button id="demo-load" type="button">Import public demo data</button>
-    <p id="demo-status" role="status" aria-live="polite" hidden></p>
+    <button id="demo-load" type="button">Import Demo Data</button>
     <details>
       <summary>What gets imported?</summary>
       <p><strong>Unsafe public test seeds only.</strong> Ghost, Zoo, their BIP85 children, two single-signature PSBT examples, one completely unsigned Ghost + Zoo + Mirror 2-of-3 PSBT and the matching multisig wallet. Two blank virtual Smartcards receive Ghost (PIN 1234) and Zoo (PIN 21). Mirror's seed is never stored.</p>
     </details>
   </section>
+
+  <details id="technical-details" class="technical-details">
+    <summary>Technical details</summary>
+    <p>Repository: <a id="build-repository-link" href="#">Loading…</a></p>
+    <p id="build-context" hidden></p>
+    <p>Source commit: <a id="build-link" href="#">Loading…</a></p>
+    <p>Restart keeps simulated flash, SD and Smartcard contents in this tab. Factory reset wipes flash and keeps peripherals. Clear, eject or reset them separately.</p>
+    <button id="factory-btn">Factory reset simulated flash</button>
+    <pre id="build-details"></pre>
+    <pre id="debug-log"></pre>
+  </details>
 
 </div>
 
@@ -436,6 +448,6 @@
 </footer>
 
 <script src="/assets/jsQR-1.4.0.js"></script>
-<script type="module" src="/browser/site.js"></script>
+<script type="module" src="/browser/site.js?v=20260916-ui10"></script>
 </body>
 </html>

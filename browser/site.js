@@ -1,6 +1,32 @@
+const legacyWorkerCleanupKey = 'specter-legacy-worker-cleanup';
+async function removeLegacyServiceWorkers() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    if (!registrations.length) {
+      sessionStorage.removeItem(legacyWorkerCleanupKey);
+      return;
+    }
+    const wasControlled = Boolean(navigator.serviceWorker.controller);
+    await Promise.all(registrations.map(registration => registration.unregister()));
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    }
+    if (wasControlled && !sessionStorage.getItem(legacyWorkerCleanupKey)) {
+      sessionStorage.setItem(legacyWorkerCleanupKey, '1');
+      location.reload();
+      await new Promise(() => {});
+    }
+    sessionStorage.removeItem(legacyWorkerCleanupKey);
+  } catch (error) {
+    console.warn('Legacy service worker cleanup failed:', error);
+  }
+}
+await removeLegacyServiceWorkers();
+
 const $ = selector => document.querySelector(selector);
 const params = new URLSearchParams(location.search);
-if (params.has('legacy')) location.replace('/legacy/');
 const embedded = params.get('embedded') === '1' && window.parent !== window;
 const gallery = embedded && params.get('gallery') === '1';
 const variant = ['diy', 'play', 'schnuartz'].includes(params.get('variant')) ? params.get('variant') : 'diy';
@@ -22,11 +48,13 @@ const loadingSteps = [...loading.querySelectorAll('[data-loading-step]')];
 const debug = $('#debug-log');
 const fileList = $('#sd-files');
 const picker = $('#sd-picker');
-const sdCapacity = $('#sd-capacity');
 const video = $('#camera-preview');
 const screenVideo = $('#camera-screen-video');
 const screenCamera = $('#camera-screen');
+const cameraPanel = $('#camera-panel');
 const cameraSelect = $('#camera-select');
+const cameraToggle = $('#camera-toggle');
+const cameraStatusDot = $('#camera-status-dot');
 let worker;
 let softwareContext;
 let softwareFrame;
@@ -41,7 +69,6 @@ let sdFileSizes = new Map();
 let activeCard = null;
 let cardSlots = [];
 const demoCardMetadata = new Map();
-let cardStatusRefreshTimer;
 let cameraStream;
 let cameraLoop;
 let scannerActive = false;
@@ -64,8 +91,38 @@ let startupStartedAt;
 let startupTicker;
 const snapshots = new Map();
 let demoImportBusy = false;
+let runtimeConfigured = false;
+let pageWasSuspended = false;
+let activationPromise;
+let successfulRuns = 0;
+let automaticStartupRetryUsed = false;
 
 const startupTimeoutMs = 60000;
+
+function waitForPageActivation() {
+  if (document.readyState === 'complete' && document.visibilityState === 'visible') return Promise.resolve();
+  if (activationPromise) return activationPromise;
+  activationPromise = new Promise(resolve => {
+    const ready = () => {
+      if (document.readyState !== 'complete' || document.visibilityState !== 'visible') return;
+      removeEventListener('load', ready);
+      document.removeEventListener('visibilitychange', ready);
+      activationPromise = undefined;
+      resolve();
+    };
+    addEventListener('load', ready);
+    document.addEventListener('visibilitychange', ready);
+    ready();
+  });
+  return activationPromise;
+}
+async function startWhenPageActive(reason) {
+  await waitForPageActivation();
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  if (!runtimeConfigured || worker || restartPromise) return;
+  log(`Starting after page activation (${reason}).`);
+  await start();
+}
 
 function log(message) {
   debug.textContent += `[${new Date().toISOString()}] ${String(message)}\n`;
@@ -131,9 +188,11 @@ function showLoadingError(message) {
 }
 function failure(message, generation = runGeneration) {
   if (generation !== runGeneration) return;
+  const canRetryAutomatically = runtimeConfigured && successfulRuns === 0 &&
+    !automaticStartupRetryUsed && 'Worker' in window;
   runGeneration++;
+  const recoveryGeneration = runGeneration;
   clearTimeout(recoveryTimer);
-  clearTimeout(cardStatusRefreshTimer);
   clearStartupTimer();
   stopCamera();
   clearTimeout(scannerStopTimer);
@@ -142,9 +201,21 @@ function failure(message, generation = runGeneration) {
   const failedWorker = worker;
   worker = undefined;
   failedWorker?.terminate();
+  log(message);
+  if (canRetryAutomatically) {
+    automaticStartupRetryUsed = true;
+    setStatus('Retrying startup');
+    showLoading('runtime', 'Retrying Specter startup…', 12);
+    log('Automatic cold-start retry 1/1.');
+    recoveryTimer = setTimeout(() => {
+      if (recoveryGeneration !== runGeneration) return;
+      startWhenPageActive('automatic cold-start recovery')
+        .catch(error => failure(`Automatic retry failed: ${error.stack || error}`));
+    }, 350);
+    return;
+  }
   setStatus('Simulator error');
   showLoadingError(message);
-  log(message);
   notifyParent({ type: 'simulator-error', variant, message });
 }
 // A failed OffscreenCanvas run gets one fresh worker using the LVGL pixel bridge.
@@ -183,10 +254,6 @@ function pointer(event, down) {
   const x = Math.max(0, Math.min(479, Math.floor((event.clientX - rect.left) * 480 / rect.width)));
   const y = Math.max(0, Math.min(799, Math.floor((event.clientY - rect.top) * 800 / rect.height)));
   send({ type: 'pointer', x, y, down });
-  if (down === 0 && activeCard) {
-    clearTimeout(cardStatusRefreshTimer);
-    cardStatusRefreshTimer = setTimeout(() => refreshCardStatus(false), 900);
-  }
 }
 function newCanvas() {
   canvasBox.querySelector('canvas')?.remove();
@@ -219,23 +286,11 @@ function drawFrame(pixels) {
   }
   softwareContext.putImageData(softwareFrame, 0, 0);
 }
-function formatBytes(bytes) {
-  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(bytes === SD_CAPACITY_BYTES ? 0 : 2)} GB`;
-  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
-  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(1)} KB`;
-  return `${bytes} B`;
-}
 function renderFiles(files, capacityBytes = SD_CAPACITY_BYTES, usedBytes) {
   sdFileSizes = new Map(files.map(file => [file.path, file.size]));
   sdUsedBytes = Number.isFinite(usedBytes) ? usedBytes : files.reduce((total, file) => total + file.size, 0);
-  sdCapacity.textContent = `8 GB capacity · ${formatBytes(sdUsedBytes)} used · ${formatBytes(Math.max(0, capacityBytes - sdUsedBytes))} free`;
   fileList.replaceChildren();
-  if (!files.length) {
-    const empty = document.createElement('li');
-    empty.textContent = 'No files on the virtual card';
-    fileList.append(empty);
-    return;
-  }
+  if (!files.length) return;
   const group = path => {
     const name = path.toLowerCase();
     if (name.endsWith('.psbt') && (/\.signed(?:\.[^.]+)?\.psbt$/.test(name) || name.includes('.completed.'))) {
@@ -260,10 +315,10 @@ function renderFiles(files, capacityBytes = SD_CAPACITY_BYTES, usedBytes) {
     }
     const row = document.createElement('li');
     const label = document.createElement('span');
-    label.textContent = `${file.path} (${file.size} B)`;
+    label.textContent = file.path;
     const download = document.createElement('button');
     download.textContent = 'Download';
-    download.title = `Download ${file.path}`;
+    download.title = `Download ${file.path} (${file.size} B)`;
     download.onclick = () => send({ type: 'sd-export', name: file.path });
     const remove = document.createElement('button');
     remove.textContent = 'Delete';
@@ -273,79 +328,63 @@ function renderFiles(files, capacityBytes = SD_CAPACITY_BYTES, usedBytes) {
     fileList.append(row);
   }
 }
-function cardStorageInfo(slot) {
-  const find = name => stateFiles.find(file => file.path === `cards/${slot}/${name}`)?.bytes;
-  const secret = find('secret.bin');
-  const pinSet = Boolean(find('pin.bin')?.byteLength);
-  let seedFormat;
-  if (secret?.byteLength) {
-    const magic = [0x73, 0x64, 0x69, 0x79, 0x00];
-    const specterSeed = secret[0] === 9 && magic.every((value, index) => secret[index + 1] === value);
-    if (specterSeed) seedFormat = [6, 7, 8, 9].every(index => secret[index] === 0) ? 'Plain text' : 'Encrypted';
-    else seedFormat = 'Stored data';
-  }
-  return { pinSet, seedFormat, demo: demoCardMetadata.get(slot) };
-}
 function renderCards(slots) {
   cardSlots = slots;
   const tray = $('#card-slots');
   tray.replaceChildren();
-  for (const { slot, initialized } of slots) {
-    const { pinSet, seedFormat, demo } = cardStorageInfo(slot);
+  for (const { slot } of slots) {
     const row = document.createElement('div');
+    row.dataset.slot = String(slot);
     row.className = activeCard === slot ? 'inserted' : '';
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'smartcard-graphic';
+    const cardImage = document.createElement('img');
+    cardImage.className = 'smartcard-photo';
+    cardImage.src = '/assets/specter-smartcard-blank.png';
+    cardImage.alt = '';
     const label = document.createElement('strong');
     label.textContent = `MemoryCard ${slot}`;
     const cardStatus = document.createElement('small');
-    cardStatus.textContent = activeCard === slot ? 'Inserted' : initialized ? 'MemoryCard' : 'Blank';
-    card.append(label, cardStatus);
+    const insertedHere = activeCard === slot;
+    cardStatus.textContent = insertedHere ? 'Inserted' : '';
+    cardStatus.hidden = !insertedHere;
+    card.append(cardImage, label, cardStatus);
     card.title = `Click to ${activeCard === slot ? 'remove' : 'insert'} card ${slot}; right-click to reset it`;
-    card.setAttribute('aria-label', `MemoryCard ${slot}, ${cardStatus.textContent}. Click to ${activeCard === slot ? 'remove' : 'insert'}; right-click to reset.`);
+    card.setAttribute('aria-label', `MemoryCard ${slot}, ${insertedHere ? 'Inserted' : 'Not inserted'}. Click to ${activeCard === slot ? 'remove' : 'insert'}; right-click to reset.`);
     card.onclick = () => send(activeCard === slot ? { type: 'card-remove' } : { type: 'card-insert', slot });
     card.oncontextmenu = event => {
       event.preventDefault();
       if (confirm(`Reset MemoryCard ${slot}? Its simulated keys and PIN will be wiped.`)) {
+        demoCardMetadata.delete(slot);
+        renderCards(cardSlots);
         send({ type: 'card-reset', slot });
       }
     };
+    row.append(card);
     const hint = document.createElement('small');
     hint.className = 'card-hint';
     hint.textContent = activeCard === slot ? 'Click to remove' : 'Click to insert';
-    const details = document.createElement('small');
-    details.className = 'card-details';
-    details.textContent = [demo?.label, seedFormat && (seedFormat === 'Stored data'
-      ? seedFormat : `Seedphrase · ${seedFormat}`), pinSet && (demo?.pin ? `PIN ${demo.pin}` : 'PIN set')]
-      .filter(Boolean).join('\n');
-    if (!details.textContent) details.hidden = true;
-    row.append(card, hint, details);
+    row.append(hint);
+    const demo = demoCardMetadata.get(slot);
+    if (demo) {
+      const details = document.createElement('small');
+      details.className = 'card-details';
+      details.textContent = `PIN: ${demo.pin}\n${demo.seed}`;
+      row.append(details);
+    }
     tray.append(row);
-  }
-}
-async function refreshCardStatus(showBusy = true) {
-  const button = $('#card-status-refresh');
-  if (showBusy) button.disabled = true;
-  try {
-    stateFiles = await snapshot();
-    renderCards(cardSlots);
-  } finally {
-    if (showBusy) button.disabled = false;
   }
 }
 async function importDemoData() {
   const button = $('#demo-load');
-  const report = $('#demo-status');
-  report.hidden = false;
   if (demoImportBusy) return;
   if (startupPhase !== 'running' || !worker) {
-    report.textContent = 'Specter is still starting. Wait for Running locally, then try again.';
+    log('Demo import requested before Specter finished starting.');
     return;
   }
   demoImportBusy = true;
   button.disabled = true;
-  report.textContent = 'Loading public demo files locally…';
   try {
     const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-multisig-psbt');
     const demo = createDemoFiles();
@@ -366,7 +405,6 @@ async function importDemoData() {
       stateFiles = await snapshot();
     }
     const occupied = slot => stateFiles.some(file => file.path === `cards/${slot}/secret.bin` && file.bytes.byteLength);
-    const provisioned = [];
     for (const card of demo.cards) {
       if (occupied(card.slot)) continue;
       send({ type: 'state-import', files: [
@@ -374,18 +412,20 @@ async function importDemoData() {
         { path: `cards/${card.slot}/pin.bin`, bytes: card.pinDigest },
         { path: `cards/${card.slot}/attempts`, bytes: new Uint8Array([10]) },
       ] });
-      demoCardMetadata.set(card.slot, { label: card.label, pin: card.pin });
-      provisioned.push(card.slot);
+    }
+    for (const card of demo.cards) {
+      demoCardMetadata.set(card.slot, {
+        label: card.label,
+        pin: card.pin,
+        seed: `${card.id}-seed`,
+      });
     }
     send({ type: 'card-insert', slot: 1 });
     stateFiles = await snapshot();
     renderCards(cardSlots);
-    const cardResult = provisioned.length === 2
-      ? `MemoryCard 1 now contains ${demo.roots[demo.primary].label} (PIN ${demo.cards[0].pin}); MemoryCard 2 contains ${demo.roots[demo.secondary].label} (PIN ${demo.cards[1].pin}). Both demo seeds are stored as plain text inside the PIN-protected virtual applet.`
-      : `${provisioned.length} blank card(s) were provisioned; occupied cards were preserved.`;
-    report.textContent = `${demo.files.length} focused Testnet files are on the inserted SD card. ${cardResult}`;
+    button.textContent = 'Import Demo Data Again';
   } catch (error) {
-    report.textContent = `Demo import error: ${error.message}`;
+    log(`Demo import error: ${error.message}`);
   } finally {
     demoImportBusy = false;
     button.disabled = false;
@@ -418,6 +458,7 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     loading.style.display = 'none';
     setStatus('Running locally', true);
     startupPhase = 'running';
+    successfulRuns++;
     log('running');
     send({ type: 'sd-list' });
     send({ type: 'card-list' });
@@ -482,12 +523,13 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     const resolve = snapshots.get(data.requestId);
     if (resolve) { snapshots.delete(data.requestId); resolve(data.files); }
   } else if (data.type === 'qr-delivered') {
-    $('#camera-state').textContent = `QR delivered locally (${data.size} bytes)`;
+    log(`QR delivered locally (${data.size} bytes)`);
   } else if (data.type === 'scanner-state') {
     scannerActive = data.active;
     clearTimeout(scannerStopTimer);
     if (scannerActive) {
       log('Specter scanner active');
+      cameraPanel.hidden = false;
       screenCamera.hidden = false;
       if (cameraStream) {
         screenVideo.hidden = false;
@@ -501,7 +543,9 @@ function onWorkerMessage({ data }, generation = runGeneration) {
         screenCamera.hidden = true;
         screenCamera.classList.remove('active');
         lastQr = '';
-        if (!backupEnabled) stopCamera();
+        backupEnabled = false;
+        stopCamera();
+        cameraPanel.hidden = true;
       }, 250);
     }
   }
@@ -522,11 +566,7 @@ async function start() {
     displayMode = transferable ? 'OffscreenCanvas' : 'Canvas-Pixelbridge';
     startupPhase = 'worker-create';
     if (program === 'mockui' && !transferable) {
-      failure('This browser cannot run the Playground LVGL 9 display without OffscreenCanvas. Open the legacy Playground at /simulators/legacy/.');
-      const fallback = document.createElement('a');
-      fallback.href = '/simulators/legacy/';
-      fallback.textContent = 'Open legacy Playground';
-      loading.append(fallback);
+      failure('This browser cannot run the Playground display because it lacks OffscreenCanvas support.');
       return;
     }
     softwareContext = transferable ? undefined : canvas.getContext('2d');
@@ -590,7 +630,6 @@ function snapshot(generation = runGeneration) {
 async function restart(factory = false) {
   if (restartPromise) return restartPromise;
   restartPromise = (async () => {
-    clearTimeout(cardStatusRefreshTimer);
     stopCamera();
     clearTimeout(scannerStopTimer);
     scannerActive = false;
@@ -678,15 +717,18 @@ function stopCamera() {
   video.hidden = true;
   screenVideo.hidden = true;
   screenCamera.classList.remove('active');
-  $('#camera-toggle').textContent = 'Show backup preview';
-  $('#camera-state').textContent = 'Camera off';
+  cameraToggle.hidden = true;
+  cameraToggle.textContent = 'Show backup preview';
+  cameraSelect.hidden = true;
+  cameraStatusDot.hidden = true;
+  cameraPanel.hidden = true;
 }
 async function startCamera(deviceId) {
   const request = cameraRequest + 1;
   stopCamera();
   cameraRequest = request;
   if (!navigator.mediaDevices?.getUserMedia) {
-    $('#camera-state').textContent = 'Camera unavailable: secure context required';
+    log('Camera unavailable: secure context required');
     return;
   }
   try {
@@ -696,6 +738,7 @@ async function startCamera(deviceId) {
     });
     if (request !== cameraRequest) { stream.getTracks().forEach(track => track.stop()); return; }
     cameraStream = stream;
+    cameraPanel.hidden = false;
     log('Browser camera opened locally');
     video.srcObject = cameraStream;
     screenVideo.srcObject = cameraStream;
@@ -703,8 +746,9 @@ async function startCamera(deviceId) {
     screenVideo.hidden = !scannerActive;
     await video.play();
     if (scannerActive) { await screenVideo.play(); screenCamera.classList.add('active'); }
-    $('#camera-toggle').textContent = backupEnabled ? 'Hide backup preview' : 'Show backup preview';
-    $('#camera-state').textContent = 'Camera active — frames stay on this device';
+    cameraStatusDot.hidden = false;
+    cameraToggle.hidden = false;
+    cameraToggle.textContent = backupEnabled ? 'Hide backup preview' : 'Show backup preview';
     const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput');
     cameraSelect.replaceChildren();
     for (const device of devices) {
@@ -719,8 +763,8 @@ async function startCamera(deviceId) {
     scanFrame();
   } catch (error) {
     stopCamera();
-    $('#camera-state').textContent = error.name === 'NotAllowedError'
-      ? 'Camera permission denied' : `Camera unavailable: ${error.message}`;
+    log(error.name === 'NotAllowedError'
+      ? 'Camera permission denied' : `Camera unavailable: ${error.message}`);
     screenCamera.classList.remove('active');
   }
 }
@@ -765,7 +809,6 @@ $('#sd-toggle').onclick = () => send({ type: inserted ? 'sd-eject' : 'sd-insert'
 $('#sd-clear').onclick = () => send({ type: 'sd-clear' });
 $('#sd-add').onclick = () => picker.click();
 $('#demo-load').onclick = importDemoData;
-$('#card-status-refresh').onclick = () => refreshCardStatus(true);
 picker.onchange = () => { importFiles(picker.files); picker.value = ''; };
 $('#sd-drop').ondragover = event => { event.preventDefault(); $('#sd-drop').classList.add('dragging'); };
 $('#sd-drop').ondragleave = () => $('#sd-drop').classList.remove('dragging');
@@ -778,11 +821,11 @@ $('#camera-toggle').onclick = () => {
   backupEnabled = !backupEnabled;
   if (backupEnabled) {
     video.hidden = false;
-    $('#camera-toggle').textContent = 'Hide backup preview';
+    cameraToggle.textContent = 'Hide backup preview';
     if (!cameraStream) startCamera();
   } else {
     video.hidden = true;
-    $('#camera-toggle').textContent = 'Show backup preview';
+    cameraToggle.textContent = 'Show backup preview';
     if (!scannerActive) stopCamera();
   }
 };
@@ -790,9 +833,80 @@ $('#camera-screen-start').onclick = () => startCamera();
 $('#camera-screen-back').onclick = () => { screenCamera.hidden = true; };
 cameraSelect.onchange = () => startCamera(cameraSelect.value);
 addEventListener('pagehide', () => {
+  pageWasSuspended = true;
   runGeneration++; clearTimeout(recoveryTimer); clearStartupTimer(); stopLoadingClock();
   stopCamera(); worker?.terminate(); worker = undefined;
 });
+addEventListener('pageshow', event => {
+  if (!runtimeConfigured || worker || (!pageWasSuspended && !event.persisted)) return;
+  pageWasSuspended = false;
+  startWhenPageActive('page restore').catch(error => failure(`Resume failed: ${error.stack || error}`));
+});
+document.addEventListener('resume', () => {
+  if (!runtimeConfigured || worker) return;
+  startWhenPageActive('browser resume').catch(error => failure(`Resume failed: ${error.stack || error}`));
+});
+
+function firstBuildValue(...values) {
+  return values.find(value => value !== undefined && value !== null && String(value).trim() !== '');
+}
+function formatPullRequest(value) {
+  if (value && typeof value === 'object') value = firstBuildValue(value.number, value.id, value.name, value.title, value.url);
+  if (value === undefined || value === null || String(value).trim() === '') return '';
+  const text = String(value).trim();
+  const match = text.match(/(?:pull\/|pr\s*#?\s*|#)(\d+)/i);
+  return match ? `PR #${match[1]}` : text.toLowerCase().startsWith('pr') ? text : `PR ${text}`;
+}
+function formatBuildPresentation(manifest) {
+  const repository = String(manifest.repository || '').trim();
+  const repositoryUrl = repository ? `https://github.com/${repository}` : String(manifest.source_url || '').replace(/\/$/, '');
+  const commit = String(manifest.commit || '').trim();
+  const commitUrl = `${repositoryUrl}/commit/${commit}`;
+  const versionLabel = firstBuildValue(manifest.firmware_version, manifest.version, manifest.release_version, manifest.tag_name, manifest.tag);
+  const branchPr = String(manifest.branch || '').match(/(?:^|[\/_-])pr[\/_-]?(\d+)/i)?.[1];
+  const prLabel = formatPullRequest(firstBuildValue(manifest.pull_request, manifest.pull_request_number, manifest.pr_number, manifest.pr, branchPr));
+  const forkValue = firstBuildValue(manifest.fork_repository, manifest.fork_name, manifest.fork_owner,
+    typeof manifest.fork === 'object' ? manifest.fork.repository : manifest.fork);
+  const isFork = Boolean(forkValue) || manifest.is_fork === true || manifest.fork === true;
+  const cleanVersion = versionLabel ? String(versionLabel).replace(/^v/i, '') : '';
+  const topLabel = ['GitHub', isFork && 'Fork', cleanVersion && `v${cleanVersion}`, prLabel,
+    prLabel && commit.slice(0, 7)].filter(Boolean).join(' · ');
+  const context = [
+    cleanVersion && `Version: v${cleanVersion}`,
+    manifest.branch && `Branch: ${manifest.branch}`,
+    isFork && `Fork: ${forkValue === true ? repository : forkValue || repository}`,
+    prLabel,
+    commit && `Commit: ${commit}`,
+  ].filter(Boolean).join(' · ');
+  return { repository, repositoryUrl, commit, commitUrl, topLabel, context };
+}
+function updateBuildMetadata(manifest) {
+  const buildPresentation = formatBuildPresentation(manifest);
+  const sourceCommitLink = $('#source-commit-link');
+  if (sourceCommitLink) {
+    sourceCommitLink.href = buildPresentation.repositoryUrl;
+    sourceCommitLink.textContent = buildPresentation.topLabel;
+  }
+  const buildRepositoryLink = $('#build-repository-link');
+  if (buildRepositoryLink) {
+    buildRepositoryLink.href = buildPresentation.repositoryUrl;
+    buildRepositoryLink.textContent = buildPresentation.repository;
+  }
+  const buildContext = $('#build-context');
+  if (buildContext) {
+    buildContext.textContent = buildPresentation.context;
+    buildContext.hidden = !buildPresentation.context;
+  }
+  const buildLink = $('#build-link');
+  if (buildLink) {
+    buildLink.href = buildPresentation.commitUrl;
+    buildLink.textContent = buildPresentation.commit.slice(0, 12);
+  }
+  const buildDetails = $('#build-details');
+  if (buildDetails) buildDetails.textContent = JSON.stringify(manifest, null, 2);
+  const cardPanel = $('#card-panel');
+  if (cardPanel) cardPanel.hidden = !manifest.capabilities?.smartcard;
+}
 
 try {
   stateFiles = await awaitPeripherals();
@@ -813,21 +927,20 @@ try {
   if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
+  runtimeConfigured = true;
   log(`Firmware: ${manifest.commit}; build: ${version}; worker: ${workerRevision}`);
-  $('#build-label').textContent = `${manifest.repository} · ${manifest.commit.slice(0, 7)} · Browser / WASM`;
-  const repositoryUrl = `https://github.com/${manifest.repository}`;
-  const commitUrl = `${repositoryUrl}/commit/${manifest.commit}`;
-  $('#source-commit-link').href = repositoryUrl;
-  $('#source-commit-link').textContent = 'GitHub';
-  $('#build-link').href = commitUrl;
-  $('#build-link').textContent = manifest.commit.slice(0, 12);
-  $('#build-details').textContent = JSON.stringify(manifest, null, 2);
-  $('#card-panel').hidden = !manifest.capabilities?.smartcard;
+  // Build presentation is optional UI. It must never prevent the firmware from starting.
+  try {
+    updateBuildMetadata(manifest);
+  } catch (error) {
+    log(`Build metadata display skipped: ${error.stack || error}`);
+  }
   if (location.protocol === 'https:' && !window.crossOriginIsolated) {
-    $('#isolation-warning').hidden = false;
+    const isolationWarning = $('#isolation-warning');
+    if (isolationWarning) isolationWarning.hidden = false;
     log('Cross-origin isolation missing: check COOP, COEP and CORP response headers.');
   }
-  await start();
+  await startWhenPageActive('initial load');
 } catch (error) {
   failure(`${error.name}: Browser build failed to load: ${error.message}\n${error.stack || ''}`);
 }
