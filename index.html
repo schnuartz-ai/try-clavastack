@@ -288,9 +288,12 @@
     .sim-panel a { color: var(--specter-primary); }
     .sim-panel details { margin-top: 10px; }
     .sim-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; max-height: 180px; overflow: auto; }
-    .demo-import { border:1px solid #80632f; background:#211a0f; }
+    .demo-import { width:100%; max-width:380px; border:1px solid #80632f; border-radius:12px; background:#211a0f; color:var(--specter-light-secondary); padding:14px; font-size:13px; line-height:1.45; }
+    .demo-import h2 { color:var(--specter-light); font-size:15px; margin:0 0 8px; }
+    .demo-import p { margin:5px 0; }
     .demo-import strong { color:#ffe0a6; }
     .demo-import label { display:block; color:#f2dfbd; margin-top:8px; }
+    .demo-import select, .demo-import button { background:var(--specter-dark-accent); color:var(--specter-light); border:1px solid #536174; border-radius:6px; padding:8px; cursor:pointer; min-height:36px; }
     .demo-import select { width:100%; }
     .demo-import #demo-load { width:100%; background:#9b650e; border-color:#d69a36; font-weight:700; }
     .demo-import #demo-status { color:#ffe0a6; font-size:12px; overflow-wrap:anywhere; }
@@ -330,6 +333,7 @@
     .sim-panel .smartcard-graphic { cursor:pointer; border:0; width:100%; text-align:left; margin:0; background:linear-gradient(145deg,#fff,#d9e1e7); color:#13263a; }
     .sim-panel .smartcard-graphic:hover { border:0; box-shadow:0 7px 18px #1f99e579; }
     .card-tray .card-hint { color:#aab8c8; display:block; font-size:10px; margin-top:6px; text-align:center; }
+    .card-tray .card-details { color:#d8e6f3; display:block; font-size:10px; line-height:1.35; margin-top:5px; min-height:0; text-align:center; white-space:pre-line; }
     @media (max-width:600px) { .card-tray { gap:5px; } .smartcard-graphic { padding:5px; } }
 
     footer {
@@ -346,7 +350,7 @@
     html.gallery-pending::after { content: 'Loading Simulator…'; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; color: var(--specter-light-secondary); font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; z-index: 999; }
     html.gallery-pending.gallery body { visibility: visible; }
     html.gallery-pending.gallery::after { display: none; }
-    .embedded header, .embedded .cta-section, .embedded footer { display:none; }
+    .embedded header, .embedded .cta-section, .embedded .demo-import, .embedded footer { display:none; }
     .embedded, .embedded body { min-height:0; }
     .embedded .page { padding:10px 12px 22px; }
     .embedded .phone-wrapper { max-width:330px; }
@@ -357,12 +361,13 @@
     .gallery .phone-wrapper .phone-mockup { display:none; }
     .gallery #screen-overlay { left:0; top:0; width:100%; height:100%; border-radius:0; }
     @media (min-width:900px) {
-      .page { display:grid; grid-template-columns:380px 380px; grid-template-areas:'warning warning' 'device peripherals' 'restart peripherals' 'cta cta'; gap:16px 22px; width:100%; max-width:822px; margin:auto; align-items:start; }
+      .page { display:grid; grid-template-columns:380px 380px; grid-template-areas:'warning warning' 'device peripherals' 'restart peripherals' 'cta cta' 'demo demo'; gap:16px 22px; width:100%; max-width:822px; margin:auto; align-items:start; }
       .warning { grid-area:warning; max-width:none; }
       .phone-wrapper { grid-area:device; }
       .device-actions { grid-area:restart; }
       .sim-panel { grid-area:peripherals; }
       .cta-section { grid-area:cta; justify-self:center; }
+      .demo-import { grid-area:demo; justify-self:center; }
       .embedded .page { grid-template-columns:330px 380px; max-width:760px; }
       .gallery .page { display:block; max-width:none; }
     }
@@ -443,14 +448,6 @@
     <h2>Simulator <span style="font-size:11px;color:#7c9">Running locally in your browser</span></h2>
     <p id="build-label">Loading build information…</p>
     <p id="isolation-warning" hidden>Browser isolation headers are missing. This deployment may fail to run; check COOP, COEP and CORP in Technical details.</p>
-    <div class="peripheral-card demo-import">
-      <h3>Public demo data</h3>
-      <p><strong>Unsafe public test seeds only.</strong> Loads Ghost, Zoo, their BIP85 children, Testnet wallets and the Ghost + Zoo + public-only Mirror 2-of-3 multisig. Mirror's seed is never stored. Specter must confirm each seed before it is saved to a card.</p>
-      <label for="demo-primary">Seed prepared for MemoryCard 1</label>
-      <select id="demo-primary"><option value="ghost">ghost ×11 + machine</option><option value="zoo">zoo ×11 + wrong</option></select>
-      <button id="demo-load" type="button">Import demo data</button>
-      <p id="demo-status" role="status" aria-live="polite">Nothing is loaded until you click.</p>
-    </div>
     <div class="peripheral-card">
       <h3>Virtual SD card <span id="sd-state">Ejected</span></h3>
       <div id="sd-stage" class="sd-stage"><div class="sd-card-control"><button id="sd-toggle" type="button" aria-label="Insert 8 GB SD card" aria-pressed="false" title="Click to insert SD card"><img class="sd-card-graphic" src="/assets/sd-card-8gb.png" alt="8 GB microSD card"></button><small id="sd-hint">Click to insert</small></div><span><strong id="sd-capacity">8 GB capacity · 0 B used · 8 GB free</strong><br>Session-only · files stay in this tab</span></div>
@@ -467,8 +464,9 @@
     <video id="camera-preview" autoplay playsinline muted hidden></video>
     <div id="card-panel" hidden>
       <h3>Virtual Smartcards</h3>
-      <p>Click a card to insert or remove it. Right-click a card to reset its contents. Restart Specter after changing Smartcard storage.</p>
+      <p>Click a card to insert or remove it. Saved seed format and “PIN set” appear below it after refresh; PIN digits are never stored and cannot be displayed. Right-click a card to reset its contents.</p>
       <div id="card-slots" class="card-tray"></div>
+      <button id="card-status-refresh" type="button">Refresh card status</button>
     </div>
     <details id="technical-details">
       <summary>Technical details</summary>
@@ -503,6 +501,15 @@
 
     <a href="https://clavastack.com" class="cta-buy-btn">Get Your Specter DIY &rarr;</a>
   </div>
+
+  <section class="demo-import" aria-labelledby="demo-title">
+    <h2 id="demo-title">Public demo data</h2>
+    <p><strong>Unsafe public test seeds only.</strong> Loads Ghost, Zoo, their BIP85 children, two Testnet PSBT examples and the Ghost + Zoo + public-only Mirror 2-of-3 multisig. Mirror's seed is never stored.</p>
+    <label for="demo-primary">Seed prepared for MemoryCard 1</label>
+    <select id="demo-primary"><option value="ghost">ghost ×11 + machine</option><option value="zoo">zoo ×11 + wrong</option></select>
+    <button id="demo-load" type="button">Import demo data</button>
+    <p id="demo-status" role="status" aria-live="polite">Nothing is loaded until you click.</p>
+  </section>
 
 </div>
 

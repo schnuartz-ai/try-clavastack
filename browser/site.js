@@ -39,6 +39,7 @@ const SD_CAPACITY_BYTES = 8_000_000_000;
 let sdUsedBytes = 0;
 let sdFileSizes = new Map();
 let activeCard = null;
+let cardSlots = [];
 let cameraStream;
 let cameraLoop;
 let scannerActive = false;
@@ -244,10 +245,25 @@ function renderFiles(files, capacityBytes = SD_CAPACITY_BYTES, usedBytes) {
     fileList.append(row);
   }
 }
+function cardStorageInfo(slot) {
+  const find = name => stateFiles.find(file => file.path === `cards/${slot}/${name}`)?.bytes;
+  const secret = find('secret.bin');
+  const pinSet = Boolean(find('pin.bin')?.byteLength);
+  let seedFormat;
+  if (secret?.byteLength) {
+    const magic = [0x73, 0x64, 0x69, 0x79, 0x00];
+    const specterSeed = secret[0] === 9 && magic.every((value, index) => secret[index + 1] === value);
+    if (specterSeed) seedFormat = [6, 7, 8, 9].every(index => secret[index] === 0) ? 'Plain text' : 'Encrypted';
+    else seedFormat = 'Stored data';
+  }
+  return { pinSet, seedFormat };
+}
 function renderCards(slots) {
+  cardSlots = slots;
   const tray = $('#card-slots');
   tray.replaceChildren();
   for (const { slot, initialized } of slots) {
+    const { pinSet, seedFormat } = cardStorageInfo(slot);
     const row = document.createElement('div');
     row.className = activeCard === slot ? 'inserted' : '';
     const card = document.createElement('button');
@@ -270,8 +286,23 @@ function renderCards(slots) {
     const hint = document.createElement('small');
     hint.className = 'card-hint';
     hint.textContent = activeCard === slot ? 'Click to remove' : 'Click to insert';
-    row.append(card, hint);
+    const details = document.createElement('small');
+    details.className = 'card-details';
+    details.textContent = [seedFormat && (seedFormat === 'Stored data'
+      ? seedFormat : `Seedphrase · ${seedFormat}`), pinSet && 'PIN set'].filter(Boolean).join('\n');
+    if (!details.textContent) details.hidden = true;
+    row.append(card, hint, details);
     tray.append(row);
+  }
+}
+async function refreshCardStatus() {
+  const button = $('#card-status-refresh');
+  button.disabled = true;
+  try {
+    stateFiles = await snapshot();
+    renderCards(cardSlots);
+  } finally {
+    button.disabled = false;
   }
 }
 async function importDemoData() {
@@ -286,7 +317,7 @@ async function importDemoData() {
   button.disabled = true;
   report.textContent = 'Loading public demo files locally…';
   try {
-    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-2of3-cards');
+    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-focused-cards');
     const demo = createDemoFiles($('#demo-primary').value);
     let projected = sdUsedBytes;
     for (const file of demo.files) {
@@ -306,7 +337,8 @@ async function importDemoData() {
     }
     send({ type: 'card-insert', slot: 1 });
     stateFiles = await snapshot();
-    report.textContent = `${demo.files.length} files are on the inserted SD card. First switch Specter to Testnet. MemoryCard 1 is inserted for ${demo.roots[demo.primary].label}; use Import recovery phrase and its 01-… seed file, then Settings → Smartcard storage → Save key to the card. Insert MemoryCard 2 in the tray, choose Open SD card file and the 03-${demo.secondary}-HOST-IMPORT.txt file, confirm it, then save that key to card 2. Only Specter's confirmations write seeds to cards.`;
+    renderCards(cardSlots);
+    report.textContent = `${demo.files.length} focused Testnet files are on the inserted SD card. MemoryCard 1 is ready for ${demo.roots[demo.primary].label}. Import its 01-… seed file and confirm Settings → Smartcard storage → Save key to the card. Then insert MemoryCard 2, restart Specter manually, import the ${demo.secondary} 01-… seed file and save it to card 2. Use Refresh card status after each save. Only Specter's confirmations write seeds to cards.`;
   } catch (error) {
     report.textContent = `Demo import error: ${error.message}`;
   } finally {
@@ -394,6 +426,10 @@ function onWorkerMessage({ data }, generation = runGeneration) {
   } else if (data.type === 'card-state') {
     activeCard = data.active;
     renderCards(data.slots);
+    snapshot().then(files => {
+      stateFiles = files;
+      renderCards(cardSlots);
+    });
     notifyParent({ type: 'peripheral-state', variant, sdInserted: inserted, cardSlot: activeCard });
   } else if (data.type === 'frame') {
     drawFrame(data.pixels);
@@ -683,6 +719,7 @@ $('#sd-toggle').onclick = () => send({ type: inserted ? 'sd-eject' : 'sd-insert'
 $('#sd-clear').onclick = () => send({ type: 'sd-clear' });
 $('#sd-add').onclick = () => picker.click();
 $('#demo-load').onclick = importDemoData;
+$('#card-status-refresh').onclick = refreshCardStatus;
 picker.onchange = () => { importFiles(picker.files); picker.value = ''; };
 $('#sd-drop').ondragover = event => { event.preventDefault(); $('#sd-drop').classList.add('dragging'); };
 $('#sd-drop').ondragleave = () => $('#sd-drop').classList.remove('dragging');

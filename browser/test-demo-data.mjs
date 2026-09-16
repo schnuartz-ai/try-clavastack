@@ -11,16 +11,18 @@ for (const name of ['02-ghost-bip85-child-0.txt', '02-ghost-bip85-child-1.txt',
   '02-zoo-bip85-child-0.txt', '02-zoo-bip85-child-1.txt']) {
   if (decode(file(name)).split(/\s+/).length !== 12) throw new Error(`Invalid child seed ${name}`);
 }
-for (const id of ['ghost', 'zoo']) {
-  const hostImport = decode(file(`03-${id}-HOST-IMPORT.txt`));
-  if (!hostImport.startsWith('bip39: ') || hostImport.split(/\s+/).length !== 13) {
-    throw new Error(`${id} host import is not a firmware-compatible BIP39 command`);
-  }
+if (demo.files.length !== 10) throw new Error(`Expected 10 focused demo files, got ${demo.files.length}`);
+if (demo.files.some(candidate => /HOST-IMPORT|mainnet|addresses|verify/i.test(candidate.name))) {
+  throw new Error('Removed host, Mainnet or redundant address files returned');
+}
+if (demo.files.filter(candidate => candidate.name.endsWith('.json')).length !== 1) {
+  throw new Error('Only the multisig wallet JSON may be stored');
 }
 const multisig = JSON.parse(decode(file('testnet-ghost-zoo-mirror-2of3.json')));
 if (!multisig.descriptor.startsWith('wsh(sortedmulti(2,') ||
     !multisig.descriptor.includes('[74d682c3/48h/1h/0h/2h]') ||
-    (multisig.descriptor.match(/tpub/g) || []).length !== 3) {
+    (multisig.descriptor.match(/tpub/g) || []).length !== 3 ||
+    !multisig.address.startsWith('tb1')) {
   throw new Error('Invalid 2-of-3 public cosigner descriptor');
 }
 if ('mirror' in demo.roots || demo.files.some(candidate => /mirror.*seed/i.test(candidate.name))) {
