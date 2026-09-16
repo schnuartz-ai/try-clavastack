@@ -2,6 +2,9 @@ const roots = {
   ghost: {
     label: 'Ghost test seed',
     mnemonic: 'ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost machine',
+    cardSecret: 'CXNkaXkAAAAAAJqm8y/nqN8cx7IhDZsgvJxXv0z/xb2QKksDAwBGKlaDe+zi7C09rvdl5S6PDZZK8jRXLmG3k7VS8ywWqh4xDcWE0G5mZcXGoD8co8bpY3TV',
+    pin: '1234',
+    pinDigest: 'A6xnQhbz4Vx2HuGl4lXwZ5U2I8iziLRFnhP5eNfIRvQ=',
     children: [
       'forget pumpkin lumber cherry print casino resist three public accident toddler admit',
       'diamond wish drip energy toss mean budget novel lift print ocean label',
@@ -10,6 +13,9 @@ const roots = {
   zoo: {
     label: 'Zoo test seed',
     mnemonic: 'zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong',
+    cardSecret: 'CXNkaXkAAAAAAD8sdNlUbm41JgXQ/1CkcQUGFsD6uOUVk4GS9HiNeTmDrEGAcpdMq6YFJ//eq8LsQ5nbAD3z+45ZlboQGoxkZTS2aLcU05dhsPmZHad7KNki',
+    pin: '5678',
+    pinDigest: '+GOLl5svT3k92229GX4O4lp6bqMrCuIvXjxdEZ2DnnU=',
     children: [
       'salt option burden habit silent tone breeze fade idle dilemma subway mix',
       'also voice raise tray tree detail exchange run start still cube actual',
@@ -44,5 +50,14 @@ export function createDemoFiles(primary = 'ghost') {
   }
   add('testnet-ghost-payment-low-fee.psbt', 'cHNidP8BAHECAAAAASIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiAAAAAAD9////AmDqAAAAAAAAFgAUx6q7+sTbbs7TU1rVoghQnTkhKctMmgAAAAAAABYAFOeecUR7lROm99MUyL5extM/T11XAAAAAAABAR+ghgEAAAAAABYAFGLab1CVpSs0DBrqUxM0E2SvvC6OIgYDMe3LFs/Q+FmAUveyh7BwR6EcYJZ8Hn6wJX4CVSU52YQYjCSlEFQAAIABAACAAAAAgAAAAAAAAAAAAAAiAgIlH+LuS8Q3KbCQP/rbz4RtnmrLs6pZOwnWAIVkXL42UxiMJKUQVAAAgAEAAIAAAACAAQAAAAAAAAAA\n');
   add('testnet-ghost-payment-high-fee.psbt', 'cHNidP8BAHECAAAAATMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzAAAAAAD9////AmDqAAAAAAAAFgAUx6q7+sTbbs7TU1rVoghQnTkhKcu4iAAAAAAAABYAFOeecUR7lROm99MUyL5extM/T11XAAAAAAABAR+ghgEAAAAAABYAFGLab1CVpSs0DBrqUxM0E2SvvC6OIgYDMe3LFs/Q+FmAUveyh7BwR6EcYJZ8Hn6wJX4CVSU52YQYjCSlEFQAAIABAACAAAAAgAAAAAAAAAAAAAAiAgIlH+LuS8Q3KbCQP/rbz4RtnmrLs6pZOwnWAIVkXL42UxiMJKUQVAAAgAEAAIAAAACAAQAAAAAAAAAA\n');
-  return { files, roots, primary, secondary };
+  const bytes = value => Uint8Array.from(atob(value), character => character.charCodeAt(0));
+  const cards = [primary, secondary].map((id, index) => ({
+    slot: index + 1,
+    id,
+    label: roots[id].label,
+    pin: roots[id].pin,
+    secret: bytes(roots[id].cardSecret),
+    pinDigest: bytes(roots[id].pinDigest),
+  }));
+  return { files, roots, primary, secondary, cards };
 }

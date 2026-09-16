@@ -40,6 +40,8 @@ let sdUsedBytes = 0;
 let sdFileSizes = new Map();
 let activeCard = null;
 let cardSlots = [];
+const demoCardMetadata = new Map();
+let cardStatusRefreshTimer;
 let cameraStream;
 let cameraLoop;
 let scannerActive = false;
@@ -131,6 +133,7 @@ function failure(message, generation = runGeneration) {
   if (generation !== runGeneration) return;
   runGeneration++;
   clearTimeout(recoveryTimer);
+  clearTimeout(cardStatusRefreshTimer);
   clearStartupTimer();
   stopCamera();
   clearTimeout(scannerStopTimer);
@@ -180,6 +183,10 @@ function pointer(event, down) {
   const x = Math.max(0, Math.min(479, Math.floor((event.clientX - rect.left) * 480 / rect.width)));
   const y = Math.max(0, Math.min(799, Math.floor((event.clientY - rect.top) * 800 / rect.height)));
   send({ type: 'pointer', x, y, down });
+  if (down === 0 && activeCard) {
+    clearTimeout(cardStatusRefreshTimer);
+    cardStatusRefreshTimer = setTimeout(() => refreshCardStatus(false), 900);
+  }
 }
 function newCanvas() {
   canvasBox.querySelector('canvas')?.remove();
@@ -256,14 +263,14 @@ function cardStorageInfo(slot) {
     if (specterSeed) seedFormat = [6, 7, 8, 9].every(index => secret[index] === 0) ? 'Plain text' : 'Encrypted';
     else seedFormat = 'Stored data';
   }
-  return { pinSet, seedFormat };
+  return { pinSet, seedFormat, demo: demoCardMetadata.get(slot) };
 }
 function renderCards(slots) {
   cardSlots = slots;
   const tray = $('#card-slots');
   tray.replaceChildren();
   for (const { slot, initialized } of slots) {
-    const { pinSet, seedFormat } = cardStorageInfo(slot);
+    const { pinSet, seedFormat, demo } = cardStorageInfo(slot);
     const row = document.createElement('div');
     row.className = activeCard === slot ? 'inserted' : '';
     const card = document.createElement('button');
@@ -288,21 +295,22 @@ function renderCards(slots) {
     hint.textContent = activeCard === slot ? 'Click to remove' : 'Click to insert';
     const details = document.createElement('small');
     details.className = 'card-details';
-    details.textContent = [seedFormat && (seedFormat === 'Stored data'
-      ? seedFormat : `Seedphrase · ${seedFormat}`), pinSet && 'PIN set'].filter(Boolean).join('\n');
+    details.textContent = [demo?.label, seedFormat && (seedFormat === 'Stored data'
+      ? seedFormat : `Seedphrase · ${seedFormat}`), pinSet && (demo?.pin ? `PIN ${demo.pin}` : 'PIN set')]
+      .filter(Boolean).join('\n');
     if (!details.textContent) details.hidden = true;
     row.append(card, hint, details);
     tray.append(row);
   }
 }
-async function refreshCardStatus() {
+async function refreshCardStatus(showBusy = true) {
   const button = $('#card-status-refresh');
-  button.disabled = true;
+  if (showBusy) button.disabled = true;
   try {
     stateFiles = await snapshot();
     renderCards(cardSlots);
   } finally {
-    button.disabled = false;
+    if (showBusy) button.disabled = false;
   }
 }
 async function importDemoData() {
@@ -317,7 +325,7 @@ async function importDemoData() {
   button.disabled = true;
   report.textContent = 'Loading public demo files locally…';
   try {
-    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-focused-cards');
+    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-provisioned-cards');
     const demo = createDemoFiles($('#demo-primary').value);
     let projected = sdUsedBytes;
     for (const file of demo.files) {
@@ -335,10 +343,25 @@ async function importDemoData() {
       send({ type: 'card-remove' });
       stateFiles = await snapshot();
     }
+    const occupied = slot => stateFiles.some(file => file.path === `cards/${slot}/secret.bin` && file.bytes.byteLength);
+    const provisioned = [];
+    for (const card of demo.cards) {
+      if (occupied(card.slot)) continue;
+      send({ type: 'state-import', files: [
+        { path: `cards/${card.slot}/secret.bin`, bytes: card.secret },
+        { path: `cards/${card.slot}/pin.bin`, bytes: card.pinDigest },
+        { path: `cards/${card.slot}/attempts`, bytes: new Uint8Array([10]) },
+      ] });
+      demoCardMetadata.set(card.slot, { label: card.label, pin: card.pin });
+      provisioned.push(card.slot);
+    }
     send({ type: 'card-insert', slot: 1 });
     stateFiles = await snapshot();
     renderCards(cardSlots);
-    report.textContent = `${demo.files.length} focused Testnet files are on the inserted SD card. MemoryCard 1 is ready for ${demo.roots[demo.primary].label}. Import its 01-… seed file and confirm Settings → Smartcard storage → Save key to the card. Then insert MemoryCard 2, restart Specter manually, import the ${demo.secondary} 01-… seed file and save it to card 2. Use Refresh card status after each save. Only Specter's confirmations write seeds to cards.`;
+    const cardResult = provisioned.length === 2
+      ? `MemoryCard 1 now contains ${demo.roots[demo.primary].label} (PIN ${demo.cards[0].pin}); MemoryCard 2 contains ${demo.roots[demo.secondary].label} (PIN ${demo.cards[1].pin}). Both demo seeds are stored as plain text inside the PIN-protected virtual applet.`
+      : `${provisioned.length} blank card(s) were provisioned; occupied cards were preserved.`;
+    report.textContent = `${demo.files.length} focused Testnet files are on the inserted SD card. ${cardResult}`;
   } catch (error) {
     report.textContent = `Demo import error: ${error.message}`;
   } finally {
@@ -545,6 +568,7 @@ function snapshot(generation = runGeneration) {
 async function restart(factory = false) {
   if (restartPromise) return restartPromise;
   restartPromise = (async () => {
+    clearTimeout(cardStatusRefreshTimer);
     stopCamera();
     clearTimeout(scannerStopTimer);
     scannerActive = false;
@@ -719,7 +743,7 @@ $('#sd-toggle').onclick = () => send({ type: inserted ? 'sd-eject' : 'sd-insert'
 $('#sd-clear').onclick = () => send({ type: 'sd-clear' });
 $('#sd-add').onclick = () => picker.click();
 $('#demo-load').onclick = importDemoData;
-$('#card-status-refresh').onclick = refreshCardStatus;
+$('#card-status-refresh').onclick = () => refreshCardStatus(true);
 picker.onchange = () => { importFiles(picker.files); picker.value = ''; };
 $('#sd-drop').ondragover = event => { event.preventDefault(); $('#sd-drop').classList.add('dragging'); };
 $('#sd-drop').ondragleave = () => $('#sd-drop').classList.remove('dragging');

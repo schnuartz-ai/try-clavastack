@@ -464,7 +464,7 @@
     <video id="camera-preview" autoplay playsinline muted hidden></video>
     <div id="card-panel" hidden>
       <h3>Virtual Smartcards</h3>
-      <p>Click a card to insert or remove it. Saved seed format and “PIN set” appear below it after refresh; PIN digits are never stored and cannot be displayed. Right-click a card to reset its contents.</p>
+      <p>Click a card to insert or remove it. Saved seed format appears below it after refresh. Real PIN digits cannot be recovered; known public demo PINs are shown. Demo labels belong to this simulator because the MemoryCard applet has no name field.</p>
       <div id="card-slots" class="card-tray"></div>
       <button id="card-status-refresh" type="button">Refresh card status</button>
     </div>
@@ -504,7 +504,7 @@
 
   <section class="demo-import" aria-labelledby="demo-title">
     <h2 id="demo-title">Public demo data</h2>
-    <p><strong>Unsafe public test seeds only.</strong> Loads Ghost, Zoo, their BIP85 children, two Testnet PSBT examples and the Ghost + Zoo + public-only Mirror 2-of-3 multisig. Mirror's seed is never stored.</p>
+    <p><strong>Unsafe public test seeds only.</strong> Loads Ghost, Zoo, their BIP85 children, two Testnet PSBT examples and the Ghost + Zoo + public-only Mirror 2-of-3 multisig. It also provisions two blank virtual Smartcards with the public Ghost and Zoo seeds. Mirror's seed is never stored.</p>
     <label for="demo-primary">Seed prepared for MemoryCard 1</label>
     <select id="demo-primary"><option value="ghost">ghost ×11 + machine</option><option value="zoo">zoo ×11 + wrong</option></select>
     <button id="demo-load" type="button">Import demo data</button>

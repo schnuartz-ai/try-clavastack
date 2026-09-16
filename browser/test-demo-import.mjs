@@ -12,7 +12,7 @@ if (process.env.TEST_LOCAL_CHANGES === '1') {
   for (const [url, path, contentType] of [
     [`${base}/`, 'index.html', 'text/html'],
     [`${base}/browser/site.js`, 'browser/site.js', 'text/javascript'],
-    [`${base}/browser/demo-data.js?v=20260916-focused-cards`, 'browser/demo-data.js', 'text/javascript'],
+    [`${base}/browser/demo-data.js?v=20260916-provisioned-cards`, 'browser/demo-data.js', 'text/javascript'],
   ]) await page.route(url, async route => route.fulfill({ contentType,
     headers: { 'Cross-Origin-Resource-Policy': 'same-origin' }, body: await readFile(path) }));
 }
@@ -44,7 +44,12 @@ for (const name of ['01-ghost-PUBLIC-TEST-SEED.txt', '02-zoo-bip85-child-1.txt',
 await page.locator('#sd-state').getByText('Inserted', { exact: true }).waitFor();
 await page.locator('#card-slots > div').nth(0).getByText('Inserted', { exact: true }).waitFor();
 await page.locator('#card-status-refresh').click();
-if (await page.locator('.card-details:visible').count()) throw new Error('Prepared cards falsely report a saved seed or PIN');
+for (const [slot, label, pin] of [[0, 'Ghost test seed', 'PIN 1234'], [1, 'Zoo test seed', 'PIN 5678']]) {
+  const details = page.locator('#card-slots > div').nth(slot).locator('.card-details');
+  await details.getByText(label, { exact: false }).waitFor();
+  await details.getByText('Seedphrase · Plain text', { exact: false }).waitFor();
+  await details.getByText(pin, { exact: false }).waitFor();
+}
 if (await page.evaluate(() => window.__workerCount) !== workerCount) throw new Error('Demo import created or restarted a worker');
 if (!await page.locator('#screen').evaluate((current, previous) => current === previous, canvas)) {
   throw new Error('Demo import replaced the firmware canvas');
