@@ -34,7 +34,11 @@ for (const variant of [
     }));
     throw error;
   }
-  await page.locator('#build-repository-link').getByText(variant.repo, { exact: false }).waitFor();
+  const buildRepositoryLink = page.locator('#build-repository-link');
+  if (await buildRepositoryLink.textContent() !== variant.repo ||
+      await buildRepositoryLink.getAttribute('href') !== `https://github.com/${variant.repo}`) {
+    throw new Error(`${variant.id}: wrong hidden build repository details`);
+  }
   await page.waitForTimeout(700);
   const canvas = page.locator('#screen');
   const before = await canvas.screenshot({ path: `test-results/${variant.id}-mockui-screen.png` });
