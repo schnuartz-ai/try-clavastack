@@ -35,7 +35,10 @@ for (const name of ['diy', 'play', 'schnuartz']) {
     throw new Error('DIY firmware version label is not derived from its build manifest');
   }
   const sourceLink = page.locator(`[data-device="${name}"] .source-link`);
-  if (await sourceLink.textContent() !== `GitHub · ${manifest.commit.slice(0, 7)}` ||
+  const expectedLabel = name === 'diy' && manifest.firmware_version
+    ? `GitHub · v${manifest.firmware_version}`
+    : `GitHub · ${manifest.commit.slice(0, 7)}`;
+  if (await sourceLink.textContent() !== expectedLabel ||
       await sourceLink.getAttribute('href') !== `https://github.com/${manifest.repository}/commit/${manifest.commit}`) {
     throw new Error(`${name} does not link to its exact firmware commit below Restart`);
   }

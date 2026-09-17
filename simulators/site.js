@@ -80,7 +80,8 @@ function render() {
   list.replaceChildren();
   const sdFiles = filesFor('sd/');
   const usedBytes = sdFiles.reduce((total, file) => total + file.bytes.byteLength, 0);
-  document.querySelector('#sd-capacity').textContent = `8 GB capacity · ${formatBytes(usedBytes)} used · ${formatBytes(SD_CAPACITY_BYTES - usedBytes)} free`;
+  const capacity = document.querySelector('#sd-capacity');
+  if (capacity) capacity.textContent = `8 GB capacity · ${formatBytes(usedBytes)} used · ${formatBytes(SD_CAPACITY_BYTES - usedBytes)} free`;
   if (!sdFiles.length) { const empty = document.createElement('li'); empty.textContent = 'No files on card'; list.append(empty); }
   for (const file of sdFiles) {
     const row = document.createElement('li');
@@ -203,10 +204,31 @@ for (const name of order) {
       }
       const link = devices[name].querySelector('.source-link');
       link.href = `https://github.com/${info.repository}/commit/${info.commit}`;
-      link.textContent = `GitHub · ${info.commit.slice(0, 7)}`;
+      link.textContent = info.firmware_version
+        ? `GitHub · v${info.firmware_version}`
+        : `GitHub · ${info.commit.slice(0, 7)}`;
+      const technical = document.querySelector(`[data-tech-device="${name}"]`);
+      if (technical) {
+        const repository = technical.querySelector('[data-tech-repository]');
+        repository.href = `https://github.com/${info.repository}`;
+        repository.textContent = info.repository;
+        const commit = technical.querySelector('[data-tech-commit]');
+        commit.href = `https://github.com/${info.repository}/commit/${info.commit}`;
+        commit.textContent = info.commit.slice(0, 12);
+        technical.querySelector('[data-tech-context]').textContent = [
+          info.firmware_version && `Firmware: v${info.firmware_version}`,
+          `Artifact: ${pointer.version}`,
+        ].filter(Boolean).join(' · ');
+      }
     } catch {
       devices[name].querySelector('.source-link').textContent = 'GitHub · unavailable';
       devices[name].querySelector('.device-status').textContent = 'Build information unavailable';
+      const technical = document.querySelector(`[data-tech-device="${name}"]`);
+      if (technical) {
+        technical.querySelector('[data-tech-repository]').textContent = 'Unavailable';
+        technical.querySelector('[data-tech-commit]').textContent = 'Unavailable';
+        technical.querySelector('[data-tech-context]').textContent = 'Build information unavailable.';
+      }
     }
   })();
 }
@@ -376,8 +398,8 @@ function browserLabel() {
 function clearScreenshot() {
   screenshotData = '';
   feedbackScreenshot.value = '';
+  feedbackPreview.replaceChildren();
   feedbackPreview.hidden = true;
-  feedbackPreview.removeAttribute('src');
 }
 feedbackScreenshot.addEventListener('change', () => {
   const file = feedbackScreenshot.files?.[0];
@@ -390,7 +412,13 @@ feedbackScreenshot.addEventListener('change', () => {
   const reader = new FileReader();
   reader.onload = () => {
     screenshotData = typeof reader.result === 'string' ? reader.result : '';
-    feedbackPreview.src = screenshotData;
+    feedbackPreview.replaceChildren();
+    if (screenshotData) {
+      const image = document.createElement('img');
+      image.src = screenshotData;
+      image.alt = 'Screenshot preview';
+      feedbackPreview.append(image);
+    }
     feedbackPreview.hidden = !screenshotData;
     setFeedbackStatus('Screenshot attached to the next comment.');
   };
@@ -523,6 +551,49 @@ function addFiles(files) {
     report(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
   });
 }
+const demoButton = document.querySelector('#demo-load');
+const demoStatus = document.querySelector('#demo-status');
+demoButton.onclick = () => perform(async () => {
+  if (!ready.has('diy')) throw new Error('Specter DIY is still starting.');
+  demoButton.disabled = true;
+  demoStatus.textContent = 'Importing demo data…';
+  try {
+    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-multisig-psbt');
+    const demo = createDemoFiles();
+
+    if (sdOwner && sdOwner !== 'diy') await detach('sd', null);
+    if (sdOwner !== 'diy') command('diy', { type: 'sd-insert' });
+    for (const file of demo.files) {
+      command('diy', { type: 'sd-import', name: file.name, bytes: file.bytes });
+    }
+
+    for (const card of demo.cards) {
+      if (cardOwners.get(card.slot) && cardOwners.get(card.slot) !== 'diy') await detach('card', card.slot);
+      command('diy', { type: 'state-import', files: [
+        { path: `cards/${card.slot}/secret.bin`, bytes: card.secret },
+        { path: `cards/${card.slot}/pin.bin`, bytes: card.pinDigest },
+        { path: `cards/${card.slot}/attempts`, bytes: new Uint8Array([10]) },
+      ] });
+    }
+
+    const imported = await snapshot('diy');
+    saveMedia(imported, 'sd/');
+    sdOwner = 'diy';
+    for (const card of demo.cards) saveMedia(imported, prefix('card', card.slot));
+
+    if (cardOwners.get(1) !== 'diy') {
+      command('diy', { type: 'card-insert', slot: 1 });
+      await snapshot('diy');
+      cardOwners.set(1, 'diy');
+    }
+    cardOwners.set(2, null);
+    report('Demo data imported into device 1.');
+    demoButton.textContent = 'Import Demo Data Again';
+    demoStatus.textContent = 'Demo data imported into device 1.';
+  } finally {
+    demoButton.disabled = false;
+  }
+});
 document.querySelector('#sd-refresh').onclick = () => perform(async () => {
   if (sdOwner) saveMedia(await snapshot(sdOwner), 'sd/');
   report('SD files refreshed from Specter.');
