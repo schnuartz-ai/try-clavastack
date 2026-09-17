@@ -119,29 +119,59 @@ def load_feedback():
         for item in items:
             if not isinstance(item, dict):
                 continue
-            comment = str(item.get('comment', '')).strip()
+            item_type = item.get('type', 'comment')
             variant = item.get('variant')
-            if not comment or len(comment) > 5000 or variant not in FEEDBACK_VARIANTS:
+            if item_type not in {'comment', 'poll'} or variant not in FEEDBACK_VARIANTS:
                 continue
             try:
                 likes = max(0, int(item.get('likes', 0)))
                 dislikes = max(0, int(item.get('dislikes', 0)))
             except (TypeError, ValueError):
                 likes = dislikes = 0
-            valid.append({
+            image_url = item.get('imageUrl') or item.get('screenshotUrl')
+            normalized = {
                 'id': str(item.get('id', '')),
                 'createdAt': str(item.get('createdAt', '')),
                 'variant': variant,
+                'type': item_type,
                 'label': FEEDBACK_VARIANTS[variant]['label'],
                 'repository': FEEDBACK_VARIANTS[variant]['repository'],
-                'comment': comment,
                 'version': str(item.get('version', 'Unknown'))[:200],
                 'browser': str(item.get('browser', 'Unknown'))[:200],
                 'status': item.get('status') if item.get('status') in {'new', 'in_progress', 'resolved'} else 'new',
                 'likes': likes,
                 'dislikes': dislikes,
-                'screenshotUrl': item.get('screenshotUrl') if isinstance(item.get('screenshotUrl'), str) else None,
-            })
+                'imageUrl': image_url if isinstance(image_url, str) else None,
+            }
+            if item_type == 'comment':
+                comment = str(item.get('comment', '')).strip()
+                if not comment or len(comment) > 5000:
+                    continue
+                normalized['comment'] = comment
+            else:
+                question = str(item.get('question', '')).strip()
+                raw_options = item.get('options')
+                options = []
+                if isinstance(raw_options, list):
+                    for raw_option in raw_options[:6]:
+                        if isinstance(raw_option, dict):
+                            option_text = str(raw_option.get('text', '')).strip()
+                            option_votes = raw_option.get('votes', 0)
+                        else:
+                            option_text = str(raw_option).strip()
+                            option_votes = 0
+                        if not option_text or len(option_text) > 80 or any(option_text.casefold() == existing['text'].casefold() for existing in options):
+                            continue
+                        try:
+                            option_votes = max(0, int(option_votes))
+                        except (TypeError, ValueError):
+                            option_votes = 0
+                        options.append({'text': option_text, 'votes': option_votes})
+                if not question or len(question) > 240 or len(options) < 2:
+                    continue
+                normalized['question'] = question
+                normalized['options'] = options
+            valid.append(normalized)
         feedback_items = valid[:FEEDBACK_LIMIT]
     except (OSError, ValueError, TypeError):
         feedback_items = []
@@ -169,11 +199,36 @@ def create_feedback(data):
     variant = data.get('variant') if isinstance(data, dict) else None
     if variant not in FEEDBACK_VARIANTS:
         return {'status': 'error', 'error': 'Choose a valid simulator.'}
+    item_type = data.get('type', 'comment') if isinstance(data, dict) else 'comment'
+    if item_type not in {'comment', 'poll'}:
+        return {'status': 'error', 'error': 'Choose comment or poll.'}
     comment = str(data.get('comment', '')).strip() if isinstance(data, dict) else ''
-    if not comment:
-        return {'status': 'error', 'error': 'Comment cannot be empty.'}
-    if len(comment) > 5000:
-        return {'status': 'error', 'error': 'Comment is limited to 5000 characters.'}
+    question = str(data.get('question', '')).strip() if isinstance(data, dict) else ''
+    options = []
+    if item_type == 'comment':
+        if not comment:
+            return {'status': 'error', 'error': 'Comment cannot be empty.'}
+        if len(comment) > 5000:
+            return {'status': 'error', 'error': 'Comment is limited to 5000 characters.'}
+    else:
+        if not question:
+            return {'status': 'error', 'error': 'Poll question cannot be empty.'}
+        if len(question) > 240:
+            return {'status': 'error', 'error': 'Poll question is limited to 240 characters.'}
+        raw_options = data.get('options') if isinstance(data, dict) else None
+        if not isinstance(raw_options, list):
+            return {'status': 'error', 'error': 'Add at least two poll options.'}
+        for raw_option in raw_options[:6]:
+            option = str(raw_option).strip()
+            if not option:
+                continue
+            if len(option) > 80:
+                return {'status': 'error', 'error': 'Poll options are limited to 80 characters.'}
+            if any(option.casefold() == existing.casefold() for existing in options):
+                return {'status': 'error', 'error': 'Poll options must be unique.'}
+            options.append(option)
+        if len(options) < 2:
+            return {'status': 'error', 'error': 'Add at least two poll options.'}
     version = str(data.get('version', 'Unknown')).strip()[:200]
     browser = str(data.get('browser', 'Unknown')).strip()[:200]
     now = datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
@@ -181,16 +236,21 @@ def create_feedback(data):
         'id': f"feedback_{int(time.time() * 1000)}_{random.randint(1000, 9999)}",
         'createdAt': now,
         'variant': variant,
+        'type': item_type,
         'label': FEEDBACK_VARIANTS[variant]['label'],
         'repository': FEEDBACK_VARIANTS[variant]['repository'],
-        'comment': comment,
         'version': version or 'Unknown',
         'browser': browser or 'Unknown',
         'status': 'new',
         'likes': 0,
         'dislikes': 0,
-        'screenshotUrl': None,
+        'imageUrl': None,
     }
+    if item_type == 'comment':
+        item['comment'] = comment
+    else:
+        item['question'] = question
+        item['options'] = [{'text': option, 'votes': 0} for option in options]
     screenshot = data.get('screenshot') if isinstance(data, dict) else None
     if screenshot:
         if not isinstance(screenshot, str) or ',' not in screenshot:
@@ -210,7 +270,7 @@ def create_feedback(data):
         filename = f"{item['id']}.{image_type[0]}"
         with open(os.path.join(FEEDBACK_MEDIA_DIR, filename), 'wb') as image_file:
             image_file.write(image_bytes)
-        item['screenshotUrl'] = f"/api/feedback/media/{filename}"
+        item['imageUrl'] = f"/api/feedback/media/{filename}"
     with feedback_lock:
         feedback_items.insert(0, item)
         del feedback_items[FEEDBACK_LIMIT:]
@@ -245,6 +305,25 @@ def update_feedback_reaction(data):
                 save_feedback()
                 return {'status': 'ok', 'comment': item}
     return {'status': 'error', 'error': 'Comment not found.'}
+
+
+def vote_feedback(data):
+    comment_id = data.get('id') if isinstance(data, dict) else None
+    try:
+        option_index = int(data.get('option')) if isinstance(data, dict) else -1
+    except (TypeError, ValueError):
+        option_index = -1
+    with feedback_lock:
+        for item in feedback_items:
+            if item.get('id') != comment_id:
+                continue
+            options = item.get('options') if item.get('type') == 'poll' else None
+            if not isinstance(options, list) or not 0 <= option_index < len(options):
+                return {'status': 'error', 'error': 'Choose a valid poll option.'}
+            options[option_index]['votes'] = max(0, int(options[option_index].get('votes', 0))) + 1
+            save_feedback()
+            return {'status': 'ok', 'comment': item}
+    return {'status': 'error', 'error': 'Poll not found.'}
 
 
 def send_feedback_media(handler, filename):
@@ -619,6 +698,10 @@ class Handler(BaseHTTPRequestHandler):
 
         elif path == '/api/feedback/reaction':
             result = update_feedback_reaction(data)
+            self.send_json(result, 200 if result.get('status') == 'ok' else 400)
+
+        elif path == '/api/feedback/vote':
+            result = vote_feedback(data)
             self.send_json(result, 200 if result.get('status') == 'ok' else 400)
 
         elif path == '/api/allocate':

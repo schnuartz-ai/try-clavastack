@@ -318,12 +318,24 @@ const feedbackStatus = document.querySelector('#feedback-status');
 const feedbackList = document.querySelector('#feedback-list');
 const feedbackScreenshot = document.querySelector('#feedback-screenshot');
 const feedbackPreview = document.querySelector('#feedback-preview');
+const feedbackTypeButtons = document.querySelectorAll('[data-feedback-type]');
+const commentFields = document.querySelector('#comment-fields');
+const pollFields = document.querySelector('#poll-fields');
+const pollQuestion = document.querySelector('#poll-question');
+const pollOptions = document.querySelector('#poll-options');
+const pollAddOption = document.querySelector('#poll-add-option');
+const feedbackScreenshotLabel = document.querySelector('#feedback-screenshot-label');
+const feedbackFormNote = document.querySelector('#feedback-form-note');
 const feedbackApi = '/api/feedback';
 const reactionStorageKey = 'try-clavastack-feedback-reactions-v1';
+const pollVoteStorageKey = 'try-clavastack-feedback-poll-votes-v1';
 const statusLabels = { new: 'New', in_progress: 'In progress', resolved: 'Resolved' };
 let screenshotData = '';
+let feedbackType = 'comment';
 let ownReactions = {};
+let ownPollVotes = {};
 try { ownReactions = JSON.parse(localStorage.getItem(reactionStorageKey) || '{}') || {}; } catch {}
+try { ownPollVotes = JSON.parse(localStorage.getItem(pollVoteStorageKey) || '{}') || {}; } catch {}
 let savedFeedback = [];
 function renderFeedback() {
   feedbackList.replaceChildren();
@@ -340,14 +352,12 @@ function renderFeedback() {
     const head = document.createElement('div');
     head.className = 'feedback-item-head';
     const label = document.createElement('strong');
-    label.textContent = item.label;
+    label.textContent = item.type === 'poll' ? `Poll · ${item.label}` : item.label;
     const time = document.createElement('time');
     time.dateTime = item.createdAt || '';
     const date = new Date(item.createdAt);
     time.textContent = Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
     head.append(label, time);
-    const body = document.createElement('p');
-    body.textContent = item.comment;
     const details = document.createElement('div');
     details.className = 'feedback-item-details';
     details.textContent = `Firmware: ${item.version || 'Unknown'} · Browser: ${item.browser || 'Unknown'}`;
@@ -367,16 +377,57 @@ function renderFeedback() {
     stateSelect.value = statusLabels[item.status] ? item.status : 'new';
     stateSelect.addEventListener('change', () => changeFeedbackStatus(item, stateSelect));
     state.append(stateLabel, stateSelect);
-    entry.append(head, details, body, state);
-    if (item.screenshotUrl && item.screenshotUrl.startsWith('/api/feedback/media/')) {
+    entry.append(head, details);
+    if (item.type === 'poll') {
+      const question = document.createElement('div');
+      question.className = 'feedback-poll-question';
+      question.textContent = item.question;
+      const options = document.createElement('div');
+      options.className = 'feedback-poll-options';
+      const selectedOption = Number.isInteger(ownPollVotes[item.id]) ? ownPollVotes[item.id] : null;
+      const totalVotes = (item.options || []).reduce((total, option) => total + (Number(option.votes) || 0), 0);
+      for (const [index, option] of (item.options || []).entries()) {
+        const votes = Math.max(0, Number(option.votes) || 0);
+        const percentage = totalVotes ? Math.round((votes / totalVotes) * 100) : 0;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'feedback-poll-option';
+        button.disabled = selectedOption !== null;
+        if (selectedOption === index) button.classList.add('selected');
+        const bar = document.createElement('span');
+        bar.className = 'feedback-poll-option-bar';
+        bar.style.width = `${percentage}%`;
+        const content = document.createElement('span');
+        content.className = 'feedback-poll-option-content';
+        const optionText = document.createElement('span');
+        optionText.textContent = option.text;
+        const count = document.createElement('span');
+        count.className = 'feedback-poll-option-count';
+        count.textContent = `${votes} · ${percentage}%`;
+        content.append(optionText, count);
+        button.append(bar, content);
+        button.addEventListener('click', () => voteFeedback(item, index));
+        options.append(button);
+      }
+      const pollNote = document.createElement('p');
+      pollNote.className = 'feedback-poll-note';
+      pollNote.textContent = selectedOption === null ? 'Choose one option.' : 'Your vote is saved in this browser.';
+      entry.append(question, options, pollNote, state);
+    } else {
+      const body = document.createElement('p');
+      body.textContent = item.comment;
+      entry.append(body, state);
+    }
+    const imageUrl = item.imageUrl || item.screenshotUrl;
+    if (imageUrl && imageUrl.startsWith('/api/feedback/media/')) {
       const screenshotLink = document.createElement('a');
-      screenshotLink.href = item.screenshotUrl;
+      screenshotLink.href = imageUrl;
       screenshotLink.target = '_blank';
       screenshotLink.rel = 'noopener noreferrer';
       const screenshot = document.createElement('img');
       screenshot.className = 'feedback-screenshot';
-      screenshot.src = item.screenshotUrl;
-      screenshot.alt = `Screenshot attached to ${item.label} feedback`;
+      screenshot.src = imageUrl;
+      screenshot.alt = `${item.type === 'poll' ? 'Photo attached to' : 'Screenshot attached to'} ${item.label} feedback`;
       screenshot.loading = 'lazy';
       screenshotLink.append(screenshot);
       entry.append(screenshotLink);
@@ -410,7 +461,7 @@ async function loadFeedback() {
     const data = await response.json();
     savedFeedback = Array.isArray(data.comments) ? data.comments : [];
     renderFeedback();
-    setFeedbackStatus(`${savedFeedback.length} shared comment${savedFeedback.length === 1 ? '' : 's'}.`);
+    setFeedbackStatus(`${savedFeedback.length} shared comment${savedFeedback.length === 1 ? '' : 's'} or poll${savedFeedback.length === 1 ? '' : 's'}.`);
   } catch {
     setFeedbackStatus('Shared comments could not be loaded. Please try again later.');
   }
@@ -454,17 +505,43 @@ async function reactToFeedback(item, reaction) {
     setFeedbackStatus(`Reaction could not be saved: ${error.message}`);
   }
 }
+async function voteFeedback(item, option) {
+  if (Object.prototype.hasOwnProperty.call(ownPollVotes, item.id)) return;
+  try {
+    const response = await fetch(`${feedbackApi}/vote`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, option }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.comment) throw new Error(data.error || `HTTP ${response.status}`);
+    const index = savedFeedback.findIndex(candidate => candidate.id === item.id);
+    if (index >= 0) savedFeedback[index] = data.comment;
+    ownPollVotes[item.id] = option;
+    try { localStorage.setItem(pollVoteStorageKey, JSON.stringify(ownPollVotes)); } catch {}
+    renderFeedback();
+  } catch (error) {
+    setFeedbackStatus(`Vote could not be saved: ${error.message}`);
+  }
+}
 function currentFeedback() {
   const device = devices[feedbackDevice.value];
-  return {
+  const common = {
     variant: feedbackDevice.value,
-    comment: feedbackMessage.value.trim(),
     label: feedbackDevice.selectedOptions[0].textContent,
     source: device.querySelector('.source-link').getAttribute('href') || 'Build information unavailable',
     version: feedbackVersions[feedbackDevice.value] || 'Loading…',
     browser: browserLabel(),
     screenshot: screenshotData || undefined,
   };
+  if (feedbackType === 'poll') {
+    return {
+      ...common,
+      type: 'poll',
+      question: pollQuestion.value.trim(),
+      options: [...pollOptions.querySelectorAll('.poll-option')].map(input => input.value.trim()).filter(Boolean),
+    };
+  }
+  return { ...common, type: 'comment', comment: feedbackMessage.value.trim() };
 }
 function browserLabel() {
   const ua = navigator.userAgent;
@@ -501,12 +578,52 @@ feedbackScreenshot.addEventListener('change', () => {
   };
   reader.readAsDataURL(file);
 });
+function setFeedbackType(type) {
+  feedbackType = type === 'poll' ? 'poll' : 'comment';
+  const isPoll = feedbackType === 'poll';
+  commentFields.hidden = isPoll;
+  pollFields.hidden = !isPoll;
+  feedbackMessage.required = !isPoll;
+  pollQuestion.required = isPoll;
+  feedbackScreenshotLabel.textContent = `${isPoll ? 'Photo' : 'Screenshot'} (optional, max. 2 MB)`;
+  feedbackSave.textContent = isPoll ? 'Create poll' : 'Save comment';
+  feedbackSubmit.hidden = isPoll;
+  feedbackFormNote.textContent = isPoll
+    ? 'Polls are shared with everyone on this page. You can add one photo. Please do not include seed phrases, private keys, or personal data.'
+    : 'Saved comments are shared with everyone on this page. GitHub requires at least 10 characters for the issue draft. Please do not include seed phrases, private keys, or personal data.';
+  for (const button of feedbackTypeButtons) {
+    const active = button.dataset.feedbackType === feedbackType;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+  updateFeedback();
+}
+function addPollOption() {
+  const count = pollOptions.querySelectorAll('.poll-option').length;
+  if (count >= 6) return;
+  const input = document.createElement('input');
+  input.className = 'poll-option';
+  input.type = 'text';
+  input.maxLength = 80;
+  input.placeholder = `Option ${count + 1}`;
+  input.addEventListener('input', updateFeedback);
+  pollOptions.append(input);
+  if (pollOptions.querySelectorAll('.poll-option').length >= 6) pollAddOption.hidden = true;
+  updateFeedback();
+}
+for (const button of feedbackTypeButtons) button.addEventListener('click', () => setFeedbackType(button.dataset.feedbackType));
+pollAddOption.addEventListener('click', addPollOption);
+pollQuestion.addEventListener('input', updateFeedback);
+for (const input of pollOptions.querySelectorAll('.poll-option')) input.addEventListener('input', updateFeedback);
 async function saveCurrentFeedback() {
   const current = currentFeedback();
-  if (!current.comment) return;
+  const valid = feedbackType === 'poll'
+    ? current.question && current.options.length >= 2
+    : current.comment;
+  if (!valid) return;
   feedbackSave.disabled = true;
   feedbackSave.textContent = 'Saving…';
-  setFeedbackStatus('Saving comment for everyone…');
+  setFeedbackStatus(feedbackType === 'poll' ? 'Creating poll for everyone…' : 'Saving comment for everyone…');
   try {
     const response = await fetch('/api/feedback', {
       method: 'POST',
@@ -518,23 +635,41 @@ async function saveCurrentFeedback() {
     savedFeedback = [data.comment, ...savedFeedback.filter(item => item.id !== data.comment.id)];
     renderFeedback();
     feedbackMessage.value = '';
+    pollQuestion.value = '';
+    pollOptions.replaceChildren();
+    for (let index = 1; index <= 2; index += 1) {
+      const input = document.createElement('input');
+      input.className = 'poll-option';
+      input.type = 'text';
+      input.maxLength = 80;
+      input.placeholder = `Option ${index}`;
+      input.addEventListener('input', updateFeedback);
+      pollOptions.append(input);
+    }
+    pollAddOption.hidden = false;
     clearScreenshot();
-    setFeedbackStatus('Comment saved and visible to everyone.');
+    setFeedbackStatus(feedbackType === 'poll' ? 'Poll created and visible to everyone.' : 'Comment saved and visible to everyone.');
   } catch (error) {
     setFeedbackStatus(`Comment could not be saved: ${error.message}`);
   } finally {
-    feedbackSave.textContent = 'Save comment';
+    feedbackSave.textContent = feedbackType === 'poll' ? 'Create poll' : 'Save comment';
     updateFeedback();
   }
 }
 function updateFeedback() {
+  const isPoll = feedbackType === 'poll';
   const comment = feedbackMessage.value.trim();
-  document.querySelector('#feedback-count').textContent = `${feedbackMessage.value.length} / 5000 characters`;
-  const hasComment = comment.length > 0;
-  const valid = comment.length >= 10;
-  feedbackSave.disabled = !hasComment;
-  feedbackSubmit.setAttribute('aria-disabled', String(!valid));
-  if (!valid) { feedbackSubmit.href = '#feedback-message'; return; }
+  const value = isPoll ? pollQuestion.value : feedbackMessage.value;
+  const limit = isPoll ? 240 : 5000;
+  document.querySelector('#feedback-count').textContent = `${value.length} / ${limit} characters`;
+  const valid = isPoll
+    ? pollQuestion.value.trim().length > 0 && [...pollOptions.querySelectorAll('.poll-option')].filter(input => input.value.trim()).length >= 2
+    : comment.length > 0;
+  feedbackSave.disabled = !valid;
+  feedbackSubmit.hidden = isPoll;
+  const githubValid = comment.length >= 10;
+  feedbackSubmit.setAttribute('aria-disabled', String(!githubValid));
+  if (isPoll || !githubValid) { feedbackSubmit.href = '#feedback-message'; return; }
   const device = devices[feedbackDevice.value];
   const source = device.querySelector('.source-link').getAttribute('href') || 'Build information unavailable';
   const label = feedbackDevice.selectedOptions[0].textContent;
