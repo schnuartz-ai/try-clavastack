@@ -5,22 +5,46 @@ set -euo pipefail
 # services. The old src/main.py wallet is deliberately not frozen here.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:-}" in
-  k9ert) REPOSITORY=k9ert/specter-playground; SOURCE_SHA=2b5c1acf95e4ba4b5faa04a07c64cf8164d65ce4 ;;
-  schnuartz) REPOSITORY=Schnuartz/specter-playground; SOURCE_SHA=6626a4671256a82bc890790af3c1335161981d8a ;;
-  *) echo "Usage: $0 k9ert|schnuartz" >&2; exit 2 ;;
+  k9ert)
+    REPOSITORY=k9ert/specter-playground
+    SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
+    SOURCE_SHA=${SOURCE_SHA_OVERRIDE:-}
+    POINTER_NAME=variants/specter-playground.json ;;
+  schnuartz)
+    REPOSITORY=Schnuartz/specter-playground
+    SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
+    SOURCE_SHA=${SOURCE_SHA_OVERRIDE:-}
+    POINTER_NAME=variants/specter-playground-schnuartz.json ;;
+  schnuartz-alternative)
+    REPOSITORY=schnuartz-ai/specter-playground-schnuartz
+    SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
+    SOURCE_SHA=${SOURCE_SHA_OVERRIDE:-}
+    POINTER_NAME=variants/specter-playground-schnuartz-alternative.json ;;
+  *) echo "Usage: $0 k9ert|schnuartz|schnuartz-alternative" >&2; exit 2 ;;
 esac
 # Both forks use the repository name `specter-playground`; include the owner
 # so a clean build cannot accidentally reuse the other fork's checkout.
 CHECKOUT_KEY="${REPOSITORY//\//-}"
+if [[ "${1:-}" = schnuartz-alternative ]]; then CHECKOUT_KEY+="-alternative"; fi
 FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/$CHECKOUT_KEY}"
 EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
-OUT="$ROOT/builds/${REPOSITORY}-mockui/$SOURCE_SHA"
 if [[ ! -e "$FORK_SRC/.git" ]]; then
   mkdir -p "$(dirname "$FORK_SRC")"
-  git clone "https://github.com/$REPOSITORY.git" "$FORK_SRC"
-  git -C "$FORK_SRC" checkout "$SOURCE_SHA"
+  git clone --branch "$SOURCE_BRANCH" "https://github.com/$REPOSITORY.git" "$FORK_SRC"
+else
+  git -C "$FORK_SRC" remote set-url origin "https://github.com/$REPOSITORY.git"
 fi
+if [[ -z "$SOURCE_SHA" ]]; then
+  SOURCE_SHA="$(git ls-remote "https://github.com/$REPOSITORY.git" "refs/heads/$SOURCE_BRANCH" | awk 'NR == 1 {print $1}')"
+  if [[ -z "$SOURCE_SHA" ]]; then
+    echo "Could not resolve latest $REPOSITORY commit on $SOURCE_BRANCH" >&2
+    exit 1
+  fi
+fi
+git -C "$FORK_SRC" fetch --force origin "$SOURCE_SHA"
+git -C "$FORK_SRC" checkout --force "$SOURCE_SHA"
 test "$(git -C "$FORK_SRC" rev-parse HEAD)" = "$SOURCE_SHA" || { echo "Wrong fork commit" >&2; exit 1; }
+OUT="$ROOT/builds/${REPOSITORY}-mockui/$SOURCE_SHA"
 # Only the firmware build inputs are needed here.  A fully recursive checkout
 # also downloads every optional MicroPython port library, which makes a clean
 # browser build unnecessarily slow and can leave it stuck in unrelated git
@@ -67,7 +91,7 @@ if grep -q 'lv_sdl_mouse_handler(&event);' "$FORK_SRC/f469-disco/usermods/udispl
 fi
 apply_if_needed "$FORK_SRC/f469-disco" "$ROOT/browser/v9-patches/usermods.patch"
 apply_if_needed "$FORK_SRC/f469-disco/usermods/secp256k1" "$ROOT/browser/v9-patches/secp256k1.patch"
-if [[ "$1" = schnuartz ]]; then
+if [[ "$1" = schnuartz || "$1" = schnuartz-alternative ]]; then
   python3 "$ROOT/browser/patch-playground-qstr.py" "$FORK_SRC/f469-disco/micropython"
 fi
 python3 "$ROOT/browser/limit-lvgl.py" \
@@ -112,5 +136,6 @@ python3 "$ROOT/browser/optimize-wasm.py" \
 python3 "$ROOT/browser/normalize-glue.py" "$PORT/build-specter-mockui-browser/micropython.js"
 mkdir -p "$OUT"
 cp "$PORT/build-specter-mockui-browser"/micropython.{js,wasm,data} "$OUT/"
-BROWSER_WASM_OPTIMIZED=1 python3 "$ROOT/browser/write-manifest.py" "$FORK_SRC" "$OUT" "$REPOSITORY" mockui
+BROWSER_POINTER_NAME="$POINTER_NAME" BROWSER_WASM_OPTIMIZED=1 \
+  python3 "$ROOT/browser/write-manifest.py" "$FORK_SRC" "$OUT" "$REPOSITORY" mockui
 echo "MockUI browser artifacts: $OUT"

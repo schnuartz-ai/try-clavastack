@@ -69,7 +69,10 @@ pointer = {
     "version": artifact_set[:16],
 }
 repository_key = repository.lower()
-if repository_key in ("cryptoadvance/specter-diy", "schnuartz/specter-diy", "schnuartz-ai/specter-diy"):
+pointer_name = os.environ.get("BROWSER_POINTER_NAME")
+if pointer_name:
+    pointer_name = pointer_name.replace('\\', '/')
+elif repository_key in ("cryptoadvance/specter-diy", "schnuartz/specter-diy", "schnuartz-ai/specter-diy"):
     pointer_name = "current.json"
 elif repository_key == "schnuartz/specter-playground":
     # Keep the two same-named Playground forks addressable independently.

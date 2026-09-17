@@ -31,17 +31,7 @@ jobs:
         run: |
           bash browser/build-playground.sh k9ert
           bash browser/build-playground.sh schnuartz
-      - name: Restore historical Schnuartz alternative build
-        shell: bash
-        run: |
-          set -euo pipefail
-          build='builds/schnuartz-ai/specter-playground-schnuartz-mockui/5d3e5ba2f667d035bd2375b370fb6fc7c33da458'
-          mkdir -p "$build"
-          for artifact in build-info.json micropython.js micropython.wasm micropython.data; do
-            curl --fail --location --retry 3 \
-              "https://try.clavastack.com/$build/$artifact" \
-              --output "$build/$artifact"
-          done
+          bash browser/build-playground.sh schnuartz-alternative
       - name: Verify versioned static artifacts
         run: python3 browser/verify-build.py
       - name: Install Specter native test dependencies

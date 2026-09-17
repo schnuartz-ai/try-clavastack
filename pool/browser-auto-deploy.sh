@@ -2,7 +2,8 @@
 set -euo pipefail
 
 REPOSITORY="schnuartz-ai/try-clavastack"
-WORKFLOW="official-browser-firmware.yml"
+WORKFLOW="browser.yml"
+ARTIFACT="browser-builds"
 WEBROOT="/var/www/try-clavastack"
 STATE_DIR="/var/lib/try-clavastack"
 STATE_FILE="$STATE_DIR/browser-last-deployed-run"
@@ -21,47 +22,54 @@ fi
 
 WORK_DIR=$(mktemp -d /tmp/try-browser-auto-deploy.XXXXXX)
 trap 'rm -rf -- "$WORK_DIR"' EXIT
-gh run download "$RUN_ID" --repo "$REPOSITORY" --name official-browser-builds --dir "$WORK_DIR"
+gh run download "$RUN_ID" --repo "$REPOSITORY" --name "$ARTIFACT" --dir "$WORK_DIR"
 
-POINTER="$WORK_DIR/browser/current.json"
-test -f "$POINTER"
-BUILD_PATH=$(python3 - "$POINTER" <<'PY'
-import json, re, sys
-pointer = json.load(open(sys.argv[1], encoding="utf-8"))
-path = pointer.get("build", "")
-if not re.fullmatch(r"/builds/cryptoadvance/specter-diy/[0-9a-f]{40}/", path):
-    raise SystemExit("Refusing unexpected browser build path")
-print(path)
-PY
-)
-SOURCE_BUILD="$WORK_DIR$BUILD_PATH"
-
-python3 - "$SOURCE_BUILD" <<'PY'
+python3 - "$WORK_DIR" <<'PY'
 import hashlib, json, pathlib, re, sys
-build = pathlib.Path(sys.argv[1]).resolve()
-manifest = json.loads((build / "build-info.json").read_text(encoding="utf-8"))
-if manifest.get("repository") != "cryptoadvance/specter-diy":
-    raise SystemExit("Refusing non-official firmware repository")
-if not re.fullmatch(r"[0-9a-f]{40}", manifest.get("commit", "")):
-    raise SystemExit("Invalid firmware commit")
-if not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\d+)?", manifest.get("firmware_version", "")):
-    raise SystemExit("Invalid firmware version")
-for name in ("micropython.js", "micropython.wasm", "micropython.data"):
-    path = build / name
-    expected = manifest["artifacts"][name]
-    if path.stat().st_size != expected["bytes"]:
-        raise SystemExit(f"Size mismatch: {name}")
-    if hashlib.sha256(path.read_bytes()).hexdigest() != expected["sha256"]:
-        raise SystemExit(f"Hash mismatch: {name}")
+
+root = pathlib.Path(sys.argv[1]).resolve()
+pointers = {
+    "browser/current.json": {"cryptoadvance/specter-diy"},
+    "browser/variants/specter-playground.json": {"k9ert/specter-playground"},
+    "browser/variants/specter-playground-schnuartz.json": {"schnuartz/specter-playground"},
+    "browser/variants/specter-playground-schnuartz-alternative.json": {
+        "schnuartz-ai/specter-playground-schnuartz"
+    },
+}
+path_pattern = re.compile(r"/builds/[A-Za-z0-9-]+/[A-Za-z0-9-]+/[0-9a-f]{40}/")
+for pointer_name, repositories in pointers.items():
+    pointer_path = root / pointer_name
+    if not pointer_path.is_file():
+        raise SystemExit(f"Missing pointer: {pointer_name}")
+    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    build_path = pointer.get("build", "")
+    if not path_pattern.fullmatch(build_path):
+        raise SystemExit(f"Refusing unexpected build path: {build_path}")
+    build = root / build_path.lstrip("/")
+    manifest = json.loads((build / "build-info.json").read_text(encoding="utf-8"))
+    if manifest.get("repository", "").lower() not in {item.lower() for item in repositories}:
+        raise SystemExit(f"Wrong repository in {pointer_name}")
+    commit = manifest.get("commit", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", commit) or f"/{commit}/" not in build_path:
+        raise SystemExit(f"Invalid source commit in {pointer_name}")
+    if pointer.get("version") != manifest.get("artifact_set_sha256", "")[:16]:
+        raise SystemExit(f"Pointer hash mismatch in {pointer_name}")
+    for name, expected in manifest.get("artifacts", {}).items():
+        path = build / name
+        if path.stat().st_size != expected["bytes"] or hashlib.sha256(path.read_bytes()).hexdigest() != expected["sha256"]:
+            raise SystemExit(f"Artifact hash mismatch: {pointer_name} {name}")
 PY
 
-TARGET_BUILD="$WEBROOT$BUILD_PATH"
-install -d -m 0755 "$TARGET_BUILD"
-for name in micropython.js micropython.wasm micropython.data build-info.json; do
-  install -m 0644 "$SOURCE_BUILD/$name" "$TARGET_BUILD/$name"
+# Publish immutable build directories before switching any revalidated pointer.
+while IFS= read -r -d '' source; do
+    relative="${source#"$WORK_DIR/"}"
+    install -D -m 0644 "$source" "$WEBROOT/$relative"
+done < <(find "$WORK_DIR/builds" -type f -print0)
+for pointer in browser/current.json \
+    browser/variants/specter-playground.json \
+    browser/variants/specter-playground-schnuartz.json \
+    browser/variants/specter-playground-schnuartz-alternative.json; do
+  install -D -m 0644 "$WORK_DIR/$pointer" "$WEBROOT/$pointer"
 done
-# Publish the immutable artifact directory before switching the revalidated
-# pointer. Existing sessions continue using their versioned URLs.
-install -m 0644 "$POINTER" "$WEBROOT/browser/current.json"
 install -d -m 0755 "$STATE_DIR"
 printf '%s\n' "$RUN_ID" > "$STATE_FILE"
