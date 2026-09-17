@@ -37,9 +37,14 @@ for (const name of ['diy', 'play', 'schnuartz']) {
   const sourceLink = page.locator(`[data-device="${name}"] .source-link`);
   const expectedLabel = name === 'diy' && manifest.firmware_version
     ? `GitHub · v${manifest.firmware_version}`
+    : name === 'schnuartz' ? `GitHub · ${manifest.repository}`
     : `GitHub · ${manifest.commit.slice(0, 7)}`;
+  const expectedHref = name === 'schnuartz'
+    ? `https://github.com/${manifest.repository}`
+    : `https://github.com/${manifest.repository}/commit/${manifest.commit}`;
   if (await sourceLink.textContent() !== expectedLabel ||
-      await sourceLink.getAttribute('href') !== `https://github.com/${manifest.repository}/commit/${manifest.commit}`) {
+      await sourceLink.getAttribute('href') !== expectedHref ||
+      await sourceLink.getAttribute('target') !== '_blank') {
     throw new Error(`${name} does not link to its exact firmware commit below Restart`);
   }
   if (!await page.locator(`[data-device="${name}"] .device-shell`)
@@ -76,7 +81,7 @@ const normalPointer = await (await page.request.get(`${base}/browser/variants/sp
 const normalManifest = await (await page.request.get(`${base}${normalPointer.build}build-info.json`)).json();
 if (await switchControl.locator('[data-schnuartz-mode="normal"]').getAttribute('aria-pressed') !== 'true' ||
     await page.locator('[data-device="schnuartz"] .source-link').getAttribute('href') !==
-      `https://github.com/${normalManifest.repository}/commit/${normalManifest.commit}`) {
+      `https://github.com/${normalManifest.repository}`) {
   throw new Error('Schnuartz switch did not return to the normal build');
 }
 await page.waitForTimeout(1200);

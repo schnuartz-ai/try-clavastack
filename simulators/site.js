@@ -265,17 +265,30 @@ async function loadBuildMetadata(name) {
     }
     const link = devices[name].querySelector('.source-link');
     if (name === 'schnuartz') feedbackRepositories[name] = info.repository;
-    link.href = `https://github.com/${info.repository}/commit/${info.commit}`;
-    link.textContent = info.firmware_version
+    const repositoryUrl = `https://github.com/${info.repository}`;
+    const commitUrl = `${repositoryUrl}/commit/${info.commit}`;
+    // The current local Schnuartz build can be ahead of the public repository.
+    // Keep its link useful until that source commit is published on GitHub.
+    const sourceUrl = name === 'schnuartz' && schnuartzMode === 'normal' ? repositoryUrl : commitUrl;
+    link.href = sourceUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = name === 'schnuartz' && schnuartzMode === 'normal'
+      ? `GitHub · ${info.repository}`
+      : info.firmware_version
       ? `GitHub · v${info.firmware_version}`
       : `GitHub · ${info.commit.slice(0, 7)}`;
     const technical = document.querySelector(`[data-tech-device="${name}"]`);
     if (technical) {
       const repository = technical.querySelector('[data-tech-repository]');
-      repository.href = `https://github.com/${info.repository}`;
+      repository.href = repositoryUrl;
+      repository.target = '_blank';
+      repository.rel = 'noopener noreferrer';
       repository.textContent = info.repository;
       const commit = technical.querySelector('[data-tech-commit]');
-      commit.href = `https://github.com/${info.repository}/commit/${info.commit}`;
+      commit.href = sourceUrl;
+      commit.target = '_blank';
+      commit.rel = 'noopener noreferrer';
       commit.textContent = info.commit.slice(0, 12);
       technical.querySelector('[data-tech-context]').textContent = [
         info.firmware_version && `Firmware: v${info.firmware_version}`,
