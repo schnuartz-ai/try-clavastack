@@ -106,7 +106,7 @@ test "$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 make -C "$FORK_SRC" build-i18n
 # Both MockUI forks load their compiled default theme from /flash/themes during
 # startup. Omitting this step makes SpecterGui fail before MOCKUI_READY.
-if [[ "$1" = k9ert ]]; then
+if [[ "$1" != schnuartz-alternative ]]; then
   make -C "$FORK_SRC" build-themes
 fi
 python3 "$ROOT/browser/prepare-mockui.py" "$FORK_SRC"
