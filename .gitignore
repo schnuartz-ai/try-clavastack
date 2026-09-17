@@ -2,5 +2,6 @@ node_modules/
 builds/
 .browser-work/
 test-results/
+dist/
 __pycache__/
 *.pyc

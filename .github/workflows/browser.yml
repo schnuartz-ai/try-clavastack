@@ -52,6 +52,18 @@ jobs:
         env:
           CI: 'true'
         run: npm run test:browser
+      - name: Package the complete tested production site
+        if: github.event_name != 'pull_request'
+        run: bash deploy/package-site.sh dist
+      - name: Upload complete production site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-release
+          compression-level: 0
+          path: |
+            dist/site-release-${{ github.run_id }}.tar.gz
+            dist/site-release-${{ github.run_id }}.tar.gz.sha256
       - name: Upload screenshots and manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -75,3 +87,37 @@ jobs:
             builds/**/build-info.json
             browser/current.json
             browser/variants/*.json
+
+  release:
+    name: Publish tested site release
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: browser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested site package
+        uses: actions/download-artifact@v4
+        with:
+          name: site-release
+          path: dist
+      - name: Publish immutable assets on the production release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view production --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create production \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Production deployments" \
+              --notes "Tested deployment packages consumed by try.clavastack.com."
+          fi
+          gh release upload production \
+            "dist/site-release-${GITHUB_RUN_ID}.tar.gz" \
+            "dist/site-release-${GITHUB_RUN_ID}.tar.gz.sha256" \
+            --repo "$GITHUB_REPOSITORY"
+          gh release edit production \
+            --repo "$GITHUB_REPOSITORY" \
+            --latest \
+            --notes "Latest tested deployment: run ${GITHUB_RUN_ID}, commit ${GITHUB_SHA}."

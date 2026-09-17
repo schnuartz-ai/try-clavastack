@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /novnc/
+Disallow: /api/
+Disallow: /device-test/
+
+Sitemap: https://try.clavastack.com/sitemap.xml

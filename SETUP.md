@@ -33,7 +33,42 @@ It serves versioned artifacts with immutable caching and `browser/current.json` 
 
 ## Publish
 
-Build and test first. Copy `index.html`, `browser/`, `simulators/`, `assets/`, `legacy/`, and all three generated versioned build directories to `/var/www/try-clavastack` on the VPS. Keep existing site routes such as `/specter3-testing/`. Stage the Caddyfile separately, validate it using `caddy validate --config /etc/caddy/Caddyfile`, then reload Caddy. Check both normal pages, SD import and transfer, camera permission, `/legacy/`, and `/simulators/legacy/` in a real browser. Publish artifact directories before the `browser/current.json` and `browser/variants/*.json` pointers.
+Production is deployed from GitHub rather than copied over SSH. A successful
+`Browser simulator` run on `main` packages the complete tested site, publishes
+an immutable asset on the public `production` GitHub release, and records the
+source commit plus checksums. The VPS checks that release every two minutes,
+downloads the newest complete asset pair, verifies both the archive and every
+file inside it, and extracts it into:
+
+```text
+/var/www/try-clavastack-deploy/releases/<github-run-id>/
+```
+
+Only after verification does the deployer atomically replace the
+`/var/www/try-clavastack-deploy/current` symlink. A failed download, checksum,
+manifest validation, or live health check leaves or restores the previous
+release. The seven newest releases are retained for rollback. Caddy serves the
+`current` symlink; the former `/var/www/try-clavastack` tree remains an
+independent bootstrap/rollback source.
+
+Install the mechanism once from a trusted checkout on the VPS as root:
+
+```bash
+bash deploy/install-server.sh
+```
+
+The installer creates an unprivileged `clavastack-deploy` system user, makes a
+filtered bootstrap copy of the current website, validates Caddy before changing
+it, installs the hardened systemd service and timer, and verifies the live HTTPS
+endpoint. Normal releases do not run as root and do not use personal GitHub
+credentials. To request an immediate check instead of waiting for the timer:
+
+```bash
+systemctl start try-browser-auto-deploy.service
+```
+
+Rollback is an atomic symlink change to a retained release followed by the same
+HTTPS smoke check. Do not edit files below `releases/` in place.
 
 The normal browser page fetches only `/browser/current.json`, its versioned build manifest/assets, the Worker, local logos/mockup, and the bundled QR decoder. It must not call `/api/allocate`, `/api/heartbeat`, `/novnc/*`, or a VNC WebSocket. `?legacy=1` redirects to `/legacy/`, which still uses those services and its old restart API. [The previous VNC deployment instructions](legacy/SETUP-VNC.md) remain available for rollback.
 

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marco Simulator — ClavaStack</title>
+  <style>
+    :root {
+      --dark: #04070B;
+      --dark2: #1E2734;
+      --dark-accent: #0C1A27;
+      --light: #FCFCFC;
+      --light2: #D1D5DB;
+      --primary: #1F99E5;
+      --coral: #FF7A7A;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--dark);
+      color: var(--light);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--dark-accent);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--dark2);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left img { height: 24px; }
+    .header-left .sep { color: var(--light2); opacity: 0.3; font-size: 16px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .nav-link { color: var(--light2); text-decoration: none; font-size: 12px; }
+    .nav-link:hover { color: var(--primary); }
+
+    main {
+      padding: 20px 16px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .sim-card {
+      background: var(--dark2);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sim-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .sim-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .sim-subtitle {
+      font-size: 11px;
+      color: var(--light2);
+      margin-top: 2px;
+    }
+
+    .sim-phone {
+      position: relative;
+      width: 100%;
+      padding: 8px;
+    }
+    .sim-phone .phone-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+    .sim-phone .phone-mockup {
+      width: 100%;
+      display: block;
+      position: relative;
+      z-index: 2;
+      pointer-events: none;
+      user-select: none;
+    }
+    .sim-phone .screen-overlay {
+      position: absolute;
+      left: calc(12.5% + 2px);
+      top: calc(17.9% + 2px);
+      width: 76.0%;
+      height: 66.0%;
+      z-index: 1;
+      overflow: hidden;
+      background: #000;
+      border-radius: 3px;
+    }
+    .sim-phone .loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: var(--light2);
+      font-size: 11px;
+      gap: 8px;
+      z-index: 10;
+    }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 2px solid #333;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sim-actions {
+      padding: 8px 14px 12px;
+      display: flex;
+      gap: 8px;
+    }
+    .sim-actions button {
+      flex: 1;
+      padding: 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-secondary { background: var(--dark-accent); color: var(--light); border: 1px solid var(--light2); }
+    .btn-secondary:hover { background: var(--light2); color: var(--dark); }
+    .btn-danger { background: #c0392b; color: #fff; }
+    .btn-danger:hover { filter: brightness(1.1); }
+
+    /* Feedback Styles */
+    #feedback-section {
+      margin-top: 30px;
+      padding: 20px;
+      background: var(--dark2);
+      border-radius: 12px;
+    }
+    #feedback-section h2 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: var(--primary);
+    }
+    #feedback-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    #feedback-form label {
+      font-size: 12px;
+      color: var(--light2);
+    }
+    #feedback-name, #feedback-message {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--dark-accent);
+      background: var(--dark);
+      color: var(--light);
+      font-family: inherit;
+    }
+    #feedback-message {
+      min-height: 80px;
+      resize: vertical;
+    }
+    #feedback-submit {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #feedback-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #feedback-status {
+      font-size: 11px;
+      color: var(--light2);
+      min-height: 16px;
+    }
+    .feedback-item {
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 12px 0;
+    }
+    .feedback-item:last-child {
+      border-bottom: none;
+    }
+    .feedback-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--light2);
+      margin-bottom: 4px;
+    }
+    .feedback-message {
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--coral);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .delete-btn:hover {
+      background: rgba(255,122,122,0.1);
+    }
+    .page-tracker {
+      font-size: 10px;
+      color: var(--light2);
+      margin-top: 4px;
+    }
+
+    @media (max-width: 600px) {
+      main { padding: 10px 8px; }
+      .sim-phone .phone-mockup { max-width: 280px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <img src="/assets/specter-logo.svg" alt="Specter">
+      <span class="sep">/</span>
+      <span>Marco Simulator</span>
+    </div>
+    <div class="header-right">
+      <a href="/" class="nav-link">Home</a>
+      <a href="/simulator/" class="nav-link">Simulator</a>
+      <a href="/simulators/" class="nav-link">Alle Simulatoren</a>
+    </div>
+  </header>
+
+  <main>
+    <div id="sim-container" class="sim-card">
+      <div class="sim-header">
+        <div>
+          <div class="sim-title">Marco Button Navigation Simulator</div>
+          <div class="sim-subtitle">Built by Marco Kruse</div>
+        </div>
+        <div class="sim-status">
+          <div class="dot on"></div>
+          <span id="sim-status-text">Bereit</span>
+        </div>
+      </div>
+      <div class="sim-phone">
+        <div class="phone-wrap">
+          <img src="/assets/phone-mockup.png" alt="Phone" class="phone-mockup">
+          <div class="screen-overlay" id="sim-frame"></div>
+        </div>
+        <div class="loading" id="loading-1">
+          <div class="spinner"></div>
+          <span>Starte Simulator&hellip;</span>
+        </div>
+      </div>
+      <div class="sim-actions">
+        <button class="btn-primary" id="sim-restart-1" disabled>Neustart</button>
+        <button class="btn-secondary" id="sim-release-1" disabled>Verlassen</button>
+      </div>
+    </div>
+
+    <div id="page-tracker" class="page-tracker">
+      Aktuelle Seite: <span id="current-page">Unbekannt</span>
+    </div>
+
+    <div id="feedback-section">
+      <h2>Feedback</h2>
+      <form id="feedback-form">
+        <label for="feedback-name">Name (optional)</label>
+        <input type="text" id="feedback-name" maxlength="80" placeholder="Dein Name">
+        <label for="feedback-message">Nachricht</label>
+        <textarea id="feedback-message" maxlength="2000" placeholder="Was fällt dir auf? Was sollten wir verbessern?" required></textarea>
+        <button type="submit" id="feedback-submit">Feedback speichern</button>
+        <div id="feedback-status"></div>
+      </form>
+      <div id="feedback-list">
+        <div class="feedback-item"><div class="feedback-message">Lade Feedback&hellip;</div></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // === Simulator State ===
+    const CARDS = ['1'];
+    const state = {};
+
+    function poolFor(id) { return 'marcobn'; }
+
+    // === WebSocket Connection ===
+    function connectPool(id, wsPath) {
+      const rfbEl = document.getElementById('sim-frame');
+      const loadingEl = document.getElementById('loading-' + id);
+      
+      loadingEl.innerHTML = '<div class="spinner"></div><span>Verbinde&hellip;</span>';
+
+      const rfb = new NoVNC({
+        target: wsPath,
+        repl: rfbEl,
+        credentials: { token: state[id]?.sessionId },
+        onDisplayResize: () => {},
+        onStatus: (status) => {
+          if (status === 'connect') {
+            loadingEl.innerHTML = '';
+            document.getElementById('sim-restart-' + id).disabled = false;
+            document.getElementById('sim-release-' + id).disabled = false;
+            document.getElementById('sim-status-text').textContent = 'Verbunden';
+          } else if (status === 'disconnect') {
+            loadingEl.innerHTML = '<div class="spinner"></div><span>Verbindung verloren</span>';
+            document.getElementById('sim-restart-' + id).disabled = true;
+            document.getElementById('sim-release-' + id).disabled = true;
+            document.getElementById('sim-status-text').textContent = 'Verbindung verloren';
+          }
+        }
+      });
+      
+      state[id].rfb = rfb;
+    }
+
+    // === API Functions ===
+    async function allocateCard(id) {
+      const pool = poolFor(id);
+      const loadEl = document.getElementById('loading-' + id);
+      const stEl = document.getElementById('st-' + id);
+
+      loadEl.innerHTML = '<div class="spinner"></div><span>Finde Simulator&hellip;</span>';
+
+      try {
+        const res = await fetch('/api/allocate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({pool})
+        });
+        const data = await res.json();
+
+        if (data.status === 'full') {
+          loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px;text-align:center">Alle beschäftigt<br><small>Bitte gleich nochmal versuchen</small></p>';
+          stEl.textContent = 'Beschäftigt';
+          return;
+        }
+        if (data.status !== 'ok') {
+          loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px">' + (data.message || 'Fehler') + '</p>';
+          return;
+        }
+
+        state[id] = {
+          pool,
+          sessionId: data.sessionId,
+          restartPath: data.restartPath,
+          wsPath: data.wsPath,
+          reconnectAttempt: 0,
+          reconnectTimeout: null,
+          rfb: null
+        };
+        connectPool(id, data.wsPath);
+
+      } catch(e) {
+        loadEl.innerHTML = '<p style="color:#FF7A7A;font-size:10px">' + e.message + '</p>';
+      }
+    }
+
+    // === Feedback Functions ===
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatFeedbackDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function renderFeedback(items) {
+      const list = document.getElementById('feedback-list');
+      if (!items || items.length === 0) {
+        list.innerHTML = '<div class="feedback-item"><div class="feedback-message">Noch kein Feedback. Sei der Erste!</div></div>';
+        return;
+      }
+      list.innerHTML = items.map(item => `
+    <div class="feedback-item" data-id="${escapeHtml(item.id)}">
+      <div class="feedback-meta">
+        <strong>${escapeHtml(item.name || 'Anonymous')}</strong>
+        <span>${escapeHtml(formatFeedbackDate(item.created_at))}</span>
+        <button type="button" class="delete-btn" title="Kommentar löschen">✖</button>
+      </div>
+      <div class="feedback-message">${escapeHtml(item.message || '')}</div>
+    </div>
+  `).join('');
+      list.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteFeedback(btn.closest('.feedback-item').dataset.id, btn));
+      });
+    }
+
+    async function deleteFeedback(id, btn) {
+      if (!id || !confirm('Willst du diesen Kommentar wirklich löschen?')) return;
+      const originalText = btn.textContent;
+      btn.textContent = '…';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/feedback/remove', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({id: id})
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          const itemEl = btn.closest('.feedback-item');
+          if (itemEl) itemEl.style.opacity = '0.4';
+          setTimeout(() => {
+            if (itemEl) itemEl.remove();
+          }, 300);
+        } else {
+          btn.textContent = originalText;
+          btn.disabled = false;
+          alert('Löschen fehlgeschlagen: ' + (data.message || data.status));
+        }
+      } catch (e) {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        alert('Löschen fehlgeschlagen: ' + e.message);
+      }
+    }
+
+    async function loadFeedback() {
+      try {
+        const res = await fetch('/api/feedback');
+        const data = await res.json();
+        renderFeedback(data.items || []);
+      } catch (e) {
+        document.getElementById('feedback-list').innerHTML = '<div class="feedback-item"><div class="feedback-message">Feedback konnte gerade nicht geladen werden.</div></div>';
+      }
+    }
+
+    async function submitFeedback(event) {
+      event.preventDefault();
+      const nameEl = document.getElementById('feedback-name');
+      const messageEl = document.getElementById('feedback-message');
+      const submitBtn = document.getElementById('feedback-submit');
+      const statusEl = document.getElementById('feedback-status');
+      const payload = {
+        name: nameEl.value.trim(),
+        message: messageEl.value.trim()
+      };
+
+      if (!payload.message) {
+        statusEl.textContent = 'Bitte zuerst Feedback eingeben.';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      statusEl.textContent = 'Speichere Feedback…';
+
+      try {
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok || data.status !== 'ok') {
+          throw new Error(data.message || 'Speichern fehlgeschlagen');
+        }
+        messageEl.value = '';
+        statusEl.textContent = 'Danke, Feedback gespeichert.';
+        await loadFeedback();
+      } catch (e) {
+        statusEl.textContent = e.message || 'Feedback konnte nicht gespeichert werden.';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    document.getElementById('feedback-form').addEventListener('submit', submitFeedback);
+    loadFeedback();
+
+    // === Auto-Refresh ===
+    allocateCard('1');
+
+    setInterval(async () => {
+      for (const id of CARDS) {
+        if (state[id] && state[id].sessionId) {
+          try {
+            const r = await fetch('/api/heartbeat', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({sessionId: state[id].sessionId})
+            });
+            const data = await r.json();
+            if (data.status === 'not_found') {
+              state[id].sessionId = null;
+              if (state[id].rfb) { try { state[id].rfb.disconnect(); } catch(e) {} state[id].rfb = null; }
+              if (state[id].reconnectTimeout) { clearTimeout(state[id].reconnectTimeout); }
+              state[id].reconnectAttempt = 0;
+              allocateCard(id);
+            }
+          } catch(e) { /* network error, keep trying */ }
+        }
+      }
+    }, 60000); // every 60 seconds
+
+    window.addEventListener('beforeunload', () => {
+      for (const id of CARDS) {
+        if (state[id] && state[id].sessionId) {
+          navigator.sendBeacon('/api/release', JSON.stringify({sessionId: state[id].sessionId}));
+        }
+      }
+    });
+  </script>
+
+</body>
+</html>

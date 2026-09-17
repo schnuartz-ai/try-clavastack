@@ -55,10 +55,22 @@ The MicroPython build disables sockets, SSL, and threads for the wallet runtime.
 
 ## Deployment and rollback
 
-See [`SETUP.md`](SETUP.md) for deployment commands. Publish `index.html`, `browser/`, `assets/`, `legacy/`, and the generated `builds/.../<commit>/` directory to `/var/www/try-clavastack`, then validate/reload Caddy. Keep the current VNC reverse-proxy rules, allocator, heartbeat and restart endpoints until browser usage is proven stable; only `/legacy/` requests should use them. The previous VNC setup guide is archived at [`legacy/SETUP-VNC.md`](legacy/SETUP-VNC.md).
+See [`SETUP.md`](SETUP.md) for the complete deployment design. Every successful
+`main` build publishes a checksummed, commit-labelled production package on
+GitHub. The VPS pulls that package as an unprivileged deployment user, verifies
+it, and atomically changes a `current` symlink. Previous releases remain
+available for immediate rollback; no source files are copied manually into the
+live webroot. Keep the VNC reverse-proxy rules, allocator, heartbeat and restart
+endpoints until browser usage is proven stable; only `/legacy/` requests should
+use them. The previous VNC setup guide is archived at
+[`legacy/SETUP-VNC.md`](legacy/SETUP-VNC.md).
 
 Current browser support is aimed at current Chromium and Firefox versions with WebAssembly, Web Workers, and transferable OffscreenCanvas. The DIY build also has a Canvas pixel bridge for WebKit without OffscreenCanvas. The LVGL 9 Playground builds currently require transferable OffscreenCanvas; unsupported browsers show an immediate error with a legacy Playground link. Camera access additionally requires HTTPS and permission. CI exercises Chromium; local Playwright smoke tests cover Firefox and the WebKit DIY/fallback path. Physical mobile devices and macOS Safari still need validation before the VNC services are retired. USB transport, physical QR scanner settings, battery measurements, hardware RNG/security guarantees, and non-MemoryCard JavaCard applets are not emulated.
 
 ## Phase 2 TODO
 
-CI builds the latest Specter `master` source on pushes, pull requests, and the scheduled update run. The versioned build directory and manifest keep each resolved commit addressable, while `SPECTER_SOURCE_SHA` remains available for reproducible historical builds. Publishing the tested artifact to the VPS still requires the deployment step described in [`SETUP.md`](SETUP.md).
+CI builds the latest Specter `master` source on pushes, pull requests, and the
+scheduled update run. The versioned build directory and manifest keep each
+resolved commit addressable, while `SPECTER_SOURCE_SHA` remains available for
+reproducible historical builds. Successful `main` runs are published and pulled
+into production automatically.

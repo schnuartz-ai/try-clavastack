@@ -5,10 +5,12 @@ WebAssembly in the visitor's browser. Caddy serves static pages, versioned
 builds, and the required COOP/COEP/CORP headers. The pool below remains for
 `/legacy/` and `/simulators/legacy/` rollback. See [the browser setup guide](../SETUP.md).
 
-Deploy the contents of `builds/` before publishing the matching `browser/current.json`
-and `browser/variants/*.json` pointers. Run `python3 browser/verify-build.py`
-against the deployed tree, then reload the validated Caddyfile. Do not stop the
-pool services until browser mode has been proven stable and rollback is retired.
+The complete tested site is published as a checksummed GitHub release asset and
+pulled by `try-browser-auto-deploy.timer`. It is installed below
+`/var/www/try-clavastack-deploy/releases/` and activated with an atomic
+`current` symlink. See [`deploy/install-server.sh`](../deploy/install-server.sh) and the repository-level
+`SETUP.md`. Do not stop the pool services until browser mode has been proven
+stable and rollback is retired.
 
 Multi-user simulator pool with 3 simulator types, auto-scaling (min 2, max 5 per type).
 
@@ -19,7 +21,8 @@ Multi-user simulator pool with 3 simulator types, auto-scaling (min 2, max 5 per
 | `Caddyfile` | `/etc/caddy/Caddyfile` | Caddy Reverse Proxy (15 WS routes) |
 | `pool/server.py` | `/opt/try-clavastack/pool/server.py` | Multi-Pool Allocator API (Port 9001) |
 | `pool/restart-simulator.sh` | `/opt/try-clavastack/pool/restart-simulator.sh` | Start/Stop/Restart per Instanz |
-| `pool/auto-update.sh` | `/opt/try-clavastack/pool/auto-update.sh` | Auto-Pull von GitHub (alle 15 Min) |
+| `deploy/deploy-site-release.sh` | `/usr/local/libexec/try-clavastack/deploy-site-release.sh` | Pull and atomically activate tested GitHub releases |
+| `pool/auto-update.sh` | `/opt/try-clavastack/pool/auto-update.sh` | Legacy simulator source updater |
 
 ## Simulator Types
 
@@ -43,4 +46,5 @@ Multi-user simulator pool with 3 simulator types, auto-scaling (min 2, max 5 per
 - `try-play{1-5}.service` — Playground Instanzen
 - `try-schnuartz{1-5}.service` — Schnuartz Instanzen
 - `try-allocator.service` — Allocator API
-- `try-auto-update.timer` — GitHub Auto-Update (alle 15 Min)
+- `try-browser-auto-deploy.timer` — vollständiges GitHub-Release-Deployment (alle 2 Min)
+- `try-auto-update.timer` — alter Simulator-Quellcode-Updater; nach der Migration deaktiviert

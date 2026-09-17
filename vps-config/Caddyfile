@@ -114,7 +114,7 @@ try.clavastack.com {
 	}
 
 	handle {
-		root * /var/www/try-clavastack
+		root * /var/www/try-clavastack-deploy/current
 		file_server
 		encode zstd gzip
 	}

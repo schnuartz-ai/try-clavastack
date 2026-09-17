@@ -1,0 +1,32 @@
+# try.clavastack.com
+
+> Browser-based interactive simulators for the Specter DIY hardware wallet family, hosted by ClavaStack.
+
+## What is this site?
+
+try.clavastack.com runs tested Specter firmware builds locally in the visitor's
+browser using WebAssembly. No wallet data, seed material, QR contents, virtual
+SD-card contents, or webcam frames are uploaded by the browser simulator.
+
+Use test seed phrases only. A browser simulation does not provide the physical
+security properties of a hardware wallet.
+
+## Available simulators
+
+- Specter DIY: https://try.clavastack.com/
+- Multi-device gallery: https://try.clavastack.com/simulators/
+- Legacy server simulator: https://try.clavastack.com/legacy/
+
+## Source
+
+- Site and deployment: https://github.com/schnuartz-ai/try-clavastack
+- Specter DIY: https://github.com/cryptoadvance/specter-diy
+- Specter Playground: https://github.com/k9ert/specter-playground
+- ClavaStack Playground variant: https://github.com/schnuartz-ai/specter-playground-schnuartz
+
+## About ClavaStack
+
+ClavaStack sells pre-assembled Specter DIY hardware wallets.
+
+- Website: https://clavastack.com/
+- Firmware verification: https://verify.clavastack.com/

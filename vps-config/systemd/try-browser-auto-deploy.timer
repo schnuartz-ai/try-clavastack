@@ -1,9 +1,10 @@
 [Unit]
-Description=Check for tested Specter browser firmware every 15 minutes
+Description=Check GitHub for a tested try.clavastack.com release
 
 [Timer]
-OnBootSec=3min
-OnUnitActiveSec=15min
+OnBootSec=1min
+OnUnitActiveSec=2min
+RandomizedDelaySec=15s
 Persistent=true
 
 [Install]
