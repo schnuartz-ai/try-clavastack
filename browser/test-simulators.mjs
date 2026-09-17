@@ -52,6 +52,33 @@ for (const name of ['diy', 'play', 'schnuartz']) {
 if (await page.locator('.pin-hint').textContent() !== 'A PIN may already be selected: “21”.') {
   throw new Error('PIN hint text mismatch');
 }
+const switchControl = page.locator('[data-device="schnuartz"] .restart-switch');
+if (await switchControl.locator('button').count() !== 2 ||
+    await switchControl.locator('[data-schnuartz-mode="normal"]').getAttribute('aria-pressed') !== 'true' ||
+    await switchControl.locator('[data-schnuartz-mode="alternative"]').getAttribute('aria-pressed') !== 'false') {
+  throw new Error('Schnuartz restart switch is not initialized on the normal build');
+}
+await switchControl.locator('[data-schnuartz-mode="alternative"]').click();
+await page.locator('[data-device="schnuartz"] .device-status').getByText('Running locally', { exact: false })
+  .waitFor({ timeout: 75000 });
+const alternativePointer = await (await page.request.get(`${base}/browser/variants/specter-playground-schnuartz-alternative.json`)).json();
+const alternativeManifest = await (await page.request.get(`${base}${alternativePointer.build}build-info.json`)).json();
+const alternativeSource = page.locator('[data-device="schnuartz"] .source-link');
+if (await alternativeSource.textContent() !== `GitHub · ${alternativeManifest.commit.slice(0, 7)}` ||
+    await alternativeSource.getAttribute('href') !== `https://github.com/${alternativeManifest.repository}/commit/${alternativeManifest.commit}` ||
+    await switchControl.locator('[data-schnuartz-mode="alternative"]').getAttribute('aria-pressed') !== 'true') {
+  throw new Error('Schnuartz alternative build did not load through the switch');
+}
+await switchControl.locator('[data-schnuartz-mode="normal"]').click();
+await page.locator('[data-device="schnuartz"] .device-status').getByText('Running locally', { exact: false })
+  .waitFor({ timeout: 75000 });
+const normalPointer = await (await page.request.get(`${base}/browser/variants/specter-playground-schnuartz.json`)).json();
+const normalManifest = await (await page.request.get(`${base}${normalPointer.build}build-info.json`)).json();
+if (await switchControl.locator('[data-schnuartz-mode="normal"]').getAttribute('aria-pressed') !== 'true' ||
+    await page.locator('[data-device="schnuartz"] .source-link').getAttribute('href') !==
+      `https://github.com/${normalManifest.repository}/commit/${normalManifest.commit}`) {
+  throw new Error('Schnuartz switch did not return to the normal build');
+}
 await page.waitForTimeout(1200);
 for (const name of ['diy', 'play', 'schnuartz']) {
   const png = PNG.sync.read(await page.frameLocator(`[data-device="${name}"] iframe`).locator('#screen').screenshot());

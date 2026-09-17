@@ -5,6 +5,10 @@ const pointers = {
   play: '/browser/variants/specter-playground.json',
   schnuartz: '/browser/variants/specter-playground-schnuartz.json',
 };
+const schnuartzModes = {
+  normal: { pointer: pointers.schnuartz, query: '' },
+  alternative: { pointer: '/browser/variants/specter-playground-schnuartz-alternative.json', query: 'alternative' },
+};
 const feedbackRepositories = {
   diy: 'schnuartz-ai/specter-diy',
   play: 'k9ert/specter-playground',
@@ -24,6 +28,12 @@ let sdOwner = null;
 let requestId = 0;
 let armed = null;
 let busy = false;
+let schnuartzMode = 'normal';
+const metadataGeneration = new Map();
+
+function pointerPath(name) {
+  return name === 'schnuartz' ? schnuartzModes[schnuartzMode].pointer : pointers[name];
+}
 
 function message(name, data) {
   frames[name].contentWindow?.postMessage(data, location.origin);
@@ -185,68 +195,107 @@ for (const name of order) {
     const media = armed; disarm();
     perform(() => move(media.kind, media.slot, name));
   };
-  devices[name].querySelector('.restart-device').onclick = () => {
-    message(name, { type: 'runtime-restart' });
-    devices[name].querySelector('.device-status').textContent = 'Restarting locally…';
-    ready.delete(name);
-  };
-  (async () => {
-    try {
-      const pointer = await (await fetch(pointers[name], { cache: 'no-store' })).json();
-      const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
-      const allowedRepositories = name === 'diy' ?
-        ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] : [feedbackRepositories[name]];
-      if (!/^[a-f0-9]{40}$/.test(info.commit) ||
-          !allowedRepositories.map(repository => repository.toLowerCase())
-            .includes(info.repository?.toLowerCase()) ||
-          !pointer.build.includes(`/${info.commit}/`) ||
-          pointer.version !== info.artifact_set_sha256?.slice(0, 16)) {
-        throw new Error('Build manifest mismatch');
-      }
-      feedbackVersions[name] = pointer.version || info.commit?.slice(0, 7) || 'Unknown';
-      feedbackBuilds[name] = pointer.build;
-      const child = childVersions.get(name);
-      if (child && (child.version !== feedbackVersions[name] || child.build !== feedbackBuilds[name])) {
-        ready.delete(name);
-        devices[name].querySelector('.device-status').textContent = 'Build changed · reload this page';
-      }
-      if (name === 'diy') {
-        if (!/^\d+\.\d+\.\d+(?:-rc\d+)?$/.test(info.firmware_version)) {
-          throw new Error('Missing firmware version in build manifest');
+  if (name === 'schnuartz') {
+    for (const button of devices[name].querySelectorAll('[data-schnuartz-mode]')) {
+      button.onclick = () => {
+        const nextMode = button.dataset.schnuartzMode;
+        if (!schnuartzModes[nextMode] || nextMode === schnuartzMode) return;
+        schnuartzMode = nextMode;
+        for (const option of devices[name].querySelectorAll('[data-schnuartz-mode]')) {
+          option.setAttribute('aria-pressed', String(option.dataset.schnuartzMode === schnuartzMode));
         }
-        devices[name].querySelector('.subtitle').textContent =
-          `newest v${info.firmware_version} Firmware`;
-      }
-      const link = devices[name].querySelector('.source-link');
-      link.href = `https://github.com/${info.repository}/commit/${info.commit}`;
-      link.textContent = info.firmware_version
-        ? `GitHub · v${info.firmware_version}`
-        : `GitHub · ${info.commit.slice(0, 7)}`;
-      const technical = document.querySelector(`[data-tech-device="${name}"]`);
-      if (technical) {
-        const repository = technical.querySelector('[data-tech-repository]');
-        repository.href = `https://github.com/${info.repository}`;
-        repository.textContent = info.repository;
-        const commit = technical.querySelector('[data-tech-commit]');
-        commit.href = `https://github.com/${info.repository}/commit/${info.commit}`;
-        commit.textContent = info.commit.slice(0, 12);
-        technical.querySelector('[data-tech-context]').textContent = [
-          info.firmware_version && `Firmware: v${info.firmware_version}`,
-          `Artifact: ${pointer.version}`,
-        ].filter(Boolean).join(' · ');
-      }
-    } catch {
-      devices[name].querySelector('.source-link').textContent = 'GitHub · unavailable';
-      devices[name].querySelector('.device-status').textContent = 'Build information unavailable';
-      const technical = document.querySelector(`[data-tech-device="${name}"]`);
-      if (technical) {
-        technical.querySelector('[data-tech-repository]').textContent = 'Unavailable';
-        technical.querySelector('[data-tech-commit]').textContent = 'Unavailable';
-        technical.querySelector('[data-tech-context]').textContent = 'Build information unavailable.';
-      }
+        ready.delete(name);
+        childVersions.delete(name);
+        delete feedbackVersions[name];
+        delete feedbackBuilds[name];
+        devices[name].querySelector('.device-status').textContent = 'Restarting locally…';
+        const url = new URL(frames[name].src, location.href);
+        url.searchParams.delete('buildVariant');
+        if (schnuartzModes[schnuartzMode].query) {
+          url.searchParams.set('buildVariant', schnuartzModes[schnuartzMode].query);
+        }
+        frames[name].addEventListener('load', () => message(name, { type: 'gallery-parent-ready' }), { once: true });
+        frames[name].src = url.href;
+        loadBuildMetadata(name);
+      };
     }
-  })();
+  } else {
+    devices[name].querySelector('.restart-device').onclick = () => {
+      message(name, { type: 'runtime-restart' });
+      devices[name].querySelector('.device-status').textContent = 'Restarting locally…';
+      ready.delete(name);
+    };
+  }
 }
+
+async function loadBuildMetadata(name) {
+  const generation = (metadataGeneration.get(name) || 0) + 1;
+  metadataGeneration.set(name, generation);
+  const current = () => metadataGeneration.get(name) === generation;
+  try {
+    const pointer = await (await fetch(pointerPath(name), { cache: 'no-store' })).json();
+    const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
+    const allowedRepositories = name === 'diy' ?
+      ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
+      name === 'schnuartz' ?
+        (schnuartzMode === 'alternative'
+          ? ['schnuartz-ai/specter-playground-schnuartz']
+          : ['schnuartz/specter-playground']) : [feedbackRepositories[name]];
+    if (!/^[a-f0-9]{40}$/.test(info.commit) ||
+        !allowedRepositories.map(repository => repository.toLowerCase())
+          .includes(info.repository?.toLowerCase()) ||
+        !pointer.build.includes(`/${info.commit}/`) ||
+        pointer.version !== info.artifact_set_sha256?.slice(0, 16)) {
+      throw new Error('Build manifest mismatch');
+    }
+    if (!current()) return;
+    feedbackVersions[name] = pointer.version || info.commit?.slice(0, 7) || 'Unknown';
+    feedbackBuilds[name] = pointer.build;
+    const child = childVersions.get(name);
+    if (child && (child.version !== feedbackVersions[name] || child.build !== feedbackBuilds[name])) {
+      ready.delete(name);
+      devices[name].querySelector('.device-status').textContent = 'Build changed · reload this page';
+    }
+    if (name === 'diy') {
+      if (!/^\d+\.\d+\.\d+(?:-rc\d+)?$/.test(info.firmware_version)) {
+        throw new Error('Missing firmware version in build manifest');
+      }
+      devices[name].querySelector('.subtitle').textContent =
+        `newest v${info.firmware_version} Firmware`;
+    }
+    const link = devices[name].querySelector('.source-link');
+    if (name === 'schnuartz') feedbackRepositories[name] = info.repository;
+    link.href = `https://github.com/${info.repository}/commit/${info.commit}`;
+    link.textContent = info.firmware_version
+      ? `GitHub · v${info.firmware_version}`
+      : `GitHub · ${info.commit.slice(0, 7)}`;
+    const technical = document.querySelector(`[data-tech-device="${name}"]`);
+    if (technical) {
+      const repository = technical.querySelector('[data-tech-repository]');
+      repository.href = `https://github.com/${info.repository}`;
+      repository.textContent = info.repository;
+      const commit = technical.querySelector('[data-tech-commit]');
+      commit.href = `https://github.com/${info.repository}/commit/${info.commit}`;
+      commit.textContent = info.commit.slice(0, 12);
+      technical.querySelector('[data-tech-context]').textContent = [
+        info.firmware_version && `Firmware: v${info.firmware_version}`,
+        `Artifact: ${pointer.version}`,
+      ].filter(Boolean).join(' · ');
+    }
+  } catch {
+    if (!current()) return;
+    devices[name].querySelector('.source-link').textContent = 'GitHub · unavailable';
+    devices[name].querySelector('.device-status').textContent = 'Build information unavailable';
+    const technical = document.querySelector(`[data-tech-device="${name}"]`);
+    if (technical) {
+      technical.querySelector('[data-tech-repository]').textContent = 'Unavailable';
+      technical.querySelector('[data-tech-commit]').textContent = 'Unavailable';
+      technical.querySelector('[data-tech-context]').textContent = 'Build information unavailable.';
+    }
+  }
+}
+
+for (const name of order) loadBuildMetadata(name);
 
 const feedbackMessage = document.querySelector('#feedback-message');
 const feedbackDevice = document.querySelector('#feedback-device');

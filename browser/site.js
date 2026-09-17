@@ -3,6 +3,8 @@ const params = new URLSearchParams(location.search);
 const embedded = params.get('embedded') === '1' && window.parent !== window;
 const gallery = embedded && params.get('gallery') === '1';
 const variant = ['diy', 'play', 'schnuartz'].includes(params.get('variant')) ? params.get('variant') : 'diy';
+const buildVariant = variant === 'schnuartz' && params.get('buildVariant') === 'alternative'
+  ? 'schnuartz-alternative' : variant;
 const diagnosticQrProbe = params.get('probe') === 'qr' &&
   ['127.0.0.1', 'localhost', 'try.clavastack.com'].includes(location.hostname);
 if (embedded) document.documentElement.classList.add('embedded');
@@ -827,8 +829,9 @@ function updateBuildMetadata(manifest) {
 
 try {
   stateFiles = await awaitPeripherals();
-  const pointerPath = variant === 'diy' ? '/browser/current.json' :
-    variant === 'play' ? '/browser/variants/specter-playground.json' :
+  const pointerPath = buildVariant === 'diy' ? '/browser/current.json' :
+    buildVariant === 'play' ? '/browser/variants/specter-playground.json' :
+    buildVariant === 'schnuartz-alternative' ? '/browser/variants/specter-playground-schnuartz-alternative.json' :
     '/browser/variants/specter-playground-schnuartz.json';
   const pointer = await (await fetch(pointerPath, { cache: 'no-store' })).json();
   build = pointer.build;
@@ -839,8 +842,10 @@ try {
   if (!build.includes(manifest.commit) || manifest.artifact_set_sha256?.slice(0, 16) !== version) {
     throw new Error('Build manifest mismatch');
   }
-  const expectedRepos = variant === 'diy' ? ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
-    variant === 'play' ? ['k9ert/specter-playground'] : ['schnuartz/specter-playground'];
+  const expectedRepos = buildVariant === 'diy' ? ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
+    buildVariant === 'play' ? ['k9ert/specter-playground'] :
+    buildVariant === 'schnuartz-alternative' ? ['schnuartz-ai/specter-playground-schnuartz'] :
+    ['schnuartz/specter-playground'];
   if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
