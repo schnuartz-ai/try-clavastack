@@ -745,24 +745,33 @@ const drop = document.querySelector('#sd-drop');
 drop.ondragover = event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); };
 drop.ondrop = event => { event.preventDefault(); addFiles(event.dataTransfer.files); };
 function addFiles(files) {
+  const selectedFiles = Array.from(files || []);
+  if (!selectedFiles.length) return;
   perform(async () => {
     const sizes = new Map(filesFor('sd/').map(file => [file.path, file.bytes.byteLength]));
     let projected = [...sizes.values()].reduce((total, size) => total + size, 0);
-    for (const file of files) {
+    for (const file of selectedFiles) {
       const path = `sd/${file.name}`;
       projected = projected - (sizes.get(path) || 0) + file.size;
       sizes.set(path, file.size);
     }
     if (projected > SD_CAPACITY_BYTES) throw new Error('Virtual SD card is full: imported files would exceed its 8 GB capacity');
-    for (const file of files) {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      if (sdOwner) command(sdOwner, { type: 'sd-import', name: file.name, bytes });
-      else mediaFiles.set(`sd/${file.name}`, bytes);
-    }
+    const importedFiles = await Promise.all(selectedFiles.map(async file => ({
+      path: `sd/${file.name}`,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    })));
+    if (sdOwner) command(sdOwner, { type: 'state-import', files: importedFiles });
+    else for (const file of importedFiles) mediaFiles.set(file.path, file.bytes);
     if (sdOwner) saveMedia(await snapshot(sdOwner), 'sd/');
-    report(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
+    report(`${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} added to the virtual SD card.`);
   });
 }
+addEventListener('paste', event => {
+  const files = event.clipboardData?.files;
+  if (!files?.length) return;
+  event.preventDefault();
+  addFiles(files);
+});
 const demoButton = document.querySelector('#demo-load');
 const demoStatus = document.querySelector('#demo-status');
 demoButton.onclick = () => perform(async () => {

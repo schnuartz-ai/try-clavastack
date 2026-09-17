@@ -133,15 +133,28 @@ async function childFiles(name) {
   }), name);
 }
 
-await page.locator('#sd-picker').setInputFiles({ name: 'transfer.bin', mimeType: 'application/octet-stream',
-  buffer: Buffer.from([0, 1, 2, 255]) });
+await page.locator('#sd-picker').setInputFiles([
+  { name: 'transfer.bin', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 1, 2, 255]) },
+  { name: 'companion.txt', mimeType: 'text/plain', buffer: Buffer.from('batch import') },
+]);
 await page.locator('#sd-files').getByText('transfer.bin', { exact: false }).waitFor();
+await page.locator('#sd-files').getByText('companion.txt', { exact: false }).waitFor();
+await page.evaluate(() => {
+  const clipboard = new DataTransfer();
+  clipboard.items.add(new File(['gallery paste one'], 'paste-one.txt', { type: 'text/plain' }));
+  clipboard.items.add(new File(['gallery paste two'], 'paste-two.txt', { type: 'text/plain' }));
+  dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true }));
+});
+await page.locator('#sd-files').getByText('paste-one.txt', { exact: false }).waitFor();
+await page.locator('#sd-files').getByText('paste-two.txt', { exact: false }).waitFor();
 if (await page.locator('#sd-capacity').count()) throw new Error('Removed shared SD capacity text is visible');
 await drag(page.locator('#sd-token'), 'diy');
 await page.locator('#sd-location').getByText('Inserted in device 1').waitFor();
 const first = await childFiles('diy');
 if (!first.some(file => file.path === 'sd/transfer.bin' &&
     Buffer.from(file.bytes).equals(Buffer.from([0, 1, 2, 255])))) throw new Error('SD bytes not in device 1');
+if (!first.some(file => file.path === 'sd/companion.txt' &&
+    Buffer.from(file.bytes).equals(Buffer.from('batch import')))) throw new Error('Second batch file not in device 1');
 
 await drag(page.locator('[data-slot="1"]'), 'diy');
 await page.locator('[data-slot="1"] small').getByText('Inserted in device 1').waitFor();
@@ -211,7 +224,7 @@ if (errors.length) throw new Error(errors.join('; '));
 const legacy = await (await page.request.get(`${base}/simulators/legacy/`)).text();
 if (!legacy.includes("import RFB from '/novnc/core/rfb.js'")) throw new Error('Legacy fallback missing');
 console.log(JSON.stringify({ result: 'pass', simultaneousWorkers: 3,
-  sd: 'one binary card moved through three devices', smartcard: 'same private key moved through three devices',
+  sd: 'multi-select/paste card moved through three devices', smartcard: 'same private key moved through three devices',
   restart: 'local', tap: 'card to device', reset: 'right-click changed key',
   feedback: 'draft link with selected firmware source', pointer: 'gallery display to LVGL',
   legacy: 'available' }));

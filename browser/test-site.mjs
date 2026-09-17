@@ -46,15 +46,27 @@ if (await page.locator('#sd-hint').textContent() !== 'Click to remove' ||
     await page.locator('#sd-toggle').getAttribute('aria-pressed') !== 'true') {
   throw new Error('SD card image did not switch to the inserted state');
 }
-await page.locator('#sd-picker').setInputFiles({
-  name: 'probe.bin', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 1, 2, 255]),
-});
+await page.locator('#sd-picker').setInputFiles([
+  { name: 'probe.bin', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 1, 2, 255]) },
+  { name: 'second.txt', mimeType: 'text/plain', buffer: Buffer.from('second file') },
+]);
 await page.locator('#sd-files').getByText('probe.bin', { exact: false }).waitFor();
-if (!(await page.locator('#sd-files button').first().getAttribute('title')).includes('(4 B)')) {
+await page.locator('#sd-files').getByText('second.txt', { exact: false }).waitFor();
+await page.evaluate(() => {
+  const clipboard = new DataTransfer();
+  clipboard.items.add(new File(['pasted one'], 'pasted-one.txt', { type: 'text/plain' }));
+  clipboard.items.add(new File(['pasted two'], 'pasted-two.txt', { type: 'text/plain' }));
+  dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true }));
+});
+await page.locator('#sd-files').getByText('pasted-one.txt', { exact: false }).waitFor();
+await page.locator('#sd-files').getByText('pasted-two.txt', { exact: false }).waitFor();
+const probeDownload = page.locator('#sd-files li').filter({ hasText: 'probe.bin' })
+  .getByRole('button', { name: 'Download', exact: true });
+if (!(await probeDownload.getAttribute('title')).includes('(4 B)')) {
   throw new Error('Download tooltip does not expose the file size');
 }
 const downloadPromise = page.waitForEvent('download');
-await page.locator('#sd-files button').first().click();
+await probeDownload.click();
 const download = await downloadPromise;
 if (!(await readFile(await download.path())).equals(Buffer.from([0, 1, 2, 255]))) {
   throw new Error('Virtual SD export bytes differ from imported bytes');
@@ -91,6 +103,8 @@ const probe = await page.evaluate(async () => {
     const worker = new Worker('/browser/runtime-worker.js');
     const canvas = new OffscreenCanvas(480, 800);
     const logs = [];
+    let written;
+    let checkingAtomicImport = false;
     const timer = setTimeout(() => { worker.terminate(); reject(new Error(logs.join('\n'))); }, 10000);
     worker.onmessage = ({ data }) => {
       if (data.type === 'log') logs.push(data.message);
@@ -98,10 +112,23 @@ const probe = await page.evaluate(async () => {
       if (data.type === 'log' && data.message === 'SD_PROBE_WRITTEN') {
         worker.postMessage({ type: 'snapshot', requestId: 1 });
       }
-      if (data.type === 'snapshot') {
+      if (data.type === 'snapshot' && data.requestId === 1) {
         const file = data.files.find(file => file.path === 'sd/written-by-specter.txt');
+        written = file ? new TextDecoder().decode(file.bytes) : null;
+        checkingAtomicImport = true;
+        worker.postMessage({ type: 'state-import', files: [
+          { path: 'sd/must-not-be-partial.bin', bytes: new Uint8Array([1]) },
+          { path: 'invalid/outside.bin', bytes: new Uint8Array([2]) },
+        ] });
+      }
+      if (data.type === 'operation-error' && checkingAtomicImport) {
+        checkingAtomicImport = false;
+        worker.postMessage({ type: 'snapshot', requestId: 2 });
+      }
+      if (data.type === 'snapshot' && data.requestId === 2) {
+        const partial = data.files.some(file => file.path === 'sd/must-not-be-partial.bin');
         clearTimeout(timer); worker.terminate();
-        resolve({ logs, written: file ? new TextDecoder().decode(file.bytes) : null });
+        resolve({ logs, written, partial });
       }
     };
     worker.onerror = error => { clearTimeout(timer); worker.terminate(); reject(new Error(error.message)); };
@@ -111,7 +138,7 @@ const probe = await page.evaluate(async () => {
 });
 if (!probe.logs.includes('SD_PROBE_PRESENT True') ||
     !probe.logs.some(line => line.includes("b'\\x00\\x01\\x02\\xff'")) ||
-    probe.written !== 'firmware-created file') {
+    probe.written !== 'firmware-created file' || probe.partial) {
   throw new Error(`Specter SD platform read/write failed: ${probe.logs.join('; ')}`);
 }
 
@@ -153,7 +180,7 @@ await canvasBridgeMobile.close();
 
 console.log(JSON.stringify({ result: 'pass', canvasColors: colors.size,
   crossOriginIsolated: isolated,
-  pointer: 'changed Specter screen', sd: 'import/export/restart/Specter platform read+write',
+  pointer: 'changed Specter screen', sd: 'multi-select/paste/export/restart/Specter platform read+write',
   mobileTouch: 'changed Specter screen', workerCrash: 'handled',
   legacyRequestsInBrowserMode: 0 }, null, 2));
 await browser.close();
