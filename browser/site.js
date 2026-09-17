@@ -389,7 +389,7 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     log('running');
     send({ type: 'sd-list' });
     send({ type: 'card-list' });
-    notifyParent({ type: 'simulator-running', variant });
+    notifyParent({ type: 'simulator-running', variant, build, version });
   } else if (data.type === 'log') {
     if (/^(SPECTER_|MOCKUI_)/.test(data.message)) startupPhase = data.message;
     if (data.message === 'SPECTER_IMPORTS_DONE' || data.message === 'SPECTER_MAIN_IMPORTED') {

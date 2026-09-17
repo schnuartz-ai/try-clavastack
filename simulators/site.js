@@ -11,9 +11,11 @@ const feedbackRepositories = {
   schnuartz: 'Schnuartz/specter-playground',
 };
 const feedbackVersions = {};
+const feedbackBuilds = {};
 const devices = Object.fromEntries(order.map(name => [name, document.querySelector(`[data-device="${name}"]`)]));
 const frames = Object.fromEntries(order.map(name => [name, devices[name].querySelector('iframe')]));
 const ready = new Set();
+const childVersions = new Map();
 const pending = new Map();
 const mediaFiles = new Map();
 const SD_CAPACITY_BYTES = 8_000_000_000;
@@ -156,6 +158,13 @@ addEventListener('message', event => {
   if (data.type === 'child-awaiting-peripherals' && data.variant === name) {
     message(name, { type: 'peripherals-provide', files: [] });
   } else if (data.type === 'simulator-running' && data.variant === name) {
+    childVersions.set(name, { build: data.build, version: data.version });
+    if (feedbackVersions[name] &&
+        (data.version !== feedbackVersions[name] || data.build !== feedbackBuilds[name])) {
+      ready.delete(name);
+      devices[name].querySelector('.device-status').textContent = 'Build changed · reload this page';
+      return;
+    }
     ready.add(name);
     devices[name].querySelector('.device-status').textContent = 'Running locally · drag cards here';
   } else if (data.type === 'simulator-error') {
@@ -195,6 +204,12 @@ for (const name of order) {
         throw new Error('Build manifest mismatch');
       }
       feedbackVersions[name] = pointer.version || info.commit?.slice(0, 7) || 'Unknown';
+      feedbackBuilds[name] = pointer.build;
+      const child = childVersions.get(name);
+      if (child && (child.version !== feedbackVersions[name] || child.build !== feedbackBuilds[name])) {
+        ready.delete(name);
+        devices[name].querySelector('.device-status').textContent = 'Build changed · reload this page';
+      }
       if (name === 'diy') {
         if (!/^\d+\.\d+\.\d+(?:-rc\d+)?$/.test(info.firmware_version)) {
           throw new Error('Missing firmware version in build manifest');
