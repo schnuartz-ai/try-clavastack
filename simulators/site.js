@@ -5,10 +5,15 @@ const pointers = {
   play: '/browser/variants/specter-playground.json',
   schnuartz: '/browser/variants/specter-playground-schnuartz.json',
 };
-const schnuartzModes = {
-  normal: { pointer: pointers.schnuartz, query: '' },
-  alternative: { pointer: '/browser/variants/specter-playground-schnuartz-alternative.json', query: 'alternative' },
+const playModes = {
+  normal: { pointer: pointers.play, query: '', repository: 'k9ert/specter-playground' },
+  fast: { pointer: '/browser/variants/specter-playground-fast.json', query: 'fast', repository: 'schnuartz-ai/specter-playground' },
 };
+const schnuartzModes = {
+  normal: { pointer: pointers.schnuartz, query: '', repository: 'Schnuartz/specter-playground' },
+  alternative: { pointer: '/browser/variants/specter-playground-schnuartz-alternative.json', query: 'alternative', repository: 'schnuartz-ai/specter-playground-schnuartz' },
+};
+const playgroundModes = { play: playModes, schnuartz: schnuartzModes };
 const feedbackRepositories = {
   diy: 'schnuartz-ai/specter-diy',
   play: 'k9ert/specter-playground',
@@ -28,11 +33,11 @@ let sdOwner = null;
 let requestId = 0;
 let armed = null;
 let busy = false;
-let schnuartzMode = 'normal';
+const playgroundMode = { play: 'normal', schnuartz: 'normal' };
 const metadataGeneration = new Map();
 
 function pointerPath(name) {
-  return name === 'schnuartz' ? schnuartzModes[schnuartzMode].pointer : pointers[name];
+  return playgroundModes[name] ? playgroundModes[name][playgroundMode[name]].pointer : pointers[name];
 }
 
 function message(name, data) {
@@ -195,14 +200,21 @@ for (const name of order) {
     const media = armed; disarm();
     perform(() => move(media.kind, media.slot, name));
   };
-  if (name === 'schnuartz') {
-    for (const button of devices[name].querySelectorAll('[data-schnuartz-mode]')) {
+  const restart = devices[name].querySelector('.restart-device');
+  if (restart) restart.onclick = () => {
+    message(name, { type: 'runtime-restart' });
+    devices[name].querySelector('.device-status').textContent = 'Restarting locally…';
+    ready.delete(name);
+  };
+  if (playgroundModes[name]) {
+    const modeAttribute = `${name}Mode`;
+    for (const button of devices[name].querySelectorAll(`[data-${name}-mode]`)) {
       button.onclick = () => {
-        const nextMode = button.dataset.schnuartzMode;
-        if (!schnuartzModes[nextMode] || nextMode === schnuartzMode) return;
-        schnuartzMode = nextMode;
-        for (const option of devices[name].querySelectorAll('[data-schnuartz-mode]')) {
-          option.setAttribute('aria-pressed', String(option.dataset.schnuartzMode === schnuartzMode));
+        const nextMode = button.dataset[modeAttribute];
+        if (!playgroundModes[name][nextMode] || nextMode === playgroundMode[name]) return;
+        playgroundMode[name] = nextMode;
+        for (const option of devices[name].querySelectorAll(`[data-${name}-mode]`)) {
+          option.setAttribute('aria-pressed', String(option.dataset[modeAttribute] === playgroundMode[name]));
         }
         ready.delete(name);
         childVersions.delete(name);
@@ -211,20 +223,14 @@ for (const name of order) {
         devices[name].querySelector('.device-status').textContent = 'Restarting locally…';
         const url = new URL(frames[name].src, location.href);
         url.searchParams.delete('buildVariant');
-        if (schnuartzModes[schnuartzMode].query) {
-          url.searchParams.set('buildVariant', schnuartzModes[schnuartzMode].query);
+        if (playgroundModes[name][playgroundMode[name]].query) {
+          url.searchParams.set('buildVariant', playgroundModes[name][playgroundMode[name]].query);
         }
         frames[name].addEventListener('load', () => message(name, { type: 'gallery-parent-ready' }), { once: true });
         frames[name].src = url.href;
         loadBuildMetadata(name);
       };
     }
-  } else {
-    devices[name].querySelector('.restart-device').onclick = () => {
-      message(name, { type: 'runtime-restart' });
-      devices[name].querySelector('.device-status').textContent = 'Restarting locally…';
-      ready.delete(name);
-    };
   }
 }
 
@@ -237,10 +243,9 @@ async function loadBuildMetadata(name) {
     const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
     const allowedRepositories = name === 'diy' ?
       ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
-      name === 'schnuartz' ?
-        (schnuartzMode === 'alternative'
-          ? ['schnuartz-ai/specter-playground-schnuartz']
-          : ['schnuartz/specter-playground']) : [feedbackRepositories[name]];
+      playgroundModes[name]
+        ? [playgroundModes[name][playgroundMode[name]].repository]
+        : [feedbackRepositories[name]];
     if (!/^[a-f0-9]{40}$/.test(info.commit) ||
         !allowedRepositories.map(repository => repository.toLowerCase())
           .includes(info.repository?.toLowerCase()) ||
@@ -264,16 +269,16 @@ async function loadBuildMetadata(name) {
         `newest v${info.firmware_version} Firmware`;
     }
     const link = devices[name].querySelector('.source-link');
-    if (name === 'schnuartz') feedbackRepositories[name] = info.repository;
+    if (playgroundModes[name]) feedbackRepositories[name] = info.repository;
     const repositoryUrl = `https://github.com/${info.repository}`;
     const commitUrl = `${repositoryUrl}/commit/${info.commit}`;
     // The current local Schnuartz build can be ahead of the public repository.
     // Keep its link useful until that source commit is published on GitHub.
-    const sourceUrl = name === 'schnuartz' && schnuartzMode === 'normal' ? repositoryUrl : commitUrl;
+    const sourceUrl = name === 'schnuartz' && playgroundMode[name] === 'normal' ? repositoryUrl : commitUrl;
     link.href = sourceUrl;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = name === 'schnuartz' && schnuartzMode === 'normal'
+    link.textContent = name === 'schnuartz' && playgroundMode[name] === 'normal'
       ? `GitHub · ${info.repository}`
       : info.firmware_version
       ? `GitHub · v${info.firmware_version}`

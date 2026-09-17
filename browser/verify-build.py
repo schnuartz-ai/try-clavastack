@@ -9,6 +9,7 @@ root = Path(__file__).resolve().parent.parent
 for pointer_file, repository in (
     ('current.json', 'cryptoadvance/specter-diy'),
     ('variants/specter-playground.json', 'k9ert/specter-playground'),
+    ('variants/specter-playground-fast.json', 'schnuartz-ai/specter-playground'),
     ('variants/specter-playground-schnuartz.json', 'Schnuartz/specter-playground'),
     ('variants/specter-playground-schnuartz-alternative.json', 'schnuartz-ai/specter-playground-schnuartz'),
 ):

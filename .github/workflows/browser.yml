@@ -30,6 +30,7 @@ jobs:
       - name: Build Playground firmware variants
         run: |
           bash browser/build-playground.sh k9ert
+          bash browser/build-playground.sh play-fast
           bash browser/build-playground.sh schnuartz
           bash browser/build-playground.sh schnuartz-alternative
       - name: Verify versioned static artifacts

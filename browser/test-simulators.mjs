@@ -58,6 +58,33 @@ if (await page.locator('.pin-hint').textContent() !== 'A PIN may already be sele
   throw new Error('PIN hint text mismatch');
 }
 const switchControl = page.locator('[data-device="schnuartz"] .restart-switch');
+const marcoSwitch = page.locator('[data-device="play"] .restart-switch');
+if (await marcoSwitch.locator('button').count() !== 2 ||
+    await marcoSwitch.locator('[data-play-mode="normal"]').getAttribute('aria-pressed') !== 'true' ||
+    await marcoSwitch.locator('[data-play-mode="fast"]').getAttribute('aria-pressed') !== 'false') {
+  throw new Error('Marco restart switch is not initialized on the normal build');
+}
+await marcoSwitch.locator('[data-play-mode="fast"]').click();
+await page.locator('[data-device="play"] .device-status').getByText('Running locally', { exact: false })
+  .waitFor({ timeout: 75000 });
+const fastPointer = await (await page.request.get(`${base}/browser/variants/specter-playground-fast.json`)).json();
+const fastManifest = await (await page.request.get(`${base}${fastPointer.build}build-info.json`)).json();
+const fastSource = page.locator('[data-device="play"] .source-link');
+if (await fastSource.textContent() !== `GitHub · ${fastManifest.commit.slice(0, 7)}` ||
+    await fastSource.getAttribute('href') !== `https://github.com/${fastManifest.repository}/commit/${fastManifest.commit}` ||
+    await marcoSwitch.locator('[data-play-mode="fast"]').getAttribute('aria-pressed') !== 'true') {
+  throw new Error('Marco fast build did not load through the switch');
+}
+await marcoSwitch.locator('[data-play-mode="normal"]').click();
+await page.locator('[data-device="play"] .device-status').getByText('Running locally', { exact: false })
+  .waitFor({ timeout: 75000 });
+const marcoNormalPointer = await (await page.request.get(`${base}/browser/variants/specter-playground.json`)).json();
+const marcoNormalManifest = await (await page.request.get(`${base}${marcoNormalPointer.build}build-info.json`)).json();
+if (await marcoSwitch.locator('[data-play-mode="normal"]').getAttribute('aria-pressed') !== 'true' ||
+    await page.locator('[data-device="play"] .source-link').getAttribute('href') !==
+      `https://github.com/${marcoNormalManifest.repository}/commit/${marcoNormalManifest.commit}`) {
+  throw new Error('Marco switch did not return to the normal build');
+}
 if (await switchControl.locator('button').count() !== 2 ||
     await switchControl.locator('[data-schnuartz-mode="normal"]').getAttribute('aria-pressed') !== 'true' ||
     await switchControl.locator('[data-schnuartz-mode="alternative"]').getAttribute('aria-pressed') !== 'false') {

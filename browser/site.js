@@ -4,7 +4,8 @@ const embedded = params.get('embedded') === '1' && window.parent !== window;
 const gallery = embedded && params.get('gallery') === '1';
 const variant = ['diy', 'play', 'schnuartz'].includes(params.get('variant')) ? params.get('variant') : 'diy';
 const buildVariant = variant === 'schnuartz' && params.get('buildVariant') === 'alternative'
-  ? 'schnuartz-alternative' : variant;
+  ? 'schnuartz-alternative' : variant === 'play' && params.get('buildVariant') === 'fast'
+  ? 'play-fast' : variant;
 const diagnosticQrProbe = params.get('probe') === 'qr' &&
   ['127.0.0.1', 'localhost', 'try.clavastack.com'].includes(location.hostname);
 if (embedded) document.documentElement.classList.add('embedded');
@@ -841,6 +842,7 @@ try {
   stateFiles = await awaitPeripherals();
   const pointerPath = buildVariant === 'diy' ? '/browser/current.json' :
     buildVariant === 'play' ? '/browser/variants/specter-playground.json' :
+    buildVariant === 'play-fast' ? '/browser/variants/specter-playground-fast.json' :
     buildVariant === 'schnuartz-alternative' ? '/browser/variants/specter-playground-schnuartz-alternative.json' :
     '/browser/variants/specter-playground-schnuartz.json';
   const pointer = await (await fetch(pointerPath, { cache: 'no-store' })).json();
@@ -854,6 +856,7 @@ try {
   }
   const expectedRepos = buildVariant === 'diy' ? ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
     buildVariant === 'play' ? ['k9ert/specter-playground'] :
+    buildVariant === 'play-fast' ? ['schnuartz-ai/specter-playground'] :
     buildVariant === 'schnuartz-alternative' ? ['schnuartz-ai/specter-playground-schnuartz'] :
     ['schnuartz/specter-playground'];
   if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');

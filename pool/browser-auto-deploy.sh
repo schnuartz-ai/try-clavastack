@@ -31,6 +31,7 @@ root = pathlib.Path(sys.argv[1]).resolve()
 pointers = {
     "browser/current.json": {"cryptoadvance/specter-diy"},
     "browser/variants/specter-playground.json": {"k9ert/specter-playground"},
+    "browser/variants/specter-playground-fast.json": {"schnuartz-ai/specter-playground"},
     "browser/variants/specter-playground-schnuartz.json": {"schnuartz/specter-playground"},
     "browser/variants/specter-playground-schnuartz-alternative.json": {
         "schnuartz-ai/specter-playground-schnuartz"
@@ -67,6 +68,7 @@ while IFS= read -r -d '' source; do
 done < <(find "$WORK_DIR/builds" -type f -print0)
 for pointer in browser/current.json \
     browser/variants/specter-playground.json \
+    browser/variants/specter-playground-fast.json \
     browser/variants/specter-playground-schnuartz.json \
     browser/variants/specter-playground-schnuartz-alternative.json; do
   install -D -m 0644 "$WORK_DIR/$pointer" "$WEBROOT/$pointer"

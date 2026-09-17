@@ -10,6 +10,11 @@ case "${1:-}" in
     SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
     SOURCE_SHA=${SOURCE_SHA_OVERRIDE:-}
     POINTER_NAME=variants/specter-playground.json ;;
+  play-fast)
+    REPOSITORY=schnuartz-ai/specter-playground
+    SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
+    SOURCE_SHA=${SOURCE_SHA_OVERRIDE:-}
+    POINTER_NAME=variants/specter-playground-fast.json ;;
   schnuartz)
     REPOSITORY=Schnuartz/specter-playground
     SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
@@ -20,7 +25,7 @@ case "${1:-}" in
     SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
     SOURCE_SHA=${SOURCE_SHA_OVERRIDE:-}
     POINTER_NAME=variants/specter-playground-schnuartz-alternative.json ;;
-  *) echo "Usage: $0 k9ert|schnuartz|schnuartz-alternative" >&2; exit 2 ;;
+  *) echo "Usage: $0 k9ert|play-fast|schnuartz|schnuartz-alternative" >&2; exit 2 ;;
 esac
 # Both forks use the repository name `specter-playground`; include the owner
 # so a clean build cannot accidentally reuse the other fork's checkout.
@@ -91,7 +96,7 @@ if grep -q 'lv_sdl_mouse_handler(&event);' "$FORK_SRC/f469-disco/usermods/udispl
 fi
 apply_if_needed "$FORK_SRC/f469-disco" "$ROOT/browser/v9-patches/usermods.patch"
 apply_if_needed "$FORK_SRC/f469-disco/usermods/secp256k1" "$ROOT/browser/v9-patches/secp256k1.patch"
-if [[ "$1" = schnuartz || "$1" = schnuartz-alternative ]]; then
+if [[ "$1" = schnuartz || "$1" = schnuartz-alternative || "$1" = play-fast ]]; then
   python3 "$ROOT/browser/patch-playground-qstr.py" "$FORK_SRC/f469-disco/micropython"
 fi
 python3 "$ROOT/browser/limit-lvgl.py" \

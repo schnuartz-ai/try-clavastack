@@ -1,6 +1,6 @@
 # Try Specter DIY in your browser
 
-[try.clavastack.com](https://try.clavastack.com) runs the **real Specter DIY Python application and LVGL UI** in a WebAssembly MicroPython Unix simulator. [All Simulators](https://try.clavastack.com/simulators/) runs that wallet beside the **distinct original LVGL 9 MockUI scenarios** from k9ert's and Schnuartz's Playground repositories. These two Playgrounds are source-code UI prototypes with demo wallet state, just as on the former VNC page; they are not copies of the DIY wallet. The normal pages serve static files and do not allocate remote Specter processes or open VNC. The former simulators remain at `/legacy/` and `/simulators/legacy/` during validation.
+[try.clavastack.com](https://try.clavastack.com) runs the **real Specter DIY Python application and LVGL UI** in a WebAssembly MicroPython Unix simulator. [All Simulators](https://try.clavastack.com/simulators/) runs that wallet beside the **distinct original LVGL 9 MockUI scenarios** from k9ert's and Schnuartz's Playground repositories, with the fast Marco fork available from the Playground switch. These Playgrounds are source-code UI prototypes with demo wallet state, just as on the former VNC page; they are not copies of the DIY wallet. The normal pages serve static files and do not allocate remote Specter processes or open VNC. The former simulators remain at `/legacy/` and `/simulators/legacy/` during validation.
 
 **NEVER ENTER A REAL SEED PHRASE.** This is an internet-connected browser simulator, not a hardware wallet or an air-gapped device. Use test seeds only.
 
@@ -27,6 +27,7 @@ git clone https://github.com/emscripten-core/emsdk.git .browser-work/emsdk
 .browser-work/emsdk/emsdk activate 3.1.74
 bash browser/build-browser.sh
 bash browser/build-playground.sh k9ert
+bash browser/build-playground.sh play-fast
 bash browser/build-playground.sh schnuartz
 python3 browser/verify-build.py
 npm ci
