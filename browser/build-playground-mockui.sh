@@ -5,6 +5,11 @@ set -euo pipefail
 # services. The old src/main.py wallet is deliberately not frozen here.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:-}" in
+  generic)
+    REPOSITORY="${AB_REPOSITORY:?AB_REPOSITORY is required for generic Playground builds}"
+    SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}
+    SOURCE_SHA=${SOURCE_SHA_OVERRIDE:-}
+    POINTER_NAME="" ;;
   k9ert)
     REPOSITORY=k9ert/specter-playground
     SOURCE_BRANCH=${SOURCE_BRANCH_OVERRIDE:-main}

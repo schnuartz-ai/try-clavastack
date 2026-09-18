@@ -27,6 +27,7 @@ fi
 
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0755 \
   "$DEPLOY_ROOT" "$DEPLOY_ROOT/releases"
+install -d -o root -g root -m 0755 /var/lib/try-clavastack/ab-builds
 install -d -o root -g root -m 0755 "$LIBEXEC_DIR"
 install -o root -g root -m 0755 \
   "$ROOT/deploy/deploy-site-release.sh" \

@@ -93,6 +93,7 @@ PY
 
 for required in \
   index.html \
+  ab/index.html \
   browser/site.js \
   browser/runtime-worker.js \
   browser/current.json \
@@ -101,6 +102,17 @@ for required in \
   browser/variants/specter-playground-schnuartz-alternative.json; do
   test -f "$STAGING_DIR/$required"
 done
+
+test -f "$STAGING_DIR/ab-runtime/server.py"
+test -f "$STAGING_DIR/ab-runtime/ab_builds.py"
+test -f "$STAGING_DIR/ab-runtime/browser/build-ab.sh"
+install -d -o root -g root -m 0755 /opt/try-clavastack/pool
+install -d -o root -g root -m 0755 /opt/try-clavastack/browser
+install -o root -g root -m 0755 "$STAGING_DIR/ab-runtime/server.py" /opt/try-clavastack/pool/server.py
+install -o root -g root -m 0644 "$STAGING_DIR/ab-runtime/ab_builds.py" /opt/try-clavastack/pool/ab_builds.py
+cp -a "$STAGING_DIR/ab-runtime/browser/." /opt/try-clavastack/browser/
+rm -rf -- "$STAGING_DIR/ab-runtime"
+systemctl restart try-allocator.service
 
 if [[ -e "$FINAL_DIR" ]]; then
   rm -rf -- "$STAGING_DIR"

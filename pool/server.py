@@ -18,6 +18,11 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from datetime import datetime, timedelta
 
+try:
+    from ab_builds import get_job, pointer_for_job, submit as submit_ab_build
+except ImportError:  # keep the legacy allocator usable in older checkouts
+    get_job = pointer_for_job = submit_ab_build = None
+
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%SZ",
@@ -722,6 +727,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send_json(release_session(sid))
 
+        elif path == '/api/ab/build':
+            if submit_ab_build is None:
+                self.send_json({'error': 'A/B build service is not installed'}, 503)
+                return
+            try:
+                self.send_json(submit_ab_build(data.get('url', '')), 202)
+            except ValueError as error:
+                self.send_json({'error': str(error)}, 400)
+
         else:
             m = re.match(r'^/(diy|play|schnuartz)/sim/([1-5])/restart$', self.path)
             if m:
@@ -755,6 +769,18 @@ class Handler(BaseHTTPRequestHandler):
                         "activeSessions": len([s for s in sessions.values() if s.get("pool") == pname])
                     }
                 self.send_json(result)
+        elif path.startswith('/api/ab/build/'):
+            if get_job is None:
+                self.send_json({'error': 'A/B build service is not installed'}, 503)
+                return
+            job = get_job(path.rsplit('/', 1)[-1])
+            self.send_json(job or {'error': 'Unknown build job'}, 200 if job else 404)
+        elif path.startswith('/api/ab/pointer/'):
+            if pointer_for_job is None:
+                self.send_json({'error': 'A/B build service is not installed'}, 503)
+                return
+            pointer = pointer_for_job(path.rsplit('/', 1)[-1])
+            self.send_json(pointer or {'error': 'Build is not ready'}, 200 if pointer else 404)
         else:
             self.send_json({"error": "Not found"}, 404)
 

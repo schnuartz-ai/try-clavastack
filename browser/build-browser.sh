@@ -5,7 +5,7 @@ set -euo pipefail
 # SPECTER_SOURCE_SHA when a reproducible historical build is needed, or set
 # SPECTER_SRC to an already checked-out source tree when iterating locally.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_REPO="https://github.com/cryptoadvance/specter-diy.git"
+SOURCE_REPO="${SOURCE_REPO_OVERRIDE:-https://github.com/cryptoadvance/specter-diy.git}"
 SOURCE_BRANCH="${SPECTER_SOURCE_BRANCH:-master}"
 SOURCE_SHA="${SPECTER_SOURCE_SHA:-}"
 SPECTER_SRC="${SPECTER_SRC:-$ROOT/.browser-work/specter-diy}"
@@ -34,7 +34,9 @@ if [[ "$(git -C "$SPECTER_SRC" rev-parse HEAD)" != "$SOURCE_SHA" ]]; then
   echo "Specter checkout did not reach $SOURCE_SHA" >&2
   exit 1
 fi
-OUT="$ROOT/builds/cryptoadvance/specter-diy/$SOURCE_SHA"
+REPOSITORY_PATH="${SOURCE_REPO#https://github.com/}"
+REPOSITORY_PATH="${REPOSITORY_PATH%.git}"
+OUT="$ROOT/builds/$REPOSITORY_PATH/$SOURCE_SHA"
 git -C "$SPECTER_SRC" submodule update --init --recursive
 
 if ! command -v emcc >/dev/null; then
@@ -94,5 +96,5 @@ mkdir -p "$OUT"
 cp "$SPECTER_SRC/f469-disco/micropython/ports/unix/micropython.js" "$OUT/"
 cp "$SPECTER_SRC/f469-disco/micropython/ports/unix/micropython.wasm" "$OUT/"
 cp "$SPECTER_SRC/f469-disco/micropython/ports/unix/micropython.data" "$OUT/"
-BROWSER_WASM_OPTIMIZED=1 python3 "$ROOT/browser/write-manifest.py" "$SPECTER_SRC" "$OUT" "cryptoadvance/specter-diy"
+BROWSER_WASM_OPTIMIZED=1 python3 "$ROOT/browser/write-manifest.py" "$SPECTER_SRC" "$OUT" "$REPOSITORY_PATH"
 echo "Browser artifacts: $OUT"

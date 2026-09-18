@@ -45,6 +45,7 @@ paths=(
   simulator
   simulator2
   simulators
+  ab
   specter3-testing
 )
 
@@ -55,6 +56,14 @@ for path in "${paths[@]}"; do
   fi
   cp -aL "$ROOT/$path" "$SITE_DIR/$path"
 done
+
+# The allocator is deployed separately from the static webroot, but the
+# release carries the matching A/B build API code so the VPS can update both
+# pieces atomically from the same tested GitHub release.
+mkdir -p "$SITE_DIR/ab-runtime"
+cp "$ROOT/pool/server.py" "$ROOT/pool/ab_builds.py" "$SITE_DIR/ab-runtime/"
+mkdir -p "$SITE_DIR/ab-runtime/browser"
+cp -aL "$ROOT/browser/." "$SITE_DIR/ab-runtime/browser/"
 
 if [[ $(find "$SITE_DIR/builds" -type f -name 'micropython.wasm' | wc -l) -lt 4 ]]; then
   echo "Expected all four tested firmware builds in the production package" >&2

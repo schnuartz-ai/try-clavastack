@@ -1,8 +1,10 @@
-const order = ['diy', 'play', 'schnuartz'];
+const abMode = location.pathname === '/ab/' || location.pathname === '/ab';
+const abParams = new URLSearchParams(location.search);
+const order = abMode ? ['diy', 'play'] : ['diy', 'play', 'schnuartz'];
 const numbers = { diy: 1, play: 2, schnuartz: 3 };
 const pointers = {
-  diy: '/browser/current.json',
-  play: '/browser/variants/specter-playground.json',
+  diy: abMode ? (abParams.get('left') || '/browser/variants/specter-playground.json') : '/browser/current.json',
+  play: abMode ? (abParams.get('right') || '/browser/variants/specter-playground-schnuartz.json') : '/browser/variants/specter-playground.json',
   schnuartz: '/browser/variants/specter-playground-schnuartz.json',
 };
 const playModes = {
@@ -13,12 +15,13 @@ const schnuartzModes = {
   normal: { pointer: pointers.schnuartz, query: '', repository: 'Schnuartz/specter-playground' },
   alternative: { pointer: '/browser/variants/specter-playground-schnuartz-alternative.json', query: 'alternative', repository: 'schnuartz-ai/specter-playground-schnuartz' },
 };
-const playgroundModes = { play: playModes, schnuartz: schnuartzModes };
+const playgroundModes = abMode ? {} : { play: playModes, schnuartz: schnuartzModes };
 const feedbackRepositories = {
   diy: 'schnuartz-ai/specter-diy',
   play: 'k9ert/specter-playground',
   schnuartz: 'Schnuartz/specter-playground',
 };
+const abPointers = { diy: pointers.diy, play: pointers.play };
 const feedbackVersions = {};
 const feedbackBuilds = {};
 const devices = Object.fromEntries(order.map(name => [name, document.querySelector(`[data-device="${name}"]`)]));
@@ -37,7 +40,7 @@ const playgroundMode = { play: 'normal', schnuartz: 'normal' };
 const metadataGeneration = new Map();
 
 function pointerPath(name) {
-  return playgroundModes[name] ? playgroundModes[name][playgroundMode[name]].pointer : pointers[name];
+  return abMode ? abPointers[name] : playgroundModes[name] ? playgroundModes[name][playgroundMode[name]].pointer : pointers[name];
 }
 
 function message(name, data) {
@@ -171,7 +174,10 @@ addEventListener('message', event => {
   if (!name || !event.data) return;
   const data = event.data;
   if (data.type === 'child-awaiting-peripherals' && data.variant === name) {
-    message(name, { type: 'peripherals-provide', files: [] });
+    const files = [];
+    if (sdOwner === name) files.push(...filesFor('sd/'));
+    for (const slot of [1, 2, 3]) if (cardOwners.get(slot) === name) files.push(...filesFor(`cards/${slot}/`));
+    message(name, { type: 'peripherals-provide', files });
   } else if (data.type === 'simulator-running' && data.variant === name) {
     childVersions.set(name, { build: data.build, version: data.version });
     if (feedbackVersions[name] &&
@@ -247,14 +253,15 @@ async function loadBuildMetadata(name) {
   try {
     const pointer = await (await fetch(pointerPath(name), { cache: 'no-store' })).json();
     const info = await (await fetch(`${pointer.build}build-info.json`, { cache: 'no-store' })).json();
-    const allowedRepositories = name === 'diy' ?
+    const allowedRepositories = abMode ? null : name === 'diy' ?
       ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
       playgroundModes[name]
         ? [playgroundModes[name][playgroundMode[name]].repository]
         : [feedbackRepositories[name]];
     if (!/^[a-f0-9]{40}$/.test(info.commit) ||
-        !allowedRepositories.map(repository => repository.toLowerCase())
-          .includes(info.repository?.toLowerCase()) ||
+        (!abMode && !allowedRepositories.map(repository => repository.toLowerCase())
+          .includes(info.repository?.toLowerCase())) ||
+        (abMode && !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(info.repository || '')) ||
         !pointer.build.includes(`/${info.commit}/`) ||
         pointer.version !== info.artifact_set_sha256?.slice(0, 16)) {
       throw new Error('Build manifest mismatch');
@@ -267,7 +274,7 @@ async function loadBuildMetadata(name) {
       ready.delete(name);
       devices[name].querySelector('.device-status').textContent = 'Build changed · reload this page';
     }
-    if (name === 'diy') {
+    if (name === 'diy' && !abMode) {
       if (!/^\d+\.\d+\.\d+(?:-rc\d+)?$/.test(info.firmware_version)) {
         throw new Error('Missing firmware version in build manifest');
       }
@@ -275,16 +282,16 @@ async function loadBuildMetadata(name) {
         `newest v${info.firmware_version} Firmware`;
     }
     const link = devices[name].querySelector('.source-link');
-    if (playgroundModes[name]) feedbackRepositories[name] = info.repository;
+    if (playgroundModes[name] || abMode) feedbackRepositories[name] = info.repository;
     const repositoryUrl = `https://github.com/${info.repository}`;
     const commitUrl = `${repositoryUrl}/commit/${info.commit}`;
     // The current local Schnuartz build can be ahead of the public repository.
     // Keep its link useful until that source commit is published on GitHub.
-    const sourceUrl = name === 'schnuartz' && playgroundMode[name] === 'normal' ? repositoryUrl : commitUrl;
+    const sourceUrl = !abMode && name === 'schnuartz' && playgroundMode[name] === 'normal' ? repositoryUrl : commitUrl;
     link.href = sourceUrl;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = name === 'schnuartz' && playgroundMode[name] === 'normal'
+    link.textContent = !abMode && name === 'schnuartz' && playgroundMode[name] === 'normal'
       ? `GitHub · ${info.repository}`
       : info.firmware_version
       ? `GitHub · v${info.firmware_version}`
@@ -321,6 +328,60 @@ async function loadBuildMetadata(name) {
 
 for (const name of order) loadBuildMetadata(name);
 
+if (abMode) {
+  for (const name of order) {
+    const input = devices[name].querySelector('[data-ab-input]');
+    const button = devices[name].querySelector('[data-ab-load]');
+    if (!input) continue;
+    const load = async () => {
+      const url = input.value.trim();
+      if (!url) return;
+      const status = devices[name].querySelector('.device-status');
+      const submit = button;
+      if (submit) submit.disabled = true;
+      status.textContent = 'Resolving GitHub link…';
+      try {
+        const response = await fetch('/api/ab/build', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.jobId) throw new Error(data.error || `HTTP ${response.status}`);
+        let job = data;
+        while (job.status === 'queued' || job.status === 'building' || job.status === 'validating') {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const poll = await fetch(`/api/ab/build/${encodeURIComponent(data.jobId)}`, { cache: 'no-store' });
+          job = await poll.json();
+          status.textContent = job.message || `Build ${job.status}…`;
+        }
+        if (job.status !== 'ready' || !job.pointer) throw new Error(job.error || 'Build failed');
+        const manifestPath = typeof job.pointer === 'string' ? job.pointer : `/api/ab/pointer/${data.jobId}`;
+        if (ready.has(name)) {
+          const files = await snapshot(name);
+          if (sdOwner === name) saveMedia(files, 'sd/');
+          for (const slot of [1, 2, 3]) if (cardOwners.get(slot) === name) saveMedia(files, `cards/${slot}/`);
+        }
+        abPointers[name] = manifestPath;
+        ready.delete(name);
+        childVersions.delete(name);
+        frames[name].addEventListener('load', () => message(name, { type: 'gallery-parent-ready' }), { once: true });
+        const frameUrl = new URL(frames[name].src || '/?embedded=1&gallery=1&variant=diy', location.href);
+        frameUrl.searchParams.set('manifest', manifestPath);
+        frameUrl.searchParams.delete('buildVariant');
+        frames[name].src = frameUrl.href;
+        await loadBuildMetadata(name);
+      } catch (error) {
+        status.textContent = `Build error: ${error.message}`;
+      } finally {
+        if (submit) submit.disabled = false;
+      }
+    };
+    input.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); load(); } });
+    if (button) button.addEventListener('click', load);
+  }
+}
+
+if (!abMode) {
 const feedbackMessage = document.querySelector('#feedback-message');
 const feedbackDevice = document.querySelector('#feedback-device');
 const feedbackSubmit = document.querySelector('#feedback-submit');
@@ -696,6 +757,7 @@ document.querySelector('#feedback-form').addEventListener('submit', event => eve
 renderFeedback();
 loadFeedback();
 updateFeedback();
+}
 
 let drag;
 for (const token of document.querySelectorAll('.media-token')) {
@@ -785,7 +847,7 @@ addEventListener('paste', event => {
 });
 const demoButton = document.querySelector('#demo-load');
 const demoStatus = document.querySelector('#demo-status');
-demoButton.onclick = () => perform(async () => {
+if (!abMode && demoButton) demoButton.onclick = () => perform(async () => {
   if (!ready.has('diy')) throw new Error('Specter DIY is still starting.');
   demoButton.disabled = true;
   demoStatus.textContent = 'Importing demo data…';

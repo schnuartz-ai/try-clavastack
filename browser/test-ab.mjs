@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+
+const base = process.env.BASE_URL || 'http://127.0.0.1:8765';
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+await page.goto(`${base}/ab/`);
+await page.locator('h1').getByText('Specter', { exact: true }).waitFor();
+assert.equal(await page.locator('[data-device] h2').count(), 2);
+assert.deepEqual(await page.locator('[data-device] h2').allTextContents(), ['Specter', 'Specter']);
+assert.equal(await page.locator('.memory-token').count(), 3);
+await page.locator('[data-device="diy"] .device-status').getByText('Running locally', { exact: false }).waitFor({ timeout: 60000 });
+await page.locator('[data-device="play"] .device-status').getByText('Running locally', { exact: false }).waitFor({ timeout: 60000 });
+assert.deepEqual(errors, []);
+await page.screenshot({ path: 'test-results/ab-two-devices.png', fullPage: true });
+await browser.close();
+console.log(JSON.stringify({ result: 'pass', page: '/ab/', devices: 2, sharedMemoryCards: 3 }));

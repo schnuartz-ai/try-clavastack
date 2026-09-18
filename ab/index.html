@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Specter A/B — ClavaStack</title>
+  <meta name="description" content="Compare two Specter Playground or Specter DIY builds in your browser.">
+  <style>
+    :root { color-scheme:dark; --bg:#04070b; --panel:#142131; --line:#35465a; --blue:#1f99e5; --muted:#c9d2de; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:#fcfcfc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button,input { font:inherit; }
+    header { background:#0c1a27; border-bottom:1px solid #283446; padding:12px max(18px,calc((100vw - 1440px)/2)); display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    header a { color:var(--muted); text-decoration:none; font-size:13px; }
+    header .brands { display:flex; align-items:center; gap:11px; }
+    header img { height:24px; }
+    main { max-width:1180px; margin:auto; padding:25px 18px 48px; }
+    h1 { font-size:clamp(26px,4vw,38px); margin:0 0 6px; }
+    .intro { color:var(--muted); line-height:1.5; margin:0 0 17px; }
+    .warning { background:#2b1a21; border:1px solid #b85b68; border-radius:10px; padding:9px 13px; margin-bottom:18px; color:#f1dfe2; font-size:11px; line-height:1.35; }
+    .warning strong { color:#ff929c; }
+    .device-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; }
+    .device { min-width:0; background:transparent; padding:10px 8px 14px; text-align:center; }
+    .device.drop-target { filter:drop-shadow(0 0 13px #47b5e777); }
+    .device h2 { font-size:20px; margin:0 0 2px; }
+    .device .subtitle { color:var(--muted); font-size:12px; margin:0 0 9px; }
+    .device-frame { position:relative; width:min(100%,310px); margin:auto; aspect-ratio:479/905; }
+    .device-frame iframe { position:absolute; left:calc(12.5% + 2px); top:calc(17.9% + 2px); z-index:1; display:block; border:0; border-radius:4px; background:#000; width:76%; height:66%; }
+    .device-shell { position:relative; z-index:2; display:block; width:100%; height:100%; object-fit:contain; pointer-events:none; }
+    .device-hitbox { position:absolute; inset:0; z-index:3; border-radius:28px; pointer-events:none; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; text-shadow:0 1px 6px #000; }
+    .device-hitbox.armed { pointer-events:auto; cursor:crosshair; background:#1f99e538; border:2px dashed #71cbf8; }
+    .device.drop-target .device-hitbox { background:#1f99e550; border:2px dashed #71cbf8; }
+    .device-footer { display:flex; flex-direction:column; align-items:center; gap:7px; width:100%; margin-top:10px; font-size:12px; color:var(--muted); }
+    .device-footer a { color:#8acaff; text-decoration:none; }
+    .device-footer button,.tool-btn { color:#fff; background:#1b3147; border:1px solid #5a7189; border-radius:7px; padding:7px 10px; cursor:pointer; }
+    .device-footer button:hover,.tool-btn:hover { border-color:#8acaff; }
+    .ab-input { width:min(100%,390px); display:grid; gap:5px; text-align:left; }
+    .ab-input label { color:#e9f1fa; font-weight:600; font-size:12px; }
+    .ab-input-row { display:flex; gap:6px; }
+    .ab-input input { min-width:0; flex:1; color:#fff; background:#08131f; border:1px solid #52667d; border-radius:8px; padding:9px 10px; font-size:12px; }
+    .ab-input input:focus { outline:2px solid #60c4f0; outline-offset:2px; }
+    .ab-input button { white-space:nowrap; }
+    .device-status { color:#8cdbaf; font-size:11px; min-height:15px; margin-top:2px; }
+    .media-desk { margin-top:20px; padding:18px; border:1px solid var(--line); border-radius:17px; background:#101b2a; }
+    .desk-head h2 { margin:0; font-size:19px; }
+    .media-grid { display:grid; grid-template-columns:minmax(240px,1fr) minmax(0,2fr); gap:20px; margin-top:14px; }
+    .media-group { border:1px solid #344359; background:#172637; border-radius:12px; padding:13px; min-width:0; }
+    .media-group h3 { margin:0 0 9px; font-size:14px; }
+    .media-token { display:flex; flex-direction:column; align-items:center; justify-content:center; background:transparent; border:0; cursor:grab; touch-action:none; user-select:none; padding:5px; color:white; }
+    .media-token:active { cursor:grabbing; }
+    .media-token:focus-visible { outline:2px solid #8acaff; border-radius:8px; }
+    .media-token img { width:91px; height:91px; object-fit:contain; filter:drop-shadow(4px 7px 6px #0008); pointer-events:none; }
+    .media-token small { font-size:11px; color:#b8c7d6; margin-top:5px; pointer-events:none; }
+    .memory-tray { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .memory-token { width:100%; min-width:0; }
+    .memory-token .card-art { position:relative; overflow:hidden; width:min(100%,152px); aspect-ratio:1.55; display:block; border-radius:10px; background:transparent; color:#1a3147; box-shadow:0 6px 14px #0005; pointer-events:none; }
+    .memory-token .card-photo { position:absolute; left:-12.5%; top:50%; width:125%; height:auto; transform:translateY(-50%); pointer-events:none; user-select:none; }
+    .memory-token .card-art strong { position:absolute; left:8%; bottom:9%; z-index:1; color:#13263a; text-shadow:0 1px 1px #fff9; font-size:11px; }
+    .media-token.selected .card-art { outline:2px solid #6bc5f3; }
+    .media-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:8px 0 0; }
+    .media-actions .tool-btn { font-size:11px; padding:6px 9px; }
+    .sd-files { list-style:none; margin:8px 0 0; padding:0; max-height:130px; overflow:auto; font-size:11px; color:var(--muted); }
+    .sd-files li { display:flex; justify-content:space-between; gap:6px; padding:3px 0; overflow-wrap:anywhere; }
+    .sd-files button { border:0; background:none; color:#8acaff; cursor:pointer; }
+    .drop-help { font-size:11px; color:var(--muted); margin:9px 0 0; }
+    .drag-ghost { position:fixed; z-index:30; pointer-events:none; opacity:.88; width:115px; transform:translate(-50%,-50%); filter:drop-shadow(0 12px 15px #000b); }
+    .drag-ghost img { width:100%; }
+    .drag-ghost .card-art { aspect-ratio:1.55; background:#fff; color:#1a3147; border-radius:9px; padding:10px; }
+    .pin-hint { width:fit-content; max-width:100%; margin:20px auto 0; padding:8px 14px; border:1px solid #5fc8f5; border-radius:9px; background:#102b40; color:#d9f3ff; box-shadow:0 0 0 1px #1f99e51f,0 0 10px #1f99e544; font-size:12px; line-height:1.4; text-align:center; }
+    footer { padding:0 18px 28px; text-align:center; color:var(--muted); font-size:12px; }
+    footer a { color:var(--blue); }
+    @media(max-width:760px) { .device-grid { grid-template-columns:1fr; } .media-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header><a class="brands" href="/"><img src="/assets/clavastack-logo.png" alt="ClavaStack"><span>×</span><img src="/assets/specter-logo.png" alt="Specter"></a><a href="/simulators/">← All simulators</a></header>
+  <main>
+    <h1>Specter</h1>
+    <p class="intro">Load two Specter DIY or Playground branches, pull requests, or commits and compare them locally in your browser.</p>
+    <p class="warning"><strong>Test environment.</strong> Never enter a real seed phrase. These are browser simulations, not secure hardware.</p>
+    <section class="device-grid" aria-label="Specter A/B devices">
+      <article class="device" data-device="diy">
+        <h2>Specter</h2><p class="subtitle">Preset A</p>
+        <div class="device-frame"><img class="device-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe title="Specter A firmware" src="/?embedded=1&amp;gallery=1&amp;variant=diy&amp;manifest=/browser/variants/specter-playground.json" allow="camera"></iframe><div class="device-hitbox" data-target="diy" aria-label="Insert selected card into device 1"></div></div>
+        <div class="device-footer">
+          <div class="ab-input"><label for="ab-left">Insert PR Link</label><div class="ab-input-row"><input id="ab-left" data-ab-input type="url" placeholder="GitHub repository, branch, PR, or commit"><button data-ab-load type="button">Load</button></div></div>
+          <button class="restart-device" type="button">Restart</button><a class="source-link" target="_blank" rel="noopener noreferrer">GitHub · loading…</a><div class="device-status" role="status">Starting locally…</div>
+        </div>
+      </article>
+      <article class="device" data-device="play">
+        <h2>Specter</h2><p class="subtitle">Preset B</p>
+        <div class="device-frame"><img class="device-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe title="Specter B firmware" src="/?embedded=1&amp;gallery=1&amp;variant=play&amp;manifest=/browser/variants/specter-playground-schnuartz.json" allow="camera"></iframe><div class="device-hitbox" data-target="play" aria-label="Insert selected card into device 2"></div></div>
+        <div class="device-footer">
+          <div class="ab-input"><label for="ab-right">Insert PR Link</label><div class="ab-input-row"><input id="ab-right" data-ab-input type="url" placeholder="GitHub repository, branch, PR, or commit"><button data-ab-load type="button">Load</button></div></div>
+          <button class="restart-device" type="button">Restart</button><a class="source-link" target="_blank" rel="noopener noreferrer">GitHub · loading…</a><div class="device-status" role="status">Starting locally…</div>
+        </div>
+      </article>
+    </section>
+    <section class="media-desk" aria-label="Shared removable media">
+      <div class="desk-head"><h2>Removable media</h2></div>
+      <div class="media-grid">
+        <div class="media-group" id="sd-drop"><h3>Virtual SD card</h3><button class="media-token" id="sd-token" type="button" data-media="sd" aria-label="Drag 8 GB SD card onto a device"><img src="/assets/sd-card-8gb.png" alt="8 GB microSD card"><small id="sd-location">Not inserted</small></button><div class="media-actions"><button class="tool-btn" id="sd-add" type="button">Add files</button><button class="tool-btn" id="sd-refresh" type="button">Refresh files</button><button class="tool-btn" id="sd-clear" type="button">Clear</button><input id="sd-picker" type="file" multiple hidden></div><p class="drop-help">Select, drop, or paste multiple files at once.</p><ul class="sd-files" id="sd-files"><li>No files on card</li></ul></div>
+        <div class="media-group"><h3>Virtual MemoryCards</h3><div class="memory-tray"><button class="media-token memory-token" type="button" data-media="card" data-slot="1"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 1</strong></span><small>Not inserted</small></button><button class="media-token memory-token" type="button" data-media="card" data-slot="2"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 2</strong></span><small>Not inserted</small></button><button class="media-token memory-token" type="button" data-media="card" data-slot="3"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 3</strong></span><small>Not inserted</small></button></div></div>
+      </div>
+      <p class="visually-hidden" id="transfer-state" role="status" aria-live="polite">Cards are ejected.</p>
+    </section>
+    <p class="pin-hint">A PIN may already be selected: “21”.</p>
+  </main>
+  <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="/simulators/">Development Drafts</a> · Browser simulation is not secure hardware.</footer>
+  <script type="module" src="/simulators/site.js?v=20260918-ab"></script>
+</body>
+</html>

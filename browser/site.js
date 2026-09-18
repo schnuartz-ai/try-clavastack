@@ -840,26 +840,33 @@ function updateBuildMetadata(manifest) {
 
 try {
   stateFiles = await awaitPeripherals();
-  const pointerPath = buildVariant === 'diy' ? '/browser/current.json' :
+  const requestedManifest = params.get('manifest');
+  if (requestedManifest && !/^(?:\/(?:browser|ab-builds)\/[A-Za-z0-9._/-]+\.json|\/api\/ab\/pointer\/[A-Za-z0-9]+)$/.test(requestedManifest)) {
+    throw new Error('Invalid dynamic build manifest');
+  }
+  const pointerPath = requestedManifest || (buildVariant === 'diy' ? '/browser/current.json' :
     buildVariant === 'play' ? '/browser/variants/specter-playground.json' :
     buildVariant === 'play-fast' ? '/browser/variants/specter-playground-fast.json' :
     buildVariant === 'schnuartz-alternative' ? '/browser/variants/specter-playground-schnuartz-alternative.json' :
-    '/browser/variants/specter-playground-schnuartz.json';
+    '/browser/variants/specter-playground-schnuartz.json');
   const pointer = await (await fetch(pointerPath, { cache: 'no-store' })).json();
   build = pointer.build;
   version = pointer.version;
-  if (!/^\/builds\/[A-Za-z0-9-]+\/[A-Za-z0-9-]+\/[a-f0-9]{40}\/$/.test(build)) throw new Error('Invalid build pointer');
+  if (!/^\/(?:builds|ab-builds)\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/[a-f0-9]{40}\/$/.test(build)) throw new Error('Invalid build pointer');
   if (!/^[a-f0-9]{16}$/.test(version)) throw new Error('Invalid artifact version');
   const manifest = await (await fetch(`${build}build-info.json`, { cache: 'no-store' })).json();
   if (!build.includes(manifest.commit) || manifest.artifact_set_sha256?.slice(0, 16) !== version) {
     throw new Error('Build manifest mismatch');
   }
-  const expectedRepos = buildVariant === 'diy' ? ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
+  const expectedRepos = requestedManifest ? null : buildVariant === 'diy' ? ['cryptoadvance/specter-diy', 'schnuartz/specter-diy', 'schnuartz-ai/specter-diy'] :
     buildVariant === 'play' ? ['k9ert/specter-playground'] :
     buildVariant === 'play-fast' ? ['schnuartz-ai/specter-playground'] :
     buildVariant === 'schnuartz-alternative' ? ['schnuartz-ai/specter-playground-schnuartz'] :
     ['schnuartz/specter-playground'];
-  if (!expectedRepos.includes(manifest.repository?.toLowerCase())) throw new Error('Wrong firmware variant in build manifest');
+  if ((!requestedManifest && !expectedRepos.includes(manifest.repository?.toLowerCase())) ||
+      (requestedManifest && !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(manifest.repository || ''))) {
+    throw new Error('Wrong firmware variant in build manifest');
+  }
   if (!/^[a-f0-9]{40}$/.test(manifest.commit)) throw new Error('Invalid source commit in build manifest');
   program = manifest.entrypoint === 'mockui' ? 'mockui' : 'wallet';
   log(`Firmware: ${manifest.commit}; build: ${version}; worker: ${workerRevision}`);
