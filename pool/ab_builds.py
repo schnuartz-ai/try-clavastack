@@ -157,6 +157,14 @@ def _manifest_pointer(build_dir: Path, url_prefix: str) -> dict:
     return {"build": f"{url_prefix.rstrip('/')}/", "version": version}
 
 
+def _publish_permissions(build_dir: Path) -> None:
+    """Make immutable artifacts traversable/readable by the Caddy user."""
+    for directory in (AB_STORAGE, build_dir.parent.parent, build_dir.parent, build_dir):
+        directory.chmod(0o755)
+    for path in build_dir.rglob("*"):
+        path.chmod(0o755 if path.is_dir() else 0o644)
+
+
 def _existing_build(spec: dict) -> dict | None:
     repository = spec["repository"]
     candidates = [
@@ -279,6 +287,7 @@ def _worker() -> None:
             if target.exists():
                 shutil.rmtree(target)
             staging.rename(target)
+            _publish_permissions(target)
             pointer = _manifest_pointer(target, "/ab-builds/" + _safe_repo_path(spec["repository"]) + "/" + spec["commit"])
             with jobs_lock:
                 jobs[job_id].update(status="ready", message="Build ready", pointer=pointer)
