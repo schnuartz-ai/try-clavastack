@@ -189,7 +189,12 @@ def submit(raw_url: str) -> dict:
     with jobs_lock:
         existing_id = jobs_by_key.get(key)
         if existing_id:
-            return _public_job(jobs[existing_id])
+            existing = jobs[existing_id]
+            # A failed build must be retryable after the underlying source or
+            # toolchain issue is fixed; do not keep returning the stale error.
+            if existing.get("status") != "failed":
+                return _public_job(existing)
+            jobs_by_key.pop(key, None)
         pointer = _existing_build(spec)
         job_id = uuid.uuid4().hex
         job = {
