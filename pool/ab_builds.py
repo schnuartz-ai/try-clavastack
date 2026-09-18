@@ -235,11 +235,12 @@ def _worker() -> None:
             env = os.environ.copy()
             env["AB_WORK_ROOT"] = str(WORK_ROOT / ".browser-work")
             env["AB_ARTIFACT_ROOT"] = str(WORK_ROOT / "builds")
+            env["HOME"] = str(WORK_ROOT / ".builder-home")
             account = None
             if pwd is not None and os.name == "posix" and os.geteuid() == 0:
                 account = pwd.getpwnam(BUILD_USER)
             WORK_ROOT.mkdir(parents=True, exist_ok=True)
-            for directory in (WORK_ROOT / ".browser-work", WORK_ROOT / "builds"):
+            for directory in (WORK_ROOT / ".browser-work", WORK_ROOT / "builds", WORK_ROOT / ".builder-home"):
                 directory.mkdir(parents=True, exist_ok=True)
                 if account is not None:
                     # The allocator is root, but build-ab.sh runs as the

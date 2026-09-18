@@ -23,8 +23,17 @@ for module in ("asyncio", "microur"):
     shutil.copytree(common_source / module, frozen_common / module)
 for module in ("bcur.py", "lvqr.py"):
     shutil.copy2(common_source / module, frozen_common / module)
+# Older Specter revisions vendor embit in the upstream Python-package layout
+# (``src/embit``), while newer revisions already place the package directly
+# under the submodule root. Support both layouts so a historical commit can be
+# built without requiring a particular embit release shape.
+embit_source = common_source / "embit/src/embit"
+if not embit_source.is_dir():
+    embit_source = common_source / "embit"
+if not embit_source.is_dir():
+    raise FileNotFoundError(f"Could not find vendored embit package below {common_source / 'embit'}")
 shutil.copytree(
-    common_source / "embit/src/embit",
+    embit_source,
     frozen_common / "embit",
     ignore=shutil.ignore_patterns("ctypes_*.py"),
 )
