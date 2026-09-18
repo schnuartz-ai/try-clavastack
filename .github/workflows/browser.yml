@@ -4,8 +4,16 @@ on:
   push:
   pull_request:
   schedule:
-    - cron: '17 3 * * *'
+    # The build scripts resolve the latest main commit of every configured
+    # Playground fork. Poll frequently so a fork-only commit reaches
+    # try.clavastack.com without requiring a no-op commit here.
+    - cron: '*/15 * * * *'
   workflow_dispatch:
+
+concurrency:
+  # Never let an older fork snapshot deploy after a newer one.
+  group: browser-production
+  cancel-in-progress: true
 
 jobs:
   browser:
