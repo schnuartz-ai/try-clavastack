@@ -22,7 +22,7 @@ target.mkdir(exist_ok=True)
 (source / "browser.manifest.py").write_text("""freeze('f469-disco/usermods/udisplay_f469/display_unixport')
 freeze('f469-disco/libs/common')
 freeze('f469-disco/micropython/lib/micropython-lib/python-stdlib/base64', 'base64.py')
-freeze('f469-disco/micropython/lib/micropython-lib/python-stdlib/contextlib', 'contextlib.py')
+freeze('f469-disco/micropython/lib/micropython-lib/python-stdlib/contextlib')
 freeze('scenarios/MockUI/src')
 freeze('src', ('app.py', 'config_default.py', 'errors.py', 'helpers.py',
                'platform.py', 'qrencoder.py', 'rng.py', 'specter.py'))
