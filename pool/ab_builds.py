@@ -235,13 +235,20 @@ def _worker() -> None:
             env = os.environ.copy()
             env["AB_WORK_ROOT"] = str(WORK_ROOT / ".browser-work")
             env["AB_ARTIFACT_ROOT"] = str(WORK_ROOT / "builds")
-            WORK_ROOT.mkdir(parents=True, exist_ok=True)
-            (WORK_ROOT / ".browser-work").mkdir(parents=True, exist_ok=True)
-            (WORK_ROOT / "builds").mkdir(parents=True, exist_ok=True)
-            command = ["bash", str(SOURCE_ROOT / "browser/build-ab.sh"), spec["repository"], spec["commit"], spec["adapter"]]
-            kwargs = {}
+            account = None
             if pwd is not None and os.name == "posix" and os.geteuid() == 0:
                 account = pwd.getpwnam(BUILD_USER)
+            WORK_ROOT.mkdir(parents=True, exist_ok=True)
+            for directory in (WORK_ROOT / ".browser-work", WORK_ROOT / "builds"):
+                directory.mkdir(parents=True, exist_ok=True)
+                if account is not None:
+                    # The allocator is root, but build-ab.sh runs as the
+                    # unprivileged builder. Keep these roots writable for it.
+                    os.chown(directory, account.pw_uid, account.pw_gid)
+                    os.chmod(directory, 0o750)
+            command = ["bash", str(SOURCE_ROOT / "browser/build-ab.sh"), spec["repository"], spec["commit"], spec["adapter"]]
+            kwargs = {}
+            if account is not None:
                 kwargs["preexec_fn"] = lambda: (os.setgid(account.pw_gid), os.setuid(account.pw_uid))
             result = subprocess.run(command, cwd=SOURCE_ROOT, env=env, capture_output=True, text=True, timeout=90 * 60, **kwargs)
             if result.returncode:
