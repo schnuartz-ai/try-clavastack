@@ -65,9 +65,11 @@ freeze('browser-freeze/common')
 freeze('src')
 EOF
 # This older MicroPython records a stack marker from a local variable by design.
-# Modern GCC diagnoses that pattern as dangling-pointer; keep other warnings fatal.
+# Keep warnings non-fatal for the host compiler. Do not pass the
+# compiler-specific ``-Wno-error=dangling-pointer`` spelling: Emscripten's
+# clang rejects that option on older Specter revisions.
 make -C "$SPECTER_SRC/f469-disco/micropython/mpy-cross" -j4 \
-  CFLAGS_EXTRA=-Wno-error=dangling-pointer
+  CFLAGS_EXTRA=-Wno-error
 
 # The older MicroPython makefiles do not track a changed frozen manifest or
 # Emscripten link flags reliably. Rebuild the dedicated browser target.
