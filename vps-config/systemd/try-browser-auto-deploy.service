@@ -5,8 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=clavastack-deploy
-Group=clavastack-deploy
+# The release also atomically updates the root-owned allocator runtime and
+# Caddy configuration. Keep the webroot/state paths restricted while granting
+# this oneshot the privileges required for those two coordinated updates.
+User=root
+Group=root
 RuntimeDirectory=try-clavastack
 StateDirectory=try-clavastack
 UMask=0022
@@ -15,4 +18,4 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/var/www/try-clavastack-deploy /var/lib/try-clavastack /run/try-clavastack
+ReadWritePaths=/var/www/try-clavastack-deploy /var/lib/try-clavastack /run/try-clavastack /opt/try-clavastack /etc/caddy
