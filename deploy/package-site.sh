@@ -62,6 +62,7 @@ done
 # pieces atomically from the same tested GitHub release.
 mkdir -p "$SITE_DIR/ab-runtime"
 cp "$ROOT/pool/server.py" "$ROOT/pool/ab_builds.py" "$SITE_DIR/ab-runtime/"
+cp "$ROOT/vps-config/Caddyfile" "$SITE_DIR/ab-runtime/Caddyfile"
 mkdir -p "$SITE_DIR/ab-runtime/browser"
 cp -aL "$ROOT/browser/." "$SITE_DIR/ab-runtime/browser/"
 

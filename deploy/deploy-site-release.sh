@@ -106,11 +106,15 @@ done
 test -f "$STAGING_DIR/ab-runtime/server.py"
 test -f "$STAGING_DIR/ab-runtime/ab_builds.py"
 test -f "$STAGING_DIR/ab-runtime/browser/build-ab.sh"
+test -f "$STAGING_DIR/ab-runtime/Caddyfile"
 install -d -o root -g root -m 0755 /opt/try-clavastack/pool
 install -d -o root -g root -m 0755 /opt/try-clavastack/browser
 install -o root -g root -m 0755 "$STAGING_DIR/ab-runtime/server.py" /opt/try-clavastack/pool/server.py
 install -o root -g root -m 0644 "$STAGING_DIR/ab-runtime/ab_builds.py" /opt/try-clavastack/pool/ab_builds.py
 cp -a "$STAGING_DIR/ab-runtime/browser/." /opt/try-clavastack/browser/
+caddy validate --adapter caddyfile --config "$STAGING_DIR/ab-runtime/Caddyfile"
+install -o root -g root -m 0644 "$STAGING_DIR/ab-runtime/Caddyfile" /etc/caddy/Caddyfile
+systemctl reload caddy
 rm -rf -- "$STAGING_DIR/ab-runtime"
 systemctl restart try-allocator.service
 
