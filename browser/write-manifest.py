@@ -64,10 +64,15 @@ elif len(sys.argv) > 4:
 if os.environ.get("BROWSER_WASM_OPTIMIZED") == "1":
     manifest["wasm_optimization"] = {"passes": ["coalesce-locals", "vacuum"]}
 (output / "build-info.json").write_text(json.dumps(manifest, indent=2) + "\n")
-pointer = {
-    "build": "/" + str(output.relative_to(Path(__file__).resolve().parent.parent)).replace('\\', '/') + "/",
-    "version": artifact_set[:16],
-}
+pointer_build = os.environ.get("BROWSER_POINTER_BUILD")
+if not pointer_build:
+    try:
+        pointer_build = "/" + str(output.relative_to(Path(__file__).resolve().parent.parent)).replace('\\', '/') + "/"
+    except ValueError:
+        # On-demand builds are staged outside the checked-out application tree;
+        # their API response supplies the public /ab-builds/ URL instead.
+        pointer_build = "/"
+pointer = {"build": pointer_build.rstrip("/") + "/", "version": artifact_set[:16]}
 repository_key = repository.lower()
 pointer_name = os.environ.get("BROWSER_POINTER_NAME")
 if pointer_name:
