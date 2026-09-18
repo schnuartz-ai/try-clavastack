@@ -211,7 +211,13 @@ for (const name of order) {
     for (const button of devices[name].querySelectorAll(`[data-${name}-mode]`)) {
       button.onclick = () => {
         const nextMode = button.dataset[modeAttribute];
-        if (!playgroundModes[name][nextMode] || nextMode === playgroundMode[name]) return;
+        if (!playgroundModes[name][nextMode]) return;
+        if (nextMode === playgroundMode[name]) {
+          message(name, { type: 'runtime-restart' });
+          devices[name].querySelector('.device-status').textContent = 'Restarting locally…';
+          ready.delete(name);
+          return;
+        }
         playgroundMode[name] = nextMode;
         for (const option of devices[name].querySelectorAll(`[data-${name}-mode]`)) {
           option.setAttribute('aria-pressed', String(option.dataset[modeAttribute] === playgroundMode[name]));

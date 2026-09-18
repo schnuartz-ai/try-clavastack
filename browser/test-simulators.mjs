@@ -45,7 +45,7 @@ for (const name of ['diy', 'play', 'schnuartz']) {
   if (await sourceLink.textContent() !== expectedLabel ||
       await sourceLink.getAttribute('href') !== expectedHref ||
       await sourceLink.getAttribute('target') !== '_blank') {
-    throw new Error(`${name} does not link to its exact firmware commit below Restart`);
+    throw new Error(`${name} does not link to its exact firmware commit below the mode controls`);
   }
   if (!await page.locator(`[data-device="${name}"] .device-shell`)
     .evaluate(img => img.complete && img.naturalWidth > 0)) {
@@ -60,10 +60,16 @@ if (await page.locator('.pin-hint').textContent() !== 'A PIN may already be sele
 const switchControl = page.locator('[data-device="schnuartz"] .restart-switch');
 const marcoSwitch = page.locator('[data-device="play"] .restart-switch');
 if (await marcoSwitch.locator('button').count() !== 2 ||
+    await page.locator('[data-device="play"] .restart-device').count() !== 0 ||
     await marcoSwitch.locator('[data-play-mode="normal"]').getAttribute('aria-pressed') !== 'true' ||
     await marcoSwitch.locator('[data-play-mode="fast"]').getAttribute('aria-pressed') !== 'false') {
   throw new Error('Marco restart switch is not initialized on the normal build');
 }
+await marcoSwitch.locator('[data-play-mode="normal"]').click();
+await page.locator('[data-device="play"] .device-status').getByText('Restarting locally', { exact: false })
+  .waitFor({ timeout: 5000 });
+await page.locator('[data-device="play"] .device-status').getByText('Running locally', { exact: false })
+  .waitFor({ timeout: 75000 });
 await marcoSwitch.locator('[data-play-mode="fast"]').click();
 await page.locator('[data-device="play"] .device-status').getByText('Running locally', { exact: false })
   .waitFor({ timeout: 75000 });
@@ -111,6 +117,11 @@ if (await switchControl.locator('[data-schnuartz-mode="normal"]').getAttribute('
       `https://github.com/${normalManifest.repository}`) {
   throw new Error('Schnuartz switch did not return to the normal build');
 }
+await switchControl.locator('[data-schnuartz-mode="normal"]').click();
+await page.locator('[data-device="schnuartz"] .device-status').getByText('Restarting locally', { exact: false })
+  .waitFor({ timeout: 5000 });
+await page.locator('[data-device="schnuartz"] .device-status').getByText('Running locally', { exact: false })
+  .waitFor({ timeout: 75000 });
 await page.waitForTimeout(1200);
 for (const name of ['diy', 'play', 'schnuartz']) {
   const png = PNG.sync.read(await page.frameLocator(`[data-device="${name}"] iframe`).locator('#screen').screenshot());
@@ -215,7 +226,7 @@ await page.locator('[data-slot="1"]').click();
 await page.locator('[data-slot="1"] small').getByText('Not inserted').waitFor();
 await page.locator('#sd-token').click();
 await page.locator('#sd-location').getByText('Not inserted').waitFor();
-await page.locator('[data-device="play"] .restart-device').click();
+await page.locator('[data-device="play"] .restart-switch [data-play-mode="normal"]').click();
 await page.locator('[data-device="play"] .device-status').getByText('Running locally', { exact: false }).waitFor({ timeout: 55000 });
 await page.locator('[data-slot="1"]').click();
 await page.locator('[data-target="diy"]').click();
