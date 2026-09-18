@@ -10,7 +10,7 @@ page.on('console', message => { if (message.type() === 'error') errors.push(mess
 await page.goto(`${base}/ab/`);
 await page.locator('h1').getByText('Specter', { exact: true }).waitFor();
 assert.equal(await page.locator('[data-device] h2').count(), 2);
-assert.deepEqual(await page.locator('[data-device] h2').allTextContents(), ['Specter', 'Specter']);
+assert.deepEqual(await page.locator('[data-device] h2').allTextContents(), ['Specter A', 'Specter B']);
 assert.equal(await page.locator('.memory-token').count(), 3);
 await page.locator('[data-device="diy"] .device-status').getByText('Running locally', { exact: false }).waitFor({ timeout: 60000 });
 await page.locator('[data-device="play"] .device-status').getByText('Running locally', { exact: false }).waitFor({ timeout: 60000 });
