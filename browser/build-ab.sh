@@ -44,4 +44,5 @@ case "$REPOSITORY" in
   *) echo "Unsupported Specter repository: $REPOSITORY" >&2; exit 2 ;;
 esac
 
-echo "$ROOT/builds/${OUTPUT_REPOSITORY:-$REPOSITORY}/$COMMIT"
+ARTIFACT_ROOT="${AB_ARTIFACT_ROOT:-$ROOT/builds}"
+echo "$ARTIFACT_ROOT/${OUTPUT_REPOSITORY:-$REPOSITORY}/$COMMIT"
