@@ -7,16 +7,91 @@ on:
     # The build scripts resolve the latest main commit of every configured
     # Playground fork. Poll frequently so a fork-only commit reaches
     # try.clavastack.com without requiring a no-op commit here.
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
-concurrency:
-  # Never let an older fork snapshot deploy after a newer one.
-  group: browser-production
-  cancel-in-progress: true
-
 jobs:
+  fork-sync:
+    name: Check configured fork heads
+    concurrency:
+      group: fork-sync
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+    steps:
+      - name: Compare fork heads with the live pointers
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          SITE_ORIGIN: https://try.clavastack.com
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Pushes, pull requests and manual runs must always validate the
+          # checked-out try-clavastack code. Scheduled runs only need the
+          # expensive build when one of the upstream forks moved.
+          if [[ "$EVENT_NAME" != "schedule" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A full build takes longer than five minutes. Do not queue or
+          # restart another scheduled build while one is already running.
+          active_run="$(gh run list --repo "$REPOSITORY" --workflow browser.yml \
+            --status in_progress --json databaseId --jq '.[].databaseId' \
+            | awk -v current="$RUN_ID" '$1 != current {print; exit}')"
+          if [[ -n "$active_run" ]]; then
+            echo "A browser build is already running ($active_run); skipping this poll"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=false
+          check_fork() {
+            local repository="$1"
+            local branch="$2"
+            local pointer_path="$3"
+            local source_sha
+            local pointer
+
+            source_sha="$(git ls-remote "https://github.com/$repository.git" "refs/heads/$branch" | awk 'NR == 1 {print $1}')"
+            if [[ -z "$source_sha" ]]; then
+              echo "Could not resolve $repository:$branch; forcing a build" >&2
+              changed=true
+              return
+            fi
+            pointer="$(curl --fail --silent --show-error --location --retry 3 \
+              "$SITE_ORIGIN$pointer_path" | jq -r '.build')"
+            if [[ "$pointer" != *"/${source_sha}/"* ]]; then
+              echo "$repository changed: live=$pointer latest=$source_sha"
+              changed=true
+            else
+              echo "$repository unchanged at $source_sha"
+            fi
+          }
+
+          check_fork cryptoadvance/specter-diy master /browser/current.json
+          check_fork k9ert/specter-playground main /browser/variants/specter-playground.json
+          check_fork schnuartz-ai/specter-playground main /browser/variants/specter-playground-fast.json
+          check_fork Schnuartz/specter-playground main /browser/variants/specter-playground-schnuartz.json
+          check_fork schnuartz-ai/specter-playground-schnuartz main /browser/variants/specter-playground-schnuartz-alternative.json
+          echo "changed=$changed"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
   browser:
+    needs: fork-sync
+    if: needs.fork-sync.outputs.changed == 'true'
+    concurrency:
+      # A push or manual run supersedes an older build, but scheduled polls
+      # never reach this job while a build is already active.
+      group: browser-production
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
