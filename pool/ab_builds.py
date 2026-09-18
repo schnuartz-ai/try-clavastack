@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 try:
     import pwd
 except ImportError:  # Windows development machines do not expose Unix users.
@@ -35,13 +36,80 @@ KNOWN_REPOSITORIES = {
     "schnuartz-ai/specter-playground-schnuartz",
 }
 AB_STORAGE = Path(os.environ.get("AB_BUILD_STORAGE", "/var/lib/try-clavastack/ab-builds"))
+AB_USAGE_ROOT = Path(os.environ.get("AB_USAGE_ROOT", "/var/lib/try-clavastack/ab-usage"))
 SOURCE_ROOT = Path(os.environ.get("AB_SOURCE_ROOT", "/opt/try-clavastack"))
 WORK_ROOT = Path(os.environ.get("AB_WORK_ROOT", "/var/lib/try-clavastack/ab-work"))
 BUILD_USER = os.environ.get("AB_BUILD_USER", "clavastack-ab")
+RETENTION_DAYS = int(os.environ.get("AB_BUILD_RETENTION_DAYS", "30"))
+CLEANUP_INTERVAL_SECONDS = int(os.environ.get("AB_BUILD_CLEANUP_INTERVAL", "3600"))
 jobs: dict[str, dict] = {}
 jobs_by_key: dict[str, str] = {}
 jobs_lock = threading.Lock()
 build_queue: queue.Queue[str] = queue.Queue()
+
+
+def _usage_path(repository: str, commit: str) -> Path:
+    return AB_USAGE_ROOT / _safe_repo_path(repository) / commit
+
+
+def _mark_used(repository: str, commit: str) -> None:
+    marker = _usage_path(repository, commit)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+
+
+def _artifact_last_used(build_dir: Path, repository: str, commit: str) -> float:
+    marker = _usage_path(repository, commit)
+    if marker.is_file():
+        return marker.stat().st_mtime
+    # Existing builds predate usage markers. Their newest artifact mtime is a
+    # safe first-use approximation and prevents an upgrade from deleting them.
+    mtimes = [path.stat().st_mtime for path in build_dir.rglob("*") if path.is_file()]
+    return max(mtimes, default=build_dir.stat().st_mtime)
+
+
+def cleanup_unused_builds_once(now: float | None = None) -> int:
+    """Delete completed dynamic builds unused for the retention window."""
+    now = time.time() if now is None else now
+    cutoff = now - (RETENTION_DAYS * 86400)
+    with jobs_lock:
+        active = {
+            (str(job.get("repository", "")).lower(), str(job.get("commit", "")).lower())
+            for job in jobs.values()
+            if job.get("status") in {"queued", "building", "validating"}
+        }
+    removed = 0
+    if not AB_STORAGE.is_dir():
+        return removed
+    for owner_dir in AB_STORAGE.iterdir():
+        if not owner_dir.is_dir() or owner_dir.name.startswith("."):
+            continue
+        for repository_dir in owner_dir.iterdir():
+            if not repository_dir.is_dir():
+                continue
+            repository = f"{owner_dir.name}/{repository_dir.name}"
+            for build_dir in repository_dir.iterdir():
+                if not build_dir.is_dir() or not COMMIT_RE.fullmatch(build_dir.name):
+                    continue
+                key = (repository.lower(), build_dir.name.lower())
+                if key in active or _artifact_last_used(build_dir, repository, build_dir.name) >= cutoff:
+                    continue
+                shutil.rmtree(build_dir, ignore_errors=True)
+                marker = _usage_path(repository, build_dir.name)
+                marker.unlink(missing_ok=True)
+                removed += 1
+    return removed
+
+
+def _cleanup_loop() -> None:
+    while True:
+        try:
+            removed = cleanup_unused_builds_once()
+            if removed:
+                print(f"A/B cleanup removed {removed} unused build(s)", flush=True)
+        except Exception as error:  # cleanup must never stop the builder
+            print(f"A/B cleanup failed: {error}", flush=True)
+        time.sleep(CLEANUP_INTERVAL_SECONDS)
 
 
 def _github(path: str) -> dict:
@@ -178,6 +246,7 @@ def _existing_build(spec: dict) -> dict | None:
         if (candidate / "build-info.json").is_file():
             prefix = "/ab-builds/" + _safe_repo_path(repository) + "/" + spec["commit"]
             if str(candidate).startswith(str(AB_STORAGE)):
+                _mark_used(repository, spec["commit"])
                 return _manifest_pointer(candidate, prefix)
             # Existing static Playground builds have a -mockui directory.
             if str(candidate).startswith("/var/www/try-clavastack-deploy/current/"):
@@ -201,6 +270,8 @@ def submit(raw_url: str) -> dict:
             # A failed build must be retryable after the underlying source or
             # toolchain issue is fixed; do not keep returning the stale error.
             if existing.get("status") != "failed":
+                if existing.get("status") == "ready":
+                    _mark_used(existing["repository"], existing["commit"])
                 return _public_job(existing)
             jobs_by_key.pop(key, None)
         pointer = _existing_build(spec)
@@ -231,7 +302,10 @@ def get_job(job_id: str) -> dict | None:
 def pointer_for_job(job_id: str) -> dict | None:
     with jobs_lock:
         job = jobs.get(job_id)
-        return job.get("pointer") if job and job.get("status") == "ready" else None
+        if job and job.get("status") == "ready":
+            _mark_used(job["repository"], job["commit"])
+            return job.get("pointer")
+        return None
 
 
 def _worker() -> None:
@@ -288,6 +362,7 @@ def _worker() -> None:
                 shutil.rmtree(target)
             staging.rename(target)
             _publish_permissions(target)
+            _mark_used(spec["repository"], spec["commit"])
             pointer = _manifest_pointer(target, "/ab-builds/" + _safe_repo_path(spec["repository"]) + "/" + spec["commit"])
             with jobs_lock:
                 jobs[job_id].update(status="ready", message="Build ready", pointer=pointer)
@@ -299,3 +374,4 @@ def _worker() -> None:
 
 
 threading.Thread(target=_worker, name="specter-ab-builder", daemon=True).start()
+threading.Thread(target=_cleanup_loop, name="specter-ab-cleanup", daemon=True).start()
