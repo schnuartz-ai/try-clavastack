@@ -23,6 +23,7 @@ target.mkdir(exist_ok=True)
 freeze('f469-disco/libs/common')
 freeze('f469-disco/micropython/lib/micropython-lib/python-stdlib/base64', 'base64.py')
 freeze('f469-disco/micropython/lib/micropython-lib/python-stdlib/contextlib')
+freeze('f469-disco/micropython/lib/micropython-lib/micropython/ucontextlib')
 freeze('scenarios/MockUI/src')
 freeze('src', ('app.py', 'config_default.py', 'errors.py', 'helpers.py',
                'platform.py', 'qrencoder.py', 'rng.py', 'specter.py'))
