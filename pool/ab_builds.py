@@ -68,6 +68,43 @@ def _artifact_last_used(build_dir: Path, repository: str, commit: str) -> float:
     return max(mtimes, default=build_dir.stat().st_mtime)
 
 
+def _cleanup_work_cache(cutoff: float, active: set[tuple[str, str]]) -> int:
+    """Prune duplicate artifacts and idle source/toolchain caches."""
+    removed = 0
+    build_cache = WORK_ROOT / "builds"
+    if build_cache.is_dir():
+        for owner_dir in build_cache.iterdir():
+            if not owner_dir.is_dir():
+                continue
+            for repository_dir in owner_dir.iterdir():
+                if not repository_dir.is_dir():
+                    continue
+                repository = f"{owner_dir.name}/{repository_dir.name}"
+                for build_dir in repository_dir.iterdir():
+                    if not build_dir.is_dir() or not COMMIT_RE.fullmatch(build_dir.name):
+                        continue
+                    key = (repository.lower(), build_dir.name.lower())
+                    if key in active or _artifact_last_used(build_dir, repository, build_dir.name) >= cutoff:
+                        continue
+                    shutil.rmtree(build_dir, ignore_errors=True)
+                    removed += 1
+    browser_cache = WORK_ROOT / ".browser-work"
+    if browser_cache.is_dir() and not active:
+        toolchain_marker = AB_USAGE_ROOT / ".toolchain"
+        for cache_dir in browser_cache.iterdir():
+            if cache_dir.name == ".builder-home":
+                continue
+            last_used = (
+                toolchain_marker.stat().st_mtime
+                if cache_dir.name == "emsdk" and toolchain_marker.is_file()
+                else cache_dir.stat().st_mtime
+            )
+            if last_used < cutoff:
+                shutil.rmtree(cache_dir, ignore_errors=True)
+                removed += 1
+    return removed
+
+
 def cleanup_unused_builds_once(now: float | None = None) -> int:
     """Delete completed dynamic builds unused for the retention window."""
     now = time.time() if now is None else now
@@ -98,6 +135,7 @@ def cleanup_unused_builds_once(now: float | None = None) -> int:
                 marker = _usage_path(repository, build_dir.name)
                 marker.unlink(missing_ok=True)
                 removed += 1
+    removed += _cleanup_work_cache(cutoff, active)
     return removed
 
 
@@ -338,6 +376,10 @@ def _worker() -> None:
                     # unprivileged builder. Keep these roots writable for it.
                     os.chown(directory, account.pw_uid, account.pw_gid)
                     os.chmod(directory, 0o750)
+            _mark_used(spec["repository"], spec["commit"])
+            toolchain_marker = AB_USAGE_ROOT / ".toolchain"
+            toolchain_marker.parent.mkdir(parents=True, exist_ok=True)
+            toolchain_marker.touch()
             command = ["bash", str(SOURCE_ROOT / "browser/build-ab.sh"), spec["repository"], spec["commit"], spec["adapter"]]
             kwargs = {}
             if account is not None:
