@@ -8,8 +8,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_REPO="${SOURCE_REPO_OVERRIDE:-https://github.com/cryptoadvance/specter-diy.git}"
 SOURCE_BRANCH="${SPECTER_SOURCE_BRANCH:-master}"
 SOURCE_SHA="${SPECTER_SOURCE_SHA:-}"
-SPECTER_SRC="${SPECTER_SRC:-$ROOT/.browser-work/specter-diy}"
-EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
+AB_WORK_ROOT="${AB_WORK_ROOT:-$ROOT/.browser-work}"
+SPECTER_SRC="${SPECTER_SRC:-$AB_WORK_ROOT/specter-diy}"
+EMSDK_ENV="${EMSDK_ENV:-$AB_WORK_ROOT/emsdk/emsdk_env.sh}"
 
 if [[ ! -d "$SPECTER_SRC/.git" ]]; then
   mkdir -p "$(dirname "$SPECTER_SRC")"
@@ -36,12 +37,19 @@ if [[ "$(git -C "$SPECTER_SRC" rev-parse HEAD)" != "$SOURCE_SHA" ]]; then
 fi
 REPOSITORY_PATH="${SOURCE_REPO#https://github.com/}"
 REPOSITORY_PATH="${REPOSITORY_PATH%.git}"
-OUT="$ROOT/builds/$REPOSITORY_PATH/$SOURCE_SHA"
+ARTIFACT_ROOT="${AB_ARTIFACT_ROOT:-$ROOT/builds}"
+OUT="$ARTIFACT_ROOT/$REPOSITORY_PATH/$SOURCE_SHA"
 git -C "$SPECTER_SRC" submodule update --init --recursive
 
 if ! command -v emcc >/dev/null; then
   # A pinned emsdk installation can be supplied outside this repository.
-  test -f "$EMSDK_ENV" || { echo "Emscripten 3.1.74 is required" >&2; exit 1; }
+  if [[ ! -f "$EMSDK_ENV" ]]; then
+    EMSDK_DIR="$(dirname "$EMSDK_ENV")"
+    mkdir -p "$(dirname "$EMSDK_DIR")"
+    git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
+    "$EMSDK_DIR/emsdk" install 3.1.74
+    "$EMSDK_DIR/emsdk" activate 3.1.74
+  fi
   # shellcheck source=/dev/null
   source "$EMSDK_ENV" >/dev/null
 fi

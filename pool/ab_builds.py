@@ -12,8 +12,11 @@ import queue
 import re
 import shutil
 import subprocess
-import tempfile
 import threading
+try:
+    import pwd
+except ImportError:  # Windows development machines do not expose Unix users.
+    pwd = None
 import urllib.error
 import urllib.request
 import uuid
@@ -33,6 +36,8 @@ KNOWN_REPOSITORIES = {
 }
 AB_STORAGE = Path(os.environ.get("AB_BUILD_STORAGE", "/var/lib/try-clavastack/ab-builds"))
 SOURCE_ROOT = Path(os.environ.get("AB_SOURCE_ROOT", "/opt/try-clavastack"))
+WORK_ROOT = Path(os.environ.get("AB_WORK_ROOT", "/var/lib/try-clavastack/ab-work"))
+BUILD_USER = os.environ.get("AB_BUILD_USER", "clavastack-ab")
 jobs: dict[str, dict] = {}
 jobs_by_key: dict[str, str] = {}
 jobs_lock = threading.Lock()
@@ -227,30 +232,37 @@ def _worker() -> None:
             job["message"] = "Building the requested revision…"
             spec = {key: job[key] for key in ("repository", "commit", "adapter")}
         try:
-            with tempfile.TemporaryDirectory(prefix="specter-ab-") as temp:
-                env = os.environ.copy()
-                env["AB_BUILD_ROOT"] = temp
-                command = ["bash", str(SOURCE_ROOT / "browser/build-ab.sh"), spec["repository"], spec["commit"], spec["adapter"]]
-                result = subprocess.run(command, cwd=SOURCE_ROOT, env=env, capture_output=True, text=True, timeout=45 * 60)
-                if result.returncode:
-                    raise RuntimeError((result.stderr or result.stdout or "Build failed")[-2000:])
-                source_dir = Path((result.stdout or "").strip().splitlines()[-1])
-                if not source_dir.is_dir():
-                    raise RuntimeError("Builder did not produce an artifact directory")
-                with jobs_lock:
-                    jobs[job_id]["status"] = "validating"
-                    jobs[job_id]["message"] = "Validating WebAssembly artifacts…"
-                target = AB_STORAGE / _safe_repo_path(spec["repository"]) / spec["commit"]
-                target.parent.mkdir(parents=True, exist_ok=True)
-                staging = target.with_name(target.name + ".staging")
-                if staging.exists():
-                    shutil.rmtree(staging)
-                shutil.copytree(source_dir, staging)
-                _manifest_pointer(staging, "/ab-builds/" + _safe_repo_path(spec["repository"]) + "/" + spec["commit"])
-                if target.exists():
-                    shutil.rmtree(target)
-                staging.rename(target)
-                pointer = _manifest_pointer(target, "/ab-builds/" + _safe_repo_path(spec["repository"]) + "/" + spec["commit"])
+            env = os.environ.copy()
+            env["AB_WORK_ROOT"] = str(WORK_ROOT / ".browser-work")
+            env["AB_ARTIFACT_ROOT"] = str(WORK_ROOT / "builds")
+            WORK_ROOT.mkdir(parents=True, exist_ok=True)
+            (WORK_ROOT / ".browser-work").mkdir(parents=True, exist_ok=True)
+            (WORK_ROOT / "builds").mkdir(parents=True, exist_ok=True)
+            command = ["bash", str(SOURCE_ROOT / "browser/build-ab.sh"), spec["repository"], spec["commit"], spec["adapter"]]
+            kwargs = {}
+            if pwd is not None and os.name == "posix" and os.geteuid() == 0:
+                account = pwd.getpwnam(BUILD_USER)
+                kwargs["preexec_fn"] = lambda: (os.setgid(account.pw_gid), os.setuid(account.pw_uid))
+            result = subprocess.run(command, cwd=SOURCE_ROOT, env=env, capture_output=True, text=True, timeout=90 * 60, **kwargs)
+            if result.returncode:
+                raise RuntimeError((result.stderr or result.stdout or "Build failed")[-2000:])
+            source_dir = Path((result.stdout or "").strip().splitlines()[-1])
+            if not source_dir.is_dir():
+                raise RuntimeError("Builder did not produce an artifact directory")
+            with jobs_lock:
+                jobs[job_id]["status"] = "validating"
+                jobs[job_id]["message"] = "Validating WebAssembly artifacts…"
+            target = AB_STORAGE / _safe_repo_path(spec["repository"]) / spec["commit"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            staging = target.with_name(target.name + ".staging")
+            if staging.exists():
+                shutil.rmtree(staging)
+            shutil.copytree(source_dir, staging)
+            _manifest_pointer(staging, "/ab-builds/" + _safe_repo_path(spec["repository"]) + "/" + spec["commit"])
+            if target.exists():
+                shutil.rmtree(target)
+            staging.rename(target)
+            pointer = _manifest_pointer(target, "/ab-builds/" + _safe_repo_path(spec["repository"]) + "/" + spec["commit"])
             with jobs_lock:
                 jobs[job_id].update(status="ready", message="Build ready", pointer=pointer)
         except Exception as error:  # keep the service alive for the next request

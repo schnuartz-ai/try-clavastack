@@ -36,8 +36,9 @@ esac
 # so a clean build cannot accidentally reuse the other fork's checkout.
 CHECKOUT_KEY="${REPOSITORY//\//-}"
 if [[ "${1:-}" = schnuartz-alternative ]]; then CHECKOUT_KEY+="-alternative"; fi
-FORK_SRC="${FORK_SRC:-$ROOT/.browser-work/$CHECKOUT_KEY}"
-EMSDK_ENV="${EMSDK_ENV:-$ROOT/.browser-work/emsdk/emsdk_env.sh}"
+AB_WORK_ROOT="${AB_WORK_ROOT:-$ROOT/.browser-work}"
+FORK_SRC="${FORK_SRC:-$AB_WORK_ROOT/$CHECKOUT_KEY}"
+EMSDK_ENV="${EMSDK_ENV:-$AB_WORK_ROOT/emsdk/emsdk_env.sh}"
 if [[ ! -e "$FORK_SRC/.git" ]]; then
   mkdir -p "$(dirname "$FORK_SRC")"
   git clone --branch "$SOURCE_BRANCH" "https://github.com/$REPOSITORY.git" "$FORK_SRC"
@@ -54,7 +55,8 @@ fi
 git -C "$FORK_SRC" fetch --force origin "$SOURCE_SHA"
 git -C "$FORK_SRC" checkout --force "$SOURCE_SHA"
 test "$(git -C "$FORK_SRC" rev-parse HEAD)" = "$SOURCE_SHA" || { echo "Wrong fork commit" >&2; exit 1; }
-OUT="$ROOT/builds/${REPOSITORY}-mockui/$SOURCE_SHA"
+ARTIFACT_ROOT="${AB_ARTIFACT_ROOT:-$ROOT/builds}"
+OUT="$ARTIFACT_ROOT/${REPOSITORY}-mockui/$SOURCE_SHA"
 # Only the firmware build inputs are needed here.  A fully recursive checkout
 # also downloads every optional MicroPython port library, which makes a clean
 # browser build unnecessarily slow and can leave it stuck in unrelated git
@@ -108,7 +110,13 @@ python3 "$ROOT/browser/limit-lvgl.py" \
   "$FORK_SRC/f469-disco/usermods/udisplay_f469/lvgl/lvgl.mk"
 
 if ! command -v emcc >/dev/null; then
-  test -f "$EMSDK_ENV" || { echo "Emscripten 3.1.74 required" >&2; exit 1; }
+  if [[ ! -f "$EMSDK_ENV" ]]; then
+    EMSDK_DIR="$(dirname "$EMSDK_ENV")"
+    mkdir -p "$(dirname "$EMSDK_DIR")"
+    git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
+    "$EMSDK_DIR/emsdk" install 3.1.74
+    "$EMSDK_DIR/emsdk" activate 3.1.74
+  fi
   source "$EMSDK_ENV" >/dev/null
 fi
 test "$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)" = 3.1.74
