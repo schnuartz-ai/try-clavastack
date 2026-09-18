@@ -37,6 +37,7 @@ KNOWN_REPOSITORIES = {
 }
 AB_STORAGE = Path(os.environ.get("AB_BUILD_STORAGE", "/var/lib/try-clavastack/ab-builds"))
 AB_USAGE_ROOT = Path(os.environ.get("AB_USAGE_ROOT", "/var/lib/try-clavastack/ab-usage"))
+AB_JOB_STATE_FILE = Path(os.environ.get("AB_JOB_STATE_FILE", "/var/lib/try-clavastack/ab-jobs.json"))
 SOURCE_ROOT = Path(os.environ.get("AB_SOURCE_ROOT", "/opt/try-clavastack"))
 WORK_ROOT = Path(os.environ.get("AB_WORK_ROOT", "/var/lib/try-clavastack/ab-work"))
 BUILD_USER = os.environ.get("AB_BUILD_USER", "clavastack-ab")
@@ -46,6 +47,57 @@ jobs: dict[str, dict] = {}
 jobs_by_key: dict[str, str] = {}
 jobs_lock = threading.Lock()
 build_queue: queue.Queue[str] = queue.Queue()
+
+
+def _save_jobs_locked() -> None:
+    """Persist allocator jobs atomically so API ids survive service restarts."""
+    try:
+        AB_JOB_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporary = AB_JOB_STATE_FILE.with_name(AB_JOB_STATE_FILE.name + ".tmp")
+        temporary.write_text(json.dumps(jobs, sort_keys=True, indent=2), encoding="utf-8")
+        os.replace(temporary, AB_JOB_STATE_FILE)
+    except Exception as error:  # persistence must not take down the allocator
+        print(f"A/B job-state save failed: {error}", flush=True)
+
+
+def _load_jobs() -> None:
+    """Restore jobs and resume interrupted builds after an allocator restart."""
+    if not AB_JOB_STATE_FILE.is_file():
+        return
+    try:
+        loaded = json.loads(AB_JOB_STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        print(f"A/B job-state load failed: {error}", flush=True)
+        return
+    if not isinstance(loaded, dict):
+        return
+    changed = False
+    for job_id, raw_job in loaded.items():
+        if not isinstance(job_id, str) or not isinstance(raw_job, dict):
+            changed = True
+            continue
+        required = ("repository", "commit", "adapter", "key")
+        if any(not raw_job.get(field) for field in required):
+            changed = True
+            continue
+        job = dict(raw_job)
+        spec = {key: job[key] for key in ("repository", "commit", "adapter")}
+        # A completed artifact always wins over a stale in-progress status.
+        pointer = _existing_build(spec)
+        if pointer:
+            if job.get("status") != "ready" or job.get("pointer") != pointer:
+                job.update(status="ready", message="Build ready after allocator restart", pointer=pointer)
+                changed = True
+        elif job.get("status") in {"queued", "building", "validating"}:
+            # Keep the same public job id and resume it once the worker starts.
+            job.update(status="queued", message="Resuming build after allocator restart", pointer=None)
+            build_queue.put(job_id)
+            changed = True
+        jobs[job_id] = job
+        jobs_by_key[str(job["key"])] = job_id
+    if changed:
+        with jobs_lock:
+            _save_jobs_locked()
 
 
 def _usage_path(repository: str, commit: str) -> Path:
@@ -312,6 +364,7 @@ def submit(raw_url: str) -> dict:
                     _mark_used(existing["repository"], existing["commit"])
                 return _public_job(existing)
             jobs_by_key.pop(key, None)
+            _save_jobs_locked()
         pointer = _existing_build(spec)
         job_id = uuid.uuid4().hex
         job = {
@@ -329,6 +382,7 @@ def submit(raw_url: str) -> dict:
         jobs_by_key[key] = job_id
         if not pointer:
             build_queue.put(job_id)
+        _save_jobs_locked()
         return _public_job(job)
 
 
@@ -356,6 +410,7 @@ def _worker() -> None:
             job["status"] = "building"
             job["message"] = "Building the requested revision…"
             spec = {key: job[key] for key in ("repository", "commit", "adapter")}
+            _save_jobs_locked()
         try:
             env = os.environ.copy()
             env["AB_WORK_ROOT"] = str(WORK_ROOT / ".browser-work")
@@ -393,6 +448,7 @@ def _worker() -> None:
             with jobs_lock:
                 jobs[job_id]["status"] = "validating"
                 jobs[job_id]["message"] = "Validating WebAssembly artifacts…"
+                _save_jobs_locked()
             target = AB_STORAGE / _safe_repo_path(spec["repository"]) / spec["commit"]
             target.parent.mkdir(parents=True, exist_ok=True)
             staging = target.with_name(target.name + ".staging")
@@ -408,12 +464,14 @@ def _worker() -> None:
             pointer = _manifest_pointer(target, "/ab-builds/" + _safe_repo_path(spec["repository"]) + "/" + spec["commit"])
             with jobs_lock:
                 jobs[job_id].update(status="ready", message="Build ready", pointer=pointer)
+                _save_jobs_locked()
         except Exception as error:  # keep the service alive for the next request
             with jobs_lock:
                 jobs[job_id].update(status="failed", message="Build failed", error=str(error)[:2000])
+                _save_jobs_locked()
         finally:
             build_queue.task_done()
 
-
+_load_jobs()
 threading.Thread(target=_worker, name="specter-ab-builder", daemon=True).start()
 threading.Thread(target=_cleanup_loop, name="specter-ab-cleanup", daemon=True).start()
