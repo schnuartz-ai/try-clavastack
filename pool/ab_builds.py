@@ -241,6 +241,7 @@ def _worker() -> None:
             env["AB_WORK_ROOT"] = str(WORK_ROOT / ".browser-work")
             env["AB_ARTIFACT_ROOT"] = str(WORK_ROOT / "builds")
             env["HOME"] = str(WORK_ROOT / ".builder-home")
+            env["BROWSER_SKIP_POINTER"] = "1"
             env["BROWSER_POINTER_BUILD"] = (
                 f"/ab-builds/{_safe_repo_path(spec['repository'])}/{spec['commit']}/"
             )

@@ -84,6 +84,7 @@ elif repository_key == "schnuartz/specter-playground":
     pointer_name = "variants/specter-playground-schnuartz.json"
 else:
     pointer_name = "variants/" + repository.split("/")[1] + ".json"
-pointer_path = Path(__file__).resolve().parent / pointer_name
-pointer_path.parent.mkdir(parents=True, exist_ok=True)
-pointer_path.write_text(json.dumps(pointer, indent=2) + "\n")
+if os.environ.get("BROWSER_SKIP_POINTER") != "1":
+    pointer_path = Path(__file__).resolve().parent / pointer_name
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    pointer_path.write_text(json.dumps(pointer, indent=2) + "\n")
