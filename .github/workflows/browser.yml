@@ -107,10 +107,11 @@ jobs:
         with:
           go-version: '1.22'
       - name: Build and test Virtual Host integration bridge
+        working-directory: virtual-host
         run: |
-          go test ./virtual-host
+          go test ./...
           go build -trimpath -ldflags "-s -w -X main.version=1.0.4" \
-            -o /tmp/clavastack-virtual-host ./virtual-host
+            -o /tmp/clavastack-virtual-host .
       - name: Install Emscripten 3.1.74
         run: |
           git clone https://github.com/emscripten-core/emsdk.git .browser-work/emsdk
