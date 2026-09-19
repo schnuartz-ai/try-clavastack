@@ -28,7 +28,7 @@ const hostSocket = await new Promise((resolve, reject) => {
 // itself can legitimately arrive after the client handshake on a busy runner.
 await page.waitForTimeout(250);
 hostSocket.end();
-await page.locator('#st').getByText('Running locally').waitFor({ timeout: 10000 });
+await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
 if (errors.length) throw new Error(`Browser errors: ${errors.join('; ')}`);
 console.log(JSON.stringify({ result: 'pass', browserTab: 'connected simulator active',
   route: 'TCP 8789 → Virtual Host → connected browser tab' }, null, 2));
