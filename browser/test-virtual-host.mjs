@@ -13,6 +13,7 @@ page.on('pageerror', error => errors.push(error.message));
 await page.goto(`${base}/connected?probe=usb`, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => document.querySelector('#debug-log')?.textContent.includes('worker-created') &&
   document.querySelector('#virtual-host-status')?.classList.contains('waiting'), null, { timeout: 15000 });
+await stalePage.locator('#virtual-host').evaluate(element => { element.open = true; });
 await stalePage.locator('#virtual-host-status-text')
   .getByText('Inactive — another connected simulator tab is open').waitFor({ timeout: 5000 });
 
