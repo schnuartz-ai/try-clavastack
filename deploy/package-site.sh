@@ -26,8 +26,6 @@ mkdir -p "$SITE_DIR" "$OUTPUT_DIR"
 
 paths=(
   index.html
-  phone-frame.html
-  specter3-testing.html
   apple-touch-icon.png
   favicon.ico
   icon-192.png
@@ -37,16 +35,8 @@ paths=(
   site.webmanifest
   llms.txt
   assets
-  browser
   builds
-  device-test
-  legacy
-  marco
-  simulator
-  simulator2
   simulators
-  ab
-  specter3-testing
 )
 
 for path in "${paths[@]}"; do
@@ -57,14 +47,16 @@ for path in "${paths[@]}"; do
   cp -aL "$ROOT/$path" "$SITE_DIR/$path"
 done
 
-# The allocator is deployed separately from the static webroot, but the
-# release carries the matching A/B build API code so the VPS can update both
-# pieces atomically from the same tested GitHub release.
-mkdir -p "$SITE_DIR/ab-runtime"
-cp "$ROOT/pool/server.py" "$ROOT/pool/ab_builds.py" "$SITE_DIR/ab-runtime/"
-cp "$ROOT/vps-config/Caddyfile" "$SITE_DIR/ab-runtime/Caddyfile"
-mkdir -p "$SITE_DIR/ab-runtime/browser"
-cp -aL "$ROOT/browser/." "$SITE_DIR/ab-runtime/browser/"
+mkdir -p "$SITE_DIR/browser/variants"
+cp "$ROOT/browser/site.js" "$ROOT/browser/runtime-worker.js" \
+  "$ROOT/browser/current.json" "$ROOT/browser/demo-data.js" \
+  "$SITE_DIR/browser/"
+cp "$ROOT/browser/variants/"*.json "$SITE_DIR/browser/variants/"
+
+# The release carries only the static site and its isolated Caddy site block.
+# The VPS root Caddyfile imports this file alongside future private services.
+mkdir -p "$SITE_DIR/server-config"
+cp "$ROOT/vps-config/Caddyfile" "$SITE_DIR/server-config/try.clavastack.caddy"
 
 if [[ $(find "$SITE_DIR/builds" -type f -name 'micropython.wasm' | wc -l) -lt 4 ]]; then
   echo "Expected all four tested firmware builds in the production package" >&2
@@ -76,10 +68,7 @@ find "$SITE_DIR" -type f \( \
   -name '*.bak' -o -name '*.backup' -o -name '*.before-*' -o \
   -name 'test-*.mjs' -o -name 'diagnose-*.mjs' \
 \) -delete
-rm -rf -- \
-  "$SITE_DIR/browser/probes" \
-  "$SITE_DIR/browser/fixtures" \
-  "$SITE_DIR/browser/v9-patches"
+rm -rf -- "$SITE_DIR/simulators/legacy"
 
 python3 - "$SITE_DIR/deployment.json" "$RUN_ID" "$SOURCE_SHA" <<'PY'
 import datetime

@@ -9,6 +9,9 @@ CURRENT_LINK="$WEBROOT/current"
 STATE_DIR="/var/lib/try-clavastack"
 STATE_FILE="$STATE_DIR/site-last-deployed-run"
 LOCK_FILE="/run/try-clavastack/site-deploy.lock"
+CADDY_MAIN="/etc/caddy/Caddyfile"
+CADDY_SITE_DIR="/etc/caddy/sites-enabled"
+CADDY_SITE="$CADDY_SITE_DIR/try.clavastack.caddy"
 
 exec 9>"$LOCK_FILE"
 flock -n 9 || exit 0
@@ -93,30 +96,38 @@ PY
 
 for required in \
   index.html \
-  ab/index.html \
   browser/site.js \
   browser/runtime-worker.js \
   browser/current.json \
+  browser/demo-data.js \
+  browser/variants/specter-playground-fast.json \
   browser/variants/specter-playground.json \
   browser/variants/specter-playground-schnuartz.json \
   browser/variants/specter-playground-schnuartz-alternative.json; do
   test -f "$STAGING_DIR/$required"
 done
 
-test -f "$STAGING_DIR/ab-runtime/server.py"
-test -f "$STAGING_DIR/ab-runtime/ab_builds.py"
-test -f "$STAGING_DIR/ab-runtime/browser/build-ab.sh"
-test -f "$STAGING_DIR/ab-runtime/Caddyfile"
-install -d -o root -g root -m 0755 /opt/try-clavastack/pool
-install -d -o root -g root -m 0755 /opt/try-clavastack/browser
-install -o root -g root -m 0755 "$STAGING_DIR/ab-runtime/server.py" /opt/try-clavastack/pool/server.py
-install -o root -g root -m 0644 "$STAGING_DIR/ab-runtime/ab_builds.py" /opt/try-clavastack/pool/ab_builds.py
-cp -a "$STAGING_DIR/ab-runtime/browser/." /opt/try-clavastack/browser/
-caddy validate --adapter caddyfile --config "$STAGING_DIR/ab-runtime/Caddyfile"
-install -o root -g root -m 0644 "$STAGING_DIR/ab-runtime/Caddyfile" /etc/caddy/Caddyfile
+test -f "$STAGING_DIR/server-config/try.clavastack.caddy"
+grep -Fq 'import /etc/caddy/sites-enabled/*.caddy' "$CADDY_MAIN"
+caddy validate --adapter caddyfile --config \
+  "$STAGING_DIR/server-config/try.clavastack.caddy"
+install -d -o root -g root -m 0755 "$CADDY_SITE_DIR"
+if [[ -f "$CADDY_SITE" ]]; then
+  cp -a "$CADDY_SITE" "$WORK_DIR/previous-site.caddy"
+fi
+install -o root -g root -m 0644 \
+  "$STAGING_DIR/server-config/try.clavastack.caddy" "$CADDY_SITE"
+if ! caddy validate --adapter caddyfile --config "$CADDY_MAIN"; then
+  if [[ -f "$WORK_DIR/previous-site.caddy" ]]; then
+    install -o root -g root -m 0644 "$WORK_DIR/previous-site.caddy" "$CADDY_SITE"
+  else
+    rm -f -- "$CADDY_SITE"
+  fi
+  echo "Caddy validation failed; previous site configuration restored" >&2
+  exit 1
+fi
 systemctl reload caddy
-rm -rf -- "$STAGING_DIR/ab-runtime"
-systemctl restart try-allocator.service
+rm -rf -- "$STAGING_DIR/server-config"
 
 if [[ -e "$FINAL_DIR" ]]; then
   rm -rf -- "$STAGING_DIR"

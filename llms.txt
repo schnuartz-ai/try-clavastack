@@ -15,7 +15,6 @@ security properties of a hardware wallet.
 
 - Specter DIY: https://try.clavastack.com/
 - Multi-device gallery: https://try.clavastack.com/simulators/
-- Legacy server simulator: https://try.clavastack.com/legacy/
 
 ## Source
 

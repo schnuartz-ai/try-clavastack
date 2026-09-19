@@ -5,9 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-# The release also atomically updates the root-owned allocator runtime and
-# Caddy configuration. Keep the webroot/state paths restricted while granting
-# this oneshot the privileges required for those two coordinated updates.
+# The release atomically updates the static webroot and its isolated Caddy
+# site block. No simulator process or allocator is installed on the VPS.
 User=root
 Group=root
 RuntimeDirectory=try-clavastack
@@ -18,4 +17,4 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/var/www/try-clavastack-deploy /var/lib/try-clavastack /run/try-clavastack /opt/try-clavastack /etc/caddy
+ReadWritePaths=/var/www/try-clavastack-deploy /var/lib/try-clavastack /run/try-clavastack /etc/caddy

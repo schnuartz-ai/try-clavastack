@@ -1,6 +1,6 @@
 # Browser simulator setup and deployment
 
-The default site is static. Its only server requirements are HTTPS, correct WASM MIME delivery, and the headers in [`vps-config/Caddyfile`](vps-config/Caddyfile). The legacy VNC routes remain configured for `/legacy/`.
+The production site is static. Its only server requirements are HTTPS, correct WASM MIME delivery, and the headers in [`vps-config/Caddyfile`](vps-config/Caddyfile). No VNC, simulator or allocator process runs on the VPS.
 
 ## Local build
 
@@ -29,7 +29,7 @@ Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Resource-Policy: same-origin
 ```
 
-It serves versioned artifacts with immutable caching and `browser/current.json` plus `build-info.json` with revalidation. It retains `/api/*`, VNC WebSocket paths, `/novnc/*`, and restart routes solely for the legacy page. Caddy should serve the `.wasm` file with `application/wasm` and compress static assets using zstd/gzip. Check the live response headers with `curl -I https://try.clavastack.com/` and `curl -I https://try.clavastack.com/builds/.../micropython.wasm`.
+It serves versioned artifacts with immutable caching and `browser/current.json` plus `build-info.json` with revalidation. Caddy should serve the `.wasm` file with `application/wasm` and compress static assets using zstd/gzip. `/etc/caddy/Caddyfile` imports isolated site blocks from `/etc/caddy/sites-enabled/*.caddy`; this public site is installed as `try.clavastack.caddy`. A future CRM can therefore use a separate Tailscale-only listener without changing or exposing the public site. Check the live response headers with `curl -I https://try.clavastack.com/` and `curl -I https://try.clavastack.com/builds/.../micropython.wasm`.
 
 ## Publish
 
@@ -48,8 +48,7 @@ Only after verification does the deployer atomically replace the
 `/var/www/try-clavastack-deploy/current` symlink. A failed download, checksum,
 manifest validation, or live health check leaves or restores the previous
 release. The seven newest releases are retained for rollback. Caddy serves the
-`current` symlink; the former `/var/www/try-clavastack` tree remains an
-independent bootstrap/rollback source.
+`current` symlink. Old server-rendered/VNC trees are not retained.
 
 Install the mechanism once from a trusted checkout on the VPS as root:
 
@@ -57,10 +56,10 @@ Install the mechanism once from a trusted checkout on the VPS as root:
 bash deploy/install-server.sh
 ```
 
-The installer creates an unprivileged `clavastack-deploy` system user, makes a
-filtered bootstrap copy of the current website, validates Caddy before changing
-it, installs the hardened systemd service and timer, and verifies the live HTTPS
-endpoint. Normal releases do not run as root and do not use personal GitHub
+The installer creates the deployment directories and system user, validates
+Caddy before changing it, installs the hardened systemd service and timer, and
+verifies the live HTTPS endpoint. The root-owned deployment service can update
+only its declared webroot, state and Caddy paths and uses no personal GitHub
 credentials. To request an immediate check instead of waiting for the timer:
 
 ```bash
@@ -70,7 +69,7 @@ systemctl start try-browser-auto-deploy.service
 Rollback is an atomic symlink change to a retained release followed by the same
 HTTPS smoke check. Do not edit files below `releases/` in place.
 
-The normal browser page fetches only `/browser/current.json`, its versioned build manifest/assets, the Worker, local logos/mockup, and the bundled QR decoder. It must not call `/api/allocate`, `/api/heartbeat`, `/novnc/*`, or a VNC WebSocket. `?legacy=1` redirects to `/legacy/`, which still uses those services and its old restart API. [The previous VNC deployment instructions](legacy/SETUP-VNC.md) remain available for rollback.
+The normal browser page fetches only `/browser/current.json`, its versioned build manifest/assets, the Worker, local logos/mockup, and the bundled QR decoder. `/api/*`, `/novnc/*`, VNC WebSockets and legacy server pages are not part of the production package. [The previous VNC deployment instructions](legacy/SETUP-VNC.md) remain in Git history as documentation only.
 
 The standalone [`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host)
 repository owns the Virtual Host source and its tagged release workflow. It
@@ -87,4 +86,4 @@ The Worker runs Specter with no network socket module and an in-memory `/state` 
 
 When DIY Specter activates its scanner trigger, the device screen switches to a camera view and the browser asks for camera permission. A lower backup preview can be toggled independently, with device selection where available. Camera tracks stop when no view needs them or the page closes. Decoded QR bytes enter DIY Specter's scanner UART only during an active scan. The white MemoryCard tray has three isolated slots and passes APDUs to `browser/runtime/uscard.py`, which emulates the upstream applet's select, ephemeral-static secure channel, PIN and secret-storage commands. A click inserts/removes a card; right-clicking confirms a reset. `/simulators/` runs DIY and the two distinct Playground MockUI applications at once. Drag the shared SD or MemoryCard from its tray onto a device, or from one device to another. The parent snapshots that peripheral's files from the source Worker, removes them there, imports them into the destination Worker, and activates its virtual transport. Each device's flash remains separate, including MockUI's `/flash` preferences across restart. The Playground UI prototypes contain demo state and do not implement DIY's wallet SD, QR or Smartcard protocols; transferred media bytes remain available in their browser runtime but those MockUI screens may not consume them. The SD artwork is stored locally under `assets/` and comes from Wikimedia Commons under CC0. The transport has no hardware security. USB, battery and other JavaCard applets remain unavailable.
 
-After the browser build has sustained production validation across target browsers, the dedicated Specter slot services, Xvfb, x11vnc, noVNC, websockify, allocator, heartbeat, restart API, and their Caddy proxy routes can be retired. Until then, keep them for `/legacy/`.
+The dedicated Specter slot services, Xvfb, x11vnc, noVNC, websockify, allocator, heartbeat, restart API and their Caddy proxy routes have been retired from production.

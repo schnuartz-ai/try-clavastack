@@ -1,12 +1,11 @@
 try.clavastack.com {
-	# Isolate only the browser simulator; keep legacy pages untouched.
-	@browserPaths path / /index.html /browser/* /builds/* /ab-builds/* /ab/* /simulators/ /simulators/index.html /simulators/site.js
-	header @browserPaths {
+	header {
 		Cross-Origin-Opener-Policy "same-origin"
 		Cross-Origin-Embedder-Policy "require-corp"
 		Cross-Origin-Resource-Policy "same-origin"
 	}
-	@browserShell path / /index.html /browser/site.js /browser/runtime-worker.js /ab/ /ab/index.html /simulators/ /simulators/index.html /simulators/site.js
+
+	@browserShell path / /index.html /browser/site.js /browser/runtime-worker.js /simulators/ /simulators/index.html /simulators/site.js
 	header @browserShell Cache-Control "no-cache"
 
 	@versionedBuild path_regexp versioned ^/builds/.+/micropython\.(js|wasm|data)$
@@ -15,115 +14,8 @@ try.clavastack.com {
 	header @buildManifest Cache-Control "no-cache"
 	header /browser/current.json Cache-Control "no-cache"
 	header /browser/variants/* Cache-Control "no-cache"
-	header /api/ab/pointer/* Cache-Control "no-cache"
 
-	@abBuilds path /ab-builds/*
-	header @abBuilds Cache-Control "public, max-age=31536000, immutable"
-	handle_path /ab-builds/* {
-		root * /var/lib/try-clavastack/ab-builds
-		file_server
-	}
-
-	@api path /api/*
-	handle @api {
-		reverse_proxy localhost:9001
-	}
-
-	@restart path_regexp restart ^/(diy|play|schnuartz|marko|marcobn)/sim/[1-5]/restart$
-	handle @restart {
-		reverse_proxy localhost:9001
-	}
-
-	@diy1ws path /diy/sim/1/ws
-	handle @diy1ws {
-		reverse_proxy localhost:6080
-	}
-	@diy2ws path /diy/sim/2/ws
-	handle @diy2ws {
-		reverse_proxy localhost:6081
-	}
-	@diy3ws path /diy/sim/3/ws
-	handle @diy3ws {
-		reverse_proxy localhost:6082
-	}
-	@diy4ws path /diy/sim/4/ws
-	handle @diy4ws {
-		reverse_proxy localhost:6083
-	}
-	@diy5ws path /diy/sim/5/ws
-	handle @diy5ws {
-		reverse_proxy localhost:6084
-	}
-
-	@play1ws path /play/sim/1/ws
-	handle @play1ws {
-		reverse_proxy localhost:6090
-	}
-	@play2ws path /play/sim/2/ws
-	handle @play2ws {
-		reverse_proxy localhost:6091
-	}
-	@play3ws path /play/sim/3/ws
-	handle @play3ws {
-		reverse_proxy localhost:6092
-	}
-	@play4ws path /play/sim/4/ws
-	handle @play4ws {
-		reverse_proxy localhost:6093
-	}
-	@play5ws path /play/sim/5/ws
-	handle @play5ws {
-		reverse_proxy localhost:6094
-	}
-
-	@schnuartz1ws path /schnuartz/sim/1/ws
-	handle @schnuartz1ws {
-		reverse_proxy localhost:6100
-	}
-	@schnuartz2ws path /schnuartz/sim/2/ws
-	handle @schnuartz2ws {
-		reverse_proxy localhost:6101
-	}
-	@schnuartz3ws path /schnuartz/sim/3/ws
-	handle @schnuartz3ws {
-		reverse_proxy localhost:6102
-	}
-	@schnuartz4ws path /schnuartz/sim/4/ws
-	handle @schnuartz4ws {
-		reverse_proxy localhost:6103
-	}
-	@schnuartz5ws path /schnuartz/sim/5/ws
-	handle @schnuartz5ws {
-		reverse_proxy localhost:6104
-	}
-
-	@marko1ws path /marko/sim/1/ws
-	handle @marko1ws {
-		reverse_proxy localhost:6105
-	}
-	@marko2ws path /marko/sim/2/ws
-	handle @marko2ws {
-		reverse_proxy localhost:6106
-	}
-
-	@marcobn1ws path /marcobn/sim/1/ws
-	handle @marcobn1ws {
-		reverse_proxy localhost:6107
-	}
-	@marcobn2ws path /marcobn/sim/2/ws
-	handle @marcobn2ws {
-		reverse_proxy localhost:6108
-	}
-
-	handle_path /novnc/* {
-		root * /usr/share/novnc
-		file_server
-		header Access-Control-Allow-Origin "*"
-	}
-
-	handle {
-		root * /var/www/try-clavastack-deploy/current
-		file_server
-		encode zstd gzip
-	}
+	root * /var/www/try-clavastack-deploy/current
+	file_server
+	encode zstd gzip
 }

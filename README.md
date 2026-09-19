@@ -1,6 +1,6 @@
 # Try Specter DIY in your browser
 
-[try.clavastack.com](https://try.clavastack.com) runs the **real Specter DIY Python application and LVGL UI** in a WebAssembly MicroPython Unix simulator. [All Simulators](https://try.clavastack.com/simulators/) runs that wallet beside the **distinct original LVGL 9 MockUI scenarios** from k9ert's and Schnuartz's Playground repositories, with the fast Marco fork available from the Playground switch. These Playgrounds are source-code UI prototypes with demo wallet state, just as on the former VNC page; they are not copies of the DIY wallet. The normal pages serve static files and do not allocate remote Specter processes or open VNC. The former simulators remain at `/legacy/` and `/simulators/legacy/` during validation.
+[try.clavastack.com](https://try.clavastack.com) runs the **real Specter DIY Python application and LVGL UI** in a WebAssembly MicroPython Unix simulator. [All Simulators](https://try.clavastack.com/simulators/) runs that wallet beside the **distinct original LVGL 9 MockUI scenarios** from k9ert's and Schnuartz's Playground repositories, with the fast Marco fork available from the Playground switch. These Playgrounds are source-code UI prototypes with demo wallet state, just as on the former VNC page; they are not copies of the DIY wallet. Production serves static files only and runs no remote Specter, VNC or allocator processes.
 
 **NEVER ENTER A REAL SEED PHRASE.** This is an internet-connected browser simulator, not a hardware wallet or an air-gapped device. Use test seeds only.
 
@@ -79,12 +79,12 @@ See [`SETUP.md`](SETUP.md) for the complete deployment design. Every successful
 GitHub. The VPS pulls that package as an unprivileged deployment user, verifies
 it, and atomically changes a `current` symlink. Previous releases remain
 available for immediate rollback; no source files are copied manually into the
-live webroot. Keep the VNC reverse-proxy rules, allocator, heartbeat and restart
-endpoints until browser usage is proven stable; only `/legacy/` requests should
-use them. The previous VNC setup guide is archived at
+live webroot. Caddy imports the public site from an isolated site file, so a
+future Tailscale-only CRM can be configured separately without exposing it on
+the public hostname. The previous VNC setup guide is archived at
 [`legacy/SETUP-VNC.md`](legacy/SETUP-VNC.md).
 
-Current browser support is aimed at current Chromium and Firefox versions with WebAssembly, Web Workers, and transferable OffscreenCanvas. The DIY build also has a Canvas pixel bridge for WebKit without OffscreenCanvas. The LVGL 9 Playground builds currently require transferable OffscreenCanvas; unsupported browsers show an immediate error with a legacy Playground link. Camera access additionally requires HTTPS and permission. CI exercises Chromium; local Playwright smoke tests cover Firefox and the WebKit DIY/fallback path. Physical mobile devices and macOS Safari still need validation before the VNC services are retired. Physical USB enumeration, physical QR scanner settings, battery measurements, hardware RNG/security guarantees, and non-MemoryCard JavaCard applets are not emulated. The optional Virtual Host exposes only the simulator's documented USB protocol to software on the same PC.
+Current browser support is aimed at current Chromium and Firefox versions with WebAssembly, Web Workers, and transferable OffscreenCanvas. The DIY build also has a Canvas pixel bridge for WebKit without OffscreenCanvas. The LVGL 9 Playground builds currently require transferable OffscreenCanvas. Camera access additionally requires HTTPS and permission. CI exercises Chromium; local Playwright smoke tests cover Firefox and the WebKit DIY/fallback path. Physical USB enumeration, physical QR scanner settings, battery measurements, hardware RNG/security guarantees, and non-MemoryCard JavaCard applets are not emulated. The optional Virtual Host exposes only the simulator's documented USB protocol to software on the same PC.
 
 ## Phase 2 TODO
 
