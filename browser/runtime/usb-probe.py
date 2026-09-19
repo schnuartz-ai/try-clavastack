@@ -11,7 +11,7 @@ pyb.usb_mode("VCP")
 print("USB_PROBE_READY")
 data = usb.read()
 while data is None:
-    time.sleep(0.01)
+    time.sleep_ms(10)
     data = usb.read()
 usb.write(b"ACK\r\n" + data + b"\r\n")
 print("USB_PROBE_DONE")

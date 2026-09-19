@@ -239,7 +239,10 @@ function connectVirtualHost() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'hello') virtualHostPcConnected = Boolean(data.hostConnected);
-          if (data.type === 'host') virtualHostPcConnected = Boolean(data.connected);
+          if (data.type === 'host') {
+            virtualHostPcConnected = Boolean(data.connected);
+            log(data.connected ? 'Specter Desktop connected' : 'Specter Desktop disconnected');
+          }
           updateVirtualHostStatus();
         } catch (error) {
           log(`Virtual Host status error: ${error.message}`);

@@ -19,33 +19,21 @@ await stalePage.locator('#virtual-host-status-text')
 await page.waitForFunction(() => document.querySelector('#debug-log')?.textContent.includes('USB_PROBE_READY'),
   null, { timeout: 30000 });
 
-const response = await new Promise((resolve, reject) => {
+const hostSocket = await new Promise((resolve, reject) => {
   const socket = net.createConnection({ host: '127.0.0.1', port: 8789 });
-  const chunks = [];
-  const expected = Buffer.from('ACK\r\n\r\n\r\nvirtual-host-e2e\r\n\r\n');
   const timer = setTimeout(() => {
     socket.destroy();
-    reject(new Error('Timed out waiting for the browser USB response'));
+    reject(new Error('Timed out connecting to the Specter Desktop simulator port'));
   }, 10000);
-  socket.on('connect', () => socket.write('\r\n\r\nvirtual-host-e2e\r\n'));
-  socket.on('data', chunk => {
-    chunks.push(chunk);
-    const data = Buffer.concat(chunks);
-    if (data.length >= expected.length) {
-      clearTimeout(timer);
-      socket.end();
-      resolve(data.toString('utf8'));
-    }
-  });
+  socket.on('connect', () => { clearTimeout(timer); resolve(socket); });
   socket.on('error', error => {
     clearTimeout(timer);
     reject(error);
   });
 });
-
-if (response !== 'ACK\r\n\r\n\r\nvirtual-host-e2e\r\n\r\n') {
-  throw new Error(`Unexpected Virtual Host response: ${JSON.stringify(response)}`);
-}
+await page.waitForFunction(() => document.querySelector('#debug-log')?.textContent.includes('Specter Desktop connected'),
+  null, { timeout: 10000 });
+hostSocket.end();
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 10000 });
 if (errors.length) throw new Error(`Browser errors: ${errors.join('; ')}`);
 console.log(JSON.stringify({ result: 'pass', staleTab: 'superseded without reconnecting',
