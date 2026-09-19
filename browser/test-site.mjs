@@ -13,7 +13,7 @@ page.on('pageerror', error => errors.push(error.message));
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
 const virtualHost = page.locator('#virtual-host');
-if (await virtualHost.locator('summary').textContent().then(text => !text.includes('Connect to Companion App'))) {
+if (await virtualHost.locator('summary').textContent().then(text => !text.includes('Virtual USB Connection'))) {
   throw new Error('Virtual Host download panel is missing');
 }
 const virtualHostDownloads = {
@@ -55,7 +55,7 @@ for (const route of ['/ab/', '/simulators/']) {
   if (!response.ok()) throw new Error(`Companion App page is not reachable: ${route}`);
   const html = await response.text();
   if (!html.includes('<details id="virtual-host" class="virtual-host">') ||
-      !html.includes('Connect to Companion App') ||
+      !html.includes('Virtual USB Connection') ||
       !html.includes('https://github.com/Schnuartz/specter-virtual-host"')) {
     throw new Error(`Companion App panel is missing from ${route}`);
   }
