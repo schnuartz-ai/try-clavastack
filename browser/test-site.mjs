@@ -13,7 +13,7 @@ page.on('pageerror', error => errors.push(error.message));
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
 const virtualHost = page.locator('#virtual-host');
-if (await virtualHost.locator('summary').textContent().then(text => !text.includes('Connect to Specter Desktop'))) {
+if (await virtualHost.locator('summary').textContent().then(text => !text.includes('Connect to Companion App'))) {
   throw new Error('Virtual Host download panel is missing');
 }
 const virtualHostDownloads = {
@@ -29,6 +29,10 @@ for (const [selector, href] of Object.entries(virtualHostDownloads)) {
 }
 if (await virtualHost.evaluate(element => element.open)) {
   throw new Error('Virtual Host panel should be collapsed by default');
+}
+if (!await page.locator('.virtual-host-repository a').evaluate(anchor =>
+  anchor.href === 'https://github.com/Schnuartz/specter-virtual-host')) {
+  throw new Error('Virtual Host GitHub repository link is missing');
 }
 for (const href of Object.values(virtualHostDownloads)) {
   const releaseUrl = new URL(href);

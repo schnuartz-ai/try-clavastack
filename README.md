@@ -52,7 +52,7 @@ The CI workflow at [`.github/workflows/browser.yml`](.github/workflows/browser.y
 
 The MicroPython build disables sockets, SSL, and threads for the wallet runtime. The browser shell fetches only static build files; it makes no telemetry or data-upload requests. HTTPS is required for camera access. [`vps-config/Caddyfile`](vps-config/Caddyfile) sets COOP, COEP and CORP headers, compresses static responses, caches immutable versioned WASM assets, and keeps build manifests fresh.
 
-The expandable **Connect to Specter Desktop** section offers **Specter Virtual
+The expandable **Connect to Companion App** section offers **Specter Virtual
 Host** downloads for Windows, Linux x64, macOS Intel and macOS Apple Silicon.
 The buttons point to the pinned, checksummed `v1.0.4` release assets in the
 standalone [`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host/releases/tag/v1.0.4)

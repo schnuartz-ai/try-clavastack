@@ -204,9 +204,9 @@ function updateVirtualHostStatus(message) {
   } else if (!virtualUsbEnabled) {
     virtualHostStatusText.textContent = 'Connected — complete wallet setup, then enable USB communication';
   } else if (!virtualHostPcConnected) {
-    virtualHostStatusText.textContent = 'Ready — waiting for Specter Desktop';
+    virtualHostStatusText.textContent = 'Ready — waiting for companion app';
   } else {
-    virtualHostStatusText.textContent = 'Specter Desktop connected';
+    virtualHostStatusText.textContent = 'Companion app connected';
   }
 }
 function virtualHostUrl() {
@@ -241,7 +241,7 @@ function connectVirtualHost() {
           if (data.type === 'hello') virtualHostPcConnected = Boolean(data.hostConnected);
           if (data.type === 'host') {
             virtualHostPcConnected = Boolean(data.connected);
-            log(data.connected ? 'Specter Desktop connected' : 'Specter Desktop disconnected');
+            log(data.connected ? 'Companion app connected' : 'Companion app disconnected');
           }
           updateVirtualHostStatus();
         } catch (error) {
