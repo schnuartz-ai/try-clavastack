@@ -5,3 +5,4 @@ test-results/
 dist/
 __pycache__/
 *.pyc
+downloads/*.exe

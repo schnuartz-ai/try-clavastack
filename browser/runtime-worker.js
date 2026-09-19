@@ -2,7 +2,9 @@
 let runtimeReady = false;
 const pending = [];
 const qrQueue = [];
+const usbQueue = [];
 let scannerActive = false;
+let usbEnabled = false;
 let program = 'wallet';
 self.screen = { width: 480, height: 800 };
 const send = (type, details = {}) => postMessage({ type, ...details });
@@ -215,6 +217,27 @@ function pollScanner() {
     send('scanner-state', { active });
   }
 }
+function flushUsb() {
+  if (!runtimeReady || !usbQueue.length) return;
+  const fs = Module.FS;
+  if (fs.analyzePath('/bridge/usb-in.bin').exists) return;
+  fs.writeFile('/bridge/usb-in.bin', usbQueue.shift());
+}
+function pollUsb() {
+  if (!runtimeReady) return;
+  const fs = Module.FS;
+  const enabled = fs.analyzePath('/bridge/usb-enabled').exists;
+  if (enabled !== usbEnabled) {
+    usbEnabled = enabled;
+    send('usb-state', { enabled });
+  }
+  if (fs.analyzePath('/bridge/usb-out.bin').exists) {
+    const bytes = fs.readFile('/bridge/usb-out.bin');
+    fs.unlink('/bridge/usb-out.bin');
+    if (bytes.byteLength) send('usb-output', { bytes });
+  }
+  flushUsb();
+}
 function cardSlot(value) {
   if (![1, 2, 3].includes(value)) throw new Error('Invalid Smartcard slot');
   return value;
@@ -289,6 +312,17 @@ function handle(data) {
       if (qrQueue.length >= 16) qrQueue.shift();
       qrQueue.push(bytes);
       flushQr();
+    } else if (data.type === 'usb-data') {
+      const bytes = new Uint8Array(data.bytes);
+      if (!bytes.byteLength || bytes.byteLength > 16 * 1024 * 1024) throw new Error('Invalid Virtual Host payload');
+      if (usbQueue.length >= 64) throw new Error('Virtual Host input queue is full');
+      usbQueue.push(bytes);
+      flushUsb();
+    } else if (data.type === 'usb-disconnect') {
+      usbQueue.length = 0;
+      for (const path of ['/bridge/usb-in.bin', '/bridge/usb-out.bin']) {
+        if (fs.analyzePath(path).exists) fs.unlink(path);
+      }
     } else if (data.type === 'card-insert') {
       const slot = cardSlot(data.slot);
       if (!fs.analyzePath(`/state/cards/${slot}/private.key`).exists) createCard(fs, slot);
@@ -356,7 +390,7 @@ onmessage = async ({ data }) => {
       headlessDisplay,
       // Browser MicroPython heap is independent of hardware RAM. The full
       // wallet import needs the previously proven 64M; MockUI stays lean.
-      arguments: ['-X', `heapsize=${program === 'mockui' ? '16M' : '64M'}`, data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state'],
+      arguments: ['-X', `heapsize=${program === 'mockui' ? '16M' : '64M'}`, data.usbProbe ? '/browser/usb-probe.py' : data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state'],
       monitorRunDependencies: remaining => send('loading-progress', { remaining }),
       locateFile: path => data.build + path + assetSuffix,
       preRun: [() => {
@@ -378,12 +412,14 @@ onmessage = async ({ data }) => {
       }],
       print: message => {
         send('log', { message });
-        if (message === 'SPECTER_MAIN_IMPORTED' || message === 'MOCKUI_READY' || message === 'DIAG_SPECTER_CREATED' || message === 'QR_PROBE_READY' || message === 'SD_PROBE_WRITTEN' || message === 'CARD_PROBE_READY') {
+        if (message === 'SPECTER_MAIN_IMPORTED' || message === 'MOCKUI_READY' || message === 'DIAG_SPECTER_CREATED' || message === 'QR_PROBE_READY' || message === 'USB_PROBE_READY' || message === 'SD_PROBE_WRITTEN' || message === 'CARD_PROBE_READY') {
           runtimeReady = true;
           for (const item of pending.splice(0)) handle(item);
           setInterval(flushQr, 50);
           setInterval(pollScanner, 80);
+          setInterval(pollUsb, 20);
           pollScanner();
+          pollUsb();
           setTimeout(() => send('running'), 500);
         }
       },

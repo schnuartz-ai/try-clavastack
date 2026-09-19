@@ -52,6 +52,24 @@ The CI workflow at [`.github/workflows/browser.yml`](.github/workflows/browser.y
 
 The MicroPython build disables sockets, SSL, and threads for the wallet runtime. The browser shell fetches only static build files; it makes no telemetry or data-upload requests. HTTPS is required for camera access. [`vps-config/Caddyfile`](vps-config/Caddyfile) sets COOP, COEP and CORP headers, compresses static responses, caches immutable versioned WASM assets, and keeps build manifests fresh.
 
+The expandable **Connect to Specter Desktop** section offers **Specter Virtual
+Host** downloads for Windows, Linux x64, macOS Intel and macOS Apple Silicon.
+The buttons point to the pinned, checksummed `v1.0.4` release assets in the
+standalone [`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host/releases/tag/v1.0.4)
+repository, so the website does not have to host executable files itself. This
+small local program reverse-proxies the simulator onto
+`127.0.0.1:8788` and exposes Specter DIY's established simulator transport on
+`127.0.0.1:8789`, which Specter Desktop detects as a Specter DIY device. Browser
+USB bytes remain local and traverse the real firmware `USBHost`; the bridge does
+not emulate wallet responses. Its canonical source and cross-platform release
+workflow live in the standalone
+[`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host)
+repository; the local `virtual-host/` copy is retained only for the website's
+integration test.
+The simulated device must first complete wallet setup with public test data and
+reach its Applications screen; an uninitialized device cannot return the
+fingerprint Specter Desktop requests during discovery.
+
 `/simulators/` runs three Workers concurrently, one per device, with separate simulated flash. A shared workbench holds one 8 GB SD card and three MemoryCards. Drag a card onto a device to insert it, drag it onto another device to transfer its bytes, or click an inserted card to eject it. On transfer, the parent snapshots the source Worker, removes the media files there, imports the exact bytes into the destination Worker, then activates its virtual transport. The card and SD contents remain in tab memory; reloading clears them. The Worker enforces the SD card's 8,000,000,000-byte capacity for browser imports and firmware filesystem writes. The main page uses a click to insert/remove and right-click with confirmation to reset each MemoryCard. The SD artwork is the 8 GB image at `assets/sd-card-8gb.png`. Each build has its own versioned artifact directory and source manifest. DIY consumes SD files and Smartcard APDUs through its real wallet platform. The Playground MockUI scenarios use stub device state, so their menus do not implement every wallet operation or consume all transferred media files. Their original, distinct screens are rendered by their own Python/LVGL 9 code. The gallery places each device image outside its iframe and embeds only the live firmware screen in its cutout, avoiding a rectangular iframe background. Its feedback form drafts a GitHub issue with the selected device and source commit; text stays in the tab until the visitor chooses to continue and submit on GitHub.
 
 ## Deployment and rollback
@@ -66,7 +84,7 @@ endpoints until browser usage is proven stable; only `/legacy/` requests should
 use them. The previous VNC setup guide is archived at
 [`legacy/SETUP-VNC.md`](legacy/SETUP-VNC.md).
 
-Current browser support is aimed at current Chromium and Firefox versions with WebAssembly, Web Workers, and transferable OffscreenCanvas. The DIY build also has a Canvas pixel bridge for WebKit without OffscreenCanvas. The LVGL 9 Playground builds currently require transferable OffscreenCanvas; unsupported browsers show an immediate error with a legacy Playground link. Camera access additionally requires HTTPS and permission. CI exercises Chromium; local Playwright smoke tests cover Firefox and the WebKit DIY/fallback path. Physical mobile devices and macOS Safari still need validation before the VNC services are retired. USB transport, physical QR scanner settings, battery measurements, hardware RNG/security guarantees, and non-MemoryCard JavaCard applets are not emulated.
+Current browser support is aimed at current Chromium and Firefox versions with WebAssembly, Web Workers, and transferable OffscreenCanvas. The DIY build also has a Canvas pixel bridge for WebKit without OffscreenCanvas. The LVGL 9 Playground builds currently require transferable OffscreenCanvas; unsupported browsers show an immediate error with a legacy Playground link. Camera access additionally requires HTTPS and permission. CI exercises Chromium; local Playwright smoke tests cover Firefox and the WebKit DIY/fallback path. Physical mobile devices and macOS Safari still need validation before the VNC services are retired. Physical USB enumeration, physical QR scanner settings, battery measurements, hardware RNG/security guarantees, and non-MemoryCard JavaCard applets are not emulated. The optional Virtual Host exposes only the simulator's documented USB protocol to software on the same PC.
 
 ## Phase 2 TODO
 

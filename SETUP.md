@@ -72,6 +72,15 @@ HTTPS smoke check. Do not edit files below `releases/` in place.
 
 The normal browser page fetches only `/browser/current.json`, its versioned build manifest/assets, the Worker, local logos/mockup, and the bundled QR decoder. It must not call `/api/allocate`, `/api/heartbeat`, `/novnc/*`, or a VNC WebSocket. `?legacy=1` redirects to `/legacy/`, which still uses those services and its old restart API. [The previous VNC deployment instructions](legacy/SETUP-VNC.md) remain available for rollback.
 
+The standalone [`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host)
+repository owns the Virtual Host source and its tagged release workflow. It
+cross-compiles Windows, Linux x64, macOS Intel and macOS Apple Silicon assets,
+publishes checksums, and the browser page links to the pinned release assets.
+Keep the website release and Virtual Host release versions aligned when
+updating the download links. The program binds only to `127.0.0.1`: port 8788
+hosts the connected simulator view and browser bridge, while port 8789 is
+Specter DIY's standard simulator USB endpoint for Specter Desktop.
+
 ## State and security
 
 The Worker runs Specter with no network socket module and an in-memory `/state` filesystem. Browser SD content is at `/state/sd`, the existing simulator path for Specter's `/sd` platform abstraction. Normal restart snapshots `/state/flash`, `/state/qspi`, `/state/sd`, and `/state/cards` in page memory; factory reset retains SD and card files. Reset card wipes a selected card separately. Reloading or closing the page clears all simulation data. Files, seed material, QR contents, card data, and webcam frames are never uploaded. **Never use a real seed phrase.**

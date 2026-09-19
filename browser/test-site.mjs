@@ -12,6 +12,33 @@ page.on('request', request => requests.push(request.url()));
 page.on('pageerror', error => errors.push(error.message));
 await page.goto(base, { waitUntil: 'domcontentloaded' });
 await page.locator('#st').getByText('Running locally').waitFor({ timeout: 45000 });
+const virtualHost = page.locator('#virtual-host');
+if (await virtualHost.locator('summary').textContent().then(text => !text.includes('Connect to Specter Desktop'))) {
+  throw new Error('Virtual Host download panel is missing');
+}
+const virtualHostDownloads = {
+  '#virtual-host-download': 'https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Windows-x64.exe',
+  '#virtual-host-download-linux': 'https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Linux-x64',
+  '#virtual-host-download-macos-arm64': 'https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-arm64',
+  '#virtual-host-download-macos-amd64': 'https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-x64',
+};
+for (const [selector, href] of Object.entries(virtualHostDownloads)) {
+  if (await page.locator(selector).getAttribute('href') !== href) {
+    throw new Error(`Virtual Host download is incorrect: ${selector}`);
+  }
+}
+if (await virtualHost.evaluate(element => element.open)) {
+  throw new Error('Virtual Host panel should be collapsed by default');
+}
+for (const href of Object.values(virtualHostDownloads)) {
+  const releaseUrl = new URL(href);
+  const filename = releaseUrl.pathname.split('/').pop();
+  if (releaseUrl.hostname !== 'github.com' ||
+      releaseUrl.pathname !== `/Schnuartz/specter-virtual-host/releases/download/v1.0.4/${filename}` ||
+      !/^Specter-Virtual-Host-(Windows-x64\.exe|Linux-x64|macOS-(arm64|x64))$/.test(filename)) {
+    throw new Error(`Virtual Host release URL is malformed: ${href}`);
+  }
+}
 if (await page.locator('#sd-capacity').count()) throw new Error('Removed SD capacity text is visible');
 const mainPointer = await (await page.request.get(`${base}/browser/current.json`)).json();
 const mainManifest = await (await page.request.get(`${base}${mainPointer.build}build-info.json`)).json();
@@ -140,6 +167,37 @@ if (!probe.logs.includes('SD_PROBE_PRESENT True') ||
     !probe.logs.some(line => line.includes("b'\\x00\\x01\\x02\\xff'")) ||
     probe.written !== 'firmware-created file' || probe.partial) {
   throw new Error(`Specter SD platform read/write failed: ${probe.logs.join('; ')}`);
+}
+
+const usbProbe = await page.evaluate(async () => {
+  const { build, version } = await (await fetch('/browser/current.json')).json();
+  return new Promise((resolve, reject) => {
+    const worker = new Worker('/browser/runtime-worker.js');
+    const canvas = new OffscreenCanvas(480, 800);
+    const logs = [];
+    let enabled = false;
+    const timer = setTimeout(() => { worker.terminate(); reject(new Error(logs.join('\n'))); }, 10000);
+    worker.onmessage = ({ data }) => {
+      if (data.type === 'log') logs.push(data.message);
+      if (data.type === 'usb-state') enabled = data.enabled;
+      if (data.type === 'usb-output') {
+        clearTimeout(timer);
+        worker.terminate();
+        resolve({ logs, enabled, output: new TextDecoder().decode(data.bytes) });
+      }
+      if (data.type === 'abort' || data.type === 'worker-error') {
+        clearTimeout(timer); worker.terminate(); reject(new Error(data.message));
+      }
+    };
+    worker.onerror = error => { clearTimeout(timer); worker.terminate(); reject(new Error(error.message)); };
+    worker.postMessage({ type: 'start', build, version, canvas, usbProbe: true }, [canvas]);
+    const bytes = new TextEncoder().encode('virtual-host-probe');
+    worker.postMessage({ type: 'usb-data', bytes }, [bytes.buffer]);
+  });
+});
+if (!usbProbe.enabled || usbProbe.output !== 'ACK\r\nvirtual-host-probe\r\n' ||
+    !usbProbe.logs.includes('USB_PROBE_DONE')) {
+  throw new Error(`Specter USB bridge failed: ${JSON.stringify(usbProbe)}`);
 }
 
 const crashPage = await browser.newPage();

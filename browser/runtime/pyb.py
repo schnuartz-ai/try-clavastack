@@ -80,16 +80,29 @@ class USB_VCP(UART):
 
     def __init__(self, *args, **kwargs):
         super().__init__(None)
+        self.path = "/bridge/usb-in.bin"
 
-    def any(self):
-        return False
+    def write(self, data):
+        if isinstance(data, str):
+            data = data.encode()
+        with open("/bridge/usb-out.bin", "ab") as stream:
+            return stream.write(data)
 
 
 _usb_mode = None
+_USB_MODE_UNSET = object()
 
 
-def usb_mode(value=None):
+def usb_mode(value=_USB_MODE_UNSET):
     global _usb_mode
-    if value is not None:
+    if value is not _USB_MODE_UNSET:
         _usb_mode = value
+        if value:
+            with open("/bridge/usb-enabled", "wb") as marker:
+                marker.write(b"1")
+        else:
+            try:
+                os.remove("/bridge/usb-enabled")
+            except OSError:
+                pass
     return _usb_mode

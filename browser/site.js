@@ -8,6 +8,8 @@ const buildVariant = variant === 'schnuartz' && params.get('buildVariant') === '
   ? 'play-fast' : variant;
 const diagnosticQrProbe = params.get('probe') === 'qr' &&
   ['127.0.0.1', 'localhost', 'try.clavastack.com'].includes(location.hostname);
+const diagnosticUsbProbe = params.get('probe') === 'usb' &&
+  ['127.0.0.1', 'localhost'].includes(location.hostname);
 if (embedded) document.documentElement.classList.add('embedded');
 if (gallery) document.documentElement.classList.add('gallery');
 const notifyParent = message => { if (embedded) parent.postMessage(message, location.origin); };
@@ -67,6 +69,17 @@ let startupStartedAt;
 let startupTicker;
 const snapshots = new Map();
 let demoImportBusy = false;
+const virtualHostDetails = $('#virtual-host');
+const virtualHostStatus = $('#virtual-host-status');
+const virtualHostStatusText = $('#virtual-host-status-text');
+let virtualHostSocket;
+let virtualHostRetry;
+let virtualHostConnected = false;
+let virtualHostPcConnected = false;
+let virtualUsbEnabled = false;
+let virtualHostSuperseded = false;
+const virtualHostClientId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() :
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const startupTimeoutMs = 60000;
 
@@ -177,6 +190,83 @@ function crashRecover(message, generation = runGeneration) {
 }
 function send(message, transfer = []) {
   if (worker) worker.postMessage(message, transfer);
+}
+function updateVirtualHostStatus(message) {
+  if (!virtualHostStatus) return;
+  virtualHostStatus.classList.toggle('connected', virtualHostConnected && virtualHostPcConnected && virtualUsbEnabled);
+  virtualHostStatus.classList.toggle('waiting', virtualHostConnected && !(virtualHostPcConnected && virtualUsbEnabled));
+  if (message) {
+    virtualHostStatusText.textContent = message;
+  } else if (virtualHostSuperseded) {
+    virtualHostStatusText.textContent = 'Inactive — another connected simulator tab is open';
+  } else if (!virtualHostConnected) {
+    virtualHostStatusText.textContent = 'Virtual Host not detected';
+  } else if (!virtualUsbEnabled) {
+    virtualHostStatusText.textContent = 'Connected — complete wallet setup, then enable USB communication';
+  } else if (!virtualHostPcConnected) {
+    virtualHostStatusText.textContent = 'Ready — waiting for Specter Desktop';
+  } else {
+    virtualHostStatusText.textContent = 'Specter Desktop connected';
+  }
+}
+function virtualHostUrl() {
+	const clientQuery = `?client=${encodeURIComponent(virtualHostClientId)}`;
+  if (location.hostname === '127.0.0.1' && location.port === '8788') {
+    return `ws://${location.host}/bridge${clientQuery}`;
+  }
+  return `ws://127.0.0.1:8788/bridge${clientQuery}`;
+}
+function scheduleVirtualHostRetry() {
+  clearTimeout(virtualHostRetry);
+  if (!virtualHostDetails?.open && params.get('virtual-host') !== '1') return;
+  virtualHostRetry = setTimeout(connectVirtualHost, 2000);
+}
+function connectVirtualHost() {
+  if (!virtualHostDetails || virtualHostSocket?.readyState === WebSocket.OPEN ||
+      virtualHostSocket?.readyState === WebSocket.CONNECTING) return;
+  try {
+    const socket = new WebSocket(virtualHostUrl());
+    virtualHostSocket = socket;
+    socket.binaryType = 'arraybuffer';
+    socket.onopen = () => {
+      virtualHostSuperseded = false;
+      virtualHostConnected = true;
+      updateVirtualHostStatus();
+      log('Virtual Host connected');
+    };
+    socket.onmessage = event => {
+      if (typeof event.data === 'string') {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'hello') virtualHostPcConnected = Boolean(data.hostConnected);
+          if (data.type === 'host') virtualHostPcConnected = Boolean(data.connected);
+          updateVirtualHostStatus();
+        } catch (error) {
+          log(`Virtual Host status error: ${error.message}`);
+        }
+        return;
+      }
+      const bytes = new Uint8Array(event.data);
+      send({ type: 'usb-data', bytes }, [bytes.buffer]);
+    };
+    socket.onerror = () => { /* onclose updates the visible state and retries */ };
+    socket.onclose = event => {
+      if (virtualHostSocket === socket) virtualHostSocket = undefined;
+      virtualHostConnected = false;
+      virtualHostPcConnected = false;
+      send({ type: 'usb-disconnect' });
+      if (event.code === 4001) {
+        virtualHostSuperseded = true;
+        updateVirtualHostStatus();
+        return;
+      }
+      updateVirtualHostStatus();
+      scheduleVirtualHostRetry();
+    };
+  } catch (error) {
+    updateVirtualHostStatus(`Virtual Host unavailable: ${error.message}`);
+    scheduleVirtualHostRetry();
+  }
 }
 function pointer(event, down) {
   event.preventDefault();
@@ -478,6 +568,11 @@ function onWorkerMessage({ data }, generation = runGeneration) {
         cameraPanel.hidden = true;
       }, 250);
     }
+  } else if (data.type === 'usb-output') {
+    if (virtualHostSocket?.readyState === WebSocket.OPEN) virtualHostSocket.send(data.bytes);
+  } else if (data.type === 'usb-state') {
+    virtualUsbEnabled = data.enabled;
+    updateVirtualHostStatus();
   }
 }
 async function start() {
@@ -539,7 +634,8 @@ async function start() {
     startupPhase = 'canvas-transfer';
     const offscreen = transferable ? canvas.transferControlToOffscreen() : undefined;
     send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
-      stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe }, offscreen ? [offscreen] : []);
+      stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe,
+      usbProbe: diagnosticUsbProbe }, offscreen ? [offscreen] : []);
     startupPhase = 'runtime-assets';
   } catch (error) {
     crashRecover(`${error.name}: ${error.message}\n${error.stack || ''}`, generation);
@@ -772,8 +868,19 @@ $('#camera-toggle').onclick = () => {
 $('#camera-screen-start').onclick = () => startCamera();
 $('#camera-screen-back').onclick = () => { screenCamera.hidden = true; };
 cameraSelect.onchange = () => startCamera(cameraSelect.value);
+if (virtualHostDetails) {
+  virtualHostDetails.addEventListener('toggle', () => {
+    if (virtualHostDetails.open) connectVirtualHost();
+  });
+  if (params.get('virtual-host') === '1') {
+    // Connected sessions start the bridge silently. Keep the help panel
+    // collapsed until the user chooses to inspect it.
+    connectVirtualHost();
+  }
+}
 addEventListener('pagehide', () => {
   runGeneration++; clearTimeout(recoveryTimer); clearStartupTimer(); stopLoadingClock();
+  clearTimeout(virtualHostRetry); virtualHostSocket?.close();
   stopCamera(); worker?.terminate(); worker = undefined;
 });
 
