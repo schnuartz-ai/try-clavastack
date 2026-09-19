@@ -16,6 +16,8 @@ await page.waitForFunction(() => document.querySelector('#debug-log')?.textConte
 await stalePage.locator('#virtual-host').evaluate(element => { element.open = true; });
 await stalePage.locator('#virtual-host-status-text')
   .getByText('Inactive — another connected simulator tab is open').waitFor({ timeout: 5000 });
+await page.waitForFunction(() => document.querySelector('#debug-log')?.textContent.includes('USB_PROBE_READY'),
+  null, { timeout: 30000 });
 
 const response = await new Promise((resolve, reject) => {
   const socket = net.createConnection({ host: '127.0.0.1', port: 8789 });
