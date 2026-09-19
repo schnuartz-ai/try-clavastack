@@ -43,6 +43,22 @@ for (const href of Object.values(virtualHostDownloads)) {
     throw new Error(`Virtual Host release URL is malformed: ${href}`);
   }
 }
+for (const route of ['/ab/', '/simulators/']) {
+  const response = await page.request.get(`${base}${route}`);
+  if (!response.ok()) throw new Error(`Companion App page is not reachable: ${route}`);
+  const html = await response.text();
+  if (!html.includes('<details id="virtual-host" class="virtual-host">') ||
+      !html.includes('Connect to Companion App') ||
+      !html.includes('https://github.com/Schnuartz/specter-virtual-host"')) {
+    throw new Error(`Companion App panel is missing from ${route}`);
+  }
+  if ((html.match(/class="virtual-host-download"/g) || []).length !== 4) {
+    throw new Error(`Companion App downloads are incomplete on ${route}`);
+  }
+  if (html.includes('<details id="virtual-host" class="virtual-host" open')) {
+    throw new Error(`Companion App panel should be collapsed by default on ${route}`);
+  }
+}
 if (await page.locator('#sd-capacity').count()) throw new Error('Removed SD capacity text is visible');
 const mainPointer = await (await page.request.get(`${base}/browser/current.json`)).json();
 const mainManifest = await (await page.request.get(`${base}${mainPointer.build}build-info.json`)).json();

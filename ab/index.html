@@ -19,6 +19,21 @@
     .intro { color:var(--muted); line-height:1.5; margin:0 0 17px; }
     .warning { background:#2b1a21; border:1px solid #b85b68; border-radius:10px; padding:9px 13px; margin-bottom:18px; color:#f1dfe2; font-size:11px; line-height:1.35; }
     .warning strong { color:#ff929c; }
+    .virtual-host { width:100%; margin:0 0 20px; border:1px solid #35506d; border-radius:14px; background:linear-gradient(135deg,#101b2a,#17283b); color:#fcfcfc; overflow:hidden; }
+    .virtual-host summary { cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:17px 20px; font-size:15px; font-weight:700; list-style:none; }
+    .virtual-host summary::-webkit-details-marker { display:none; }
+    .virtual-host summary::after { content:'+'; color:var(--blue); font-size:24px; font-weight:400; line-height:1; }
+    .virtual-host[open] summary::after { content:'\2212'; }
+    .virtual-host-summary small { display:block; margin-top:4px; color:var(--muted); font-size:11px; font-weight:400; }
+    .virtual-host-body { border-top:1px solid #35506d; padding:18px 20px 20px; }
+    .virtual-host-intro { margin:0 0 15px; color:#d8e6f3; line-height:1.5; }
+    .virtual-host-actions { display:flex; flex-wrap:wrap; gap:9px; margin:14px 0; }
+    .virtual-host-download { display:inline-flex; align-items:center; justify-content:center; min-height:38px; padding:0 15px; border-radius:7px; background:var(--blue); color:#fff; font-size:12px; font-weight:700; text-decoration:none; }
+    .virtual-host-repository { margin:8px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .virtual-host-repository a { color:#8fd2ff; }
+    .virtual-host-steps { margin:17px 0 10px; padding-left:22px; color:#d8e6f3; line-height:1.55; }
+    .virtual-host-steps li { margin:8px 0; padding-left:4px; }
+    .virtual-host-note { margin:12px 0 0; color:var(--muted); font-size:11px; line-height:1.5; }
     .device-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; }
     .device { min-width:0; background:transparent; padding:10px 8px 14px; text-align:center; }
     .device.drop-target { filter:drop-shadow(0 0 13px #47b5e777); }
@@ -78,6 +93,26 @@
     <h1>Specter</h1>
     <p class="intro">Load two Specter DIY or Playground branches, pull requests, or commits and compare them locally in your browser.</p>
     <p class="warning"><strong>Test environment.</strong> Never enter a real seed phrase. These are browser simulations, not secure hardware.</p>
+    <details id="virtual-host" class="virtual-host">
+      <summary><span class="virtual-host-summary">Connect to Companion App<small>Use these browser simulators with a compatible desktop companion app.</small></span></summary>
+      <div class="virtual-host-body">
+        <p class="virtual-host-intro">Specter Virtual Host creates a local connection between this simulator and a compatible companion app, such as Specter Desktop. It runs only on your computer and uses Specter DIY's official simulator port.</p>
+        <div class="virtual-host-actions">
+          <a class="virtual-host-download" href="https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Windows-x64.exe">Download for Windows (.exe)</a>
+          <a class="virtual-host-download" href="https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Linux-x64">Download for Linux (x64)</a>
+          <a class="virtual-host-download" href="https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-arm64">Download for macOS (Apple Silicon)</a>
+          <a class="virtual-host-download" href="https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-x64">Download for macOS (Intel)</a>
+        </div>
+        <p class="virtual-host-repository">Source code, releases and checksums: <a href="https://github.com/Schnuartz/specter-virtual-host" target="_blank" rel="noopener noreferrer">github.com/Schnuartz/specter-virtual-host</a></p>
+        <ol class="virtual-host-steps">
+          <li>Download and run <strong>Specter Virtual Host</strong> for your operating system.</li>
+          <li>Open both simulator devices, finish setup with a <strong>public test seed</strong> and reach Applications.</li>
+          <li>Enable <strong>Device settings → Communication → USB communication</strong>.</li>
+          <li>In your compatible companion app, add or rescan hardware devices. The simulator appears as <strong>Specter DIY</strong>.</li>
+        </ol>
+        <p class="virtual-host-note">Unsigned preview builds may trigger a Windows SmartScreen or macOS Gatekeeper notice. On Linux/macOS, make the downloaded file executable before running it. The bridge listens only on this computer.</p>
+      </div>
+    </details>
     <section class="device-grid" aria-label="Specter A/B devices">
       <article class="device" data-device="diy">
         <h2>Specter A</h2>
