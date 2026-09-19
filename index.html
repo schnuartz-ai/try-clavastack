@@ -454,19 +454,6 @@
     </details>
   </section>
 
-  <details id="technical-details" class="technical-details">
-    <summary>Technical details</summary>
-    <p>Repository: <a id="build-repository-link" href="#">Loading…</a></p>
-    <p id="build-context" hidden></p>
-    <p>Source commit: <a id="build-link" href="#">Loading…</a></p>
-    <p>Restart keeps simulated flash, SD and Smartcard contents in this tab. Factory reset wipes flash and keeps peripherals. Clear, eject or reset them separately.</p>
-    <button id="factory-btn">Factory reset simulated flash</button>
-    <pre id="build-details"></pre>
-    <pre id="debug-log"></pre>
-  </details>
-
-</div>
-
 <details id="virtual-host" class="virtual-host">
   <summary>
     <span class="virtual-host-summary">Connect to Companion App
@@ -485,7 +472,7 @@
       <a id="virtual-host-download-macos-arm64" class="virtual-host-download" href="https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-arm64">Download for macOS (Apple Silicon)</a>
       <a id="virtual-host-download-macos-amd64" class="virtual-host-download" href="https://github.com/Schnuartz/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-x64">Download for macOS (Intel)</a>
     </div>
-    <p class="virtual-host-repository">Source code, releases and checksums: <a href="https://github.com/Schnuartz/specter-virtual-host" target="_blank" rel="noreferrer">github.com/Schnuartz/specter-virtual-host</a></p>
+    <p class="virtual-host-repository">Source code, releases and checksums: <a href="https://github.com/Schnuartz/specter-virtual-host" target="_blank" rel="noopener noreferrer">github.com/Schnuartz/specter-virtual-host</a></p>
     <ol class="virtual-host-steps">
       <li>Download and run <strong>Specter Virtual Host</strong> for your operating system. Keep its small window open.</li>
       <li>In the newly opened simulator, finish the initial wallet setup with a <strong>public test seed</strong> and reach the Applications screen. An uninitialized device has no fingerprint for Specter Desktop.</li>
@@ -495,6 +482,19 @@
     <p class="virtual-host-note">The unsigned preview builds may trigger a Windows SmartScreen or macOS Gatekeeper notice. On Linux/macOS, make the downloaded file executable before running it. The bridge listens only on this computer; closing its window ends the connection.</p>
   </div>
 </details>
+
+  <details id="technical-details" class="technical-details">
+    <summary>Technical details</summary>
+    <p>Repository: <a id="build-repository-link" href="#">Loading…</a></p>
+    <p id="build-context" hidden></p>
+    <p>Source commit: <a id="build-link" href="#">Loading…</a></p>
+    <p>Restart keeps simulated flash, SD and Smartcard contents in this tab. Factory reset wipes flash and keeps peripherals. Clear, eject or reset them separately.</p>
+    <button id="factory-btn">Factory reset simulated flash</button>
+    <pre id="build-details"></pre>
+    <pre id="debug-log"></pre>
+  </details>
+
+</div>
 
 <footer>
   <p>&copy; 2026 <a href="https://clavastack.com">ClavaStack</a> &middot; <a href="/simulators/">Development Drafts</a> &middot; <a href="https://github.com/cryptoadvance/specter-diy">GitHub</a> &middot; <a class="footer-imprint" href="https://clavastack.com/impressum">Impressum</a></p>

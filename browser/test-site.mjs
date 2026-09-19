@@ -30,6 +30,13 @@ for (const [selector, href] of Object.entries(virtualHostDownloads)) {
 if (await virtualHost.evaluate(element => element.open)) {
   throw new Error('Virtual Host panel should be collapsed by default');
 }
+if (!await page.evaluate(() => {
+  const demo = document.querySelector('.demo-import');
+  const panel = document.querySelector('#virtual-host');
+  return demo && panel && Boolean(demo.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING);
+})) {
+  throw new Error('Virtual Host panel should appear below Import Demo Data');
+}
 if (!await page.locator('.virtual-host-repository a').evaluate(anchor =>
   anchor.href === 'https://github.com/Schnuartz/specter-virtual-host')) {
   throw new Error('Virtual Host GitHub repository link is missing');
@@ -57,6 +64,15 @@ for (const route of ['/ab/', '/simulators/']) {
   }
   if (html.includes('<details id="virtual-host" class="virtual-host" open')) {
     throw new Error(`Companion App panel should be collapsed by default on ${route}`);
+  }
+  if (route === '/ab/' && (!html.includes('<div class="warning" role="note"><strong>NEVER ENTER A REAL SEED PHRASE.</strong></div>') || html.includes('Test environment.'))) {
+    throw new Error('A/B warning should use the simple seed-phrase warning');
+  }
+  const panelIndex = html.indexOf('<details id="virtual-host" class="virtual-host">');
+  const anchor = route === '/simulators/' ? '<section class="feedback"' : '<section class="media-desk"';
+  const anchorIndex = html.indexOf(anchor);
+  if (anchorIndex < 0 || panelIndex < anchorIndex) {
+    throw new Error(`Companion App panel is in the wrong position on ${route}`);
   }
 }
 if (await page.locator('#sd-capacity').count()) throw new Error('Removed SD capacity text is visible');
