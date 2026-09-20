@@ -53,11 +53,6 @@ cp "$ROOT/browser/site.js" "$ROOT/browser/runtime-worker.js" \
   "$SITE_DIR/browser/"
 cp "$ROOT/browser/variants/"*.json "$SITE_DIR/browser/variants/"
 
-# The release carries only the static site and its isolated Caddy site block.
-# The VPS root Caddyfile imports this file alongside future private services.
-mkdir -p "$SITE_DIR/server-config"
-cp "$ROOT/vps-config/Caddyfile" "$SITE_DIR/server-config/try.clavastack.caddy"
-
 if [[ $(find "$SITE_DIR/builds" -type f -name 'micropython.wasm' | wc -l) -lt 4 ]]; then
   echo "Expected all four tested firmware builds in the production package" >&2
   exit 1

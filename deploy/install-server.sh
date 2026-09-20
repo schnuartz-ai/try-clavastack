@@ -26,6 +26,8 @@ if ! id "$DEPLOY_USER" >/dev/null 2>&1; then
 fi
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0755 \
   "$DEPLOY_ROOT" "$DEPLOY_ROOT/releases" /var/lib/try-clavastack
+chown "$DEPLOY_USER:$DEPLOY_USER" \
+  "$DEPLOY_ROOT" "$DEPLOY_ROOT/releases" /var/lib/try-clavastack
 install -d -o root -g root -m 0755 "$LIBEXEC_DIR"
 install -d -o root -g root -m 0755 /etc/caddy/sites-enabled
 install -o root -g root -m 0755 \

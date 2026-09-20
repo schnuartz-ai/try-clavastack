@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-# The release atomically updates the static webroot and its isolated Caddy
-# site block. No simulator process or allocator is installed on the VPS.
-User=root
-Group=root
+# The release updates only the static webroot. Caddy and private services are
+# root-managed separately and are outside this service's write boundary.
+User=clavastack-deploy
+Group=clavastack-deploy
 RuntimeDirectory=try-clavastack
 StateDirectory=try-clavastack
 UMask=0022
@@ -17,4 +17,4 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/var/www/try-clavastack-deploy /var/lib/try-clavastack /run/try-clavastack /etc/caddy
+ReadWritePaths=/var/www/try-clavastack-deploy /var/lib/try-clavastack /run/try-clavastack

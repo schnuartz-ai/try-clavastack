@@ -58,9 +58,10 @@ bash deploy/install-server.sh
 
 The installer creates the deployment directories and system user, validates
 Caddy before changing it, installs the hardened systemd service and timer, and
-verifies the live HTTPS endpoint. The root-owned deployment service can update
-only its declared webroot, state and Caddy paths and uses no personal GitHub
-credentials. To request an immediate check instead of waiting for the timer:
+verifies the live HTTPS endpoint. The unprivileged deployment service can
+update only its declared webroot and state paths; GitHub release artifacts
+cannot modify Caddy or private services. It uses no personal GitHub credentials.
+To request an immediate check instead of waiting for the timer:
 
 ```bash
 systemctl start try-browser-auto-deploy.service

@@ -12,8 +12,9 @@ website.
 The tested static site is published as a checksummed GitHub release asset and
 pulled by `try-browser-auto-deploy.timer`. Releases are installed below
 `/var/www/try-clavastack-deploy/releases/` and activated with an atomic
-`current` symlink. The deployer also validates and atomically updates only the
-public site's Caddy snippet.
+`current` symlink. The unprivileged deployer can write only the static webroot
+and its deployment state. Caddy configuration is installed separately by root
+and cannot be changed by GitHub release artifacts.
 
 Install the mechanism from a trusted checkout as root:
 
