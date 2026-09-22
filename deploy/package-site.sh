@@ -36,6 +36,7 @@ paths=(
   llms.txt
   assets
   builds
+  ab
   simulators
 )
 

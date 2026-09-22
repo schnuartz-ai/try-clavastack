@@ -93,6 +93,7 @@ PY
 
 for required in \
   index.html \
+  ab/index.html \
   browser/site.js \
   browser/runtime-worker.js \
   browser/current.json \
