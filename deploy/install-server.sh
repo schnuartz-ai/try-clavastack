@@ -62,6 +62,9 @@ install -o root -g root -m 0644 \
 
 systemctl daemon-reload
 systemctl enable --now try-ab-builder.service
+curl --fail --silent --show-error \
+  --connect-timeout 5 --max-time 10 \
+  http://127.0.0.1:9002/api/ab/health >/dev/null
 systemctl enable try-browser-auto-deploy.timer
 systemctl restart try-browser-auto-deploy.timer
 if [[ ! -L "$DEPLOY_ROOT/current" ]]; then
@@ -74,5 +77,9 @@ curl --fail --silent --show-error \
   --resolve try.clavastack.com:443:127.0.0.1 \
   --connect-timeout 5 --max-time 20 \
   https://try.clavastack.com/ >/dev/null
+curl --fail --silent --show-error \
+  --resolve try.clavastack.com:443:127.0.0.1 \
+  --connect-timeout 5 --max-time 20 \
+  https://try.clavastack.com/api/ab/health >/dev/null
 
 echo "Static GitHub release deployment installed."

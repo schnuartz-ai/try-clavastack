@@ -64,7 +64,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
-        if path.startswith("/api/ab/build/"):
+        if path == "/api/ab/health":
+            self.send_json({"status": "ok"})
+        elif path.startswith("/api/ab/build/"):
             job_id = path.rsplit("/", 1)[-1]
             job = get_job(job_id) if JOB_ID_RE.fullmatch(job_id) else None
             self.send_json(job or {"error": "Unknown build job"}, 200 if job else 404)
