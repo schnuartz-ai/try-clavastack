@@ -14,6 +14,18 @@ try.clavastack.com {
 	header @buildManifest Cache-Control "no-cache"
 	header /browser/current.json Cache-Control "no-cache"
 	header /browser/variants/* Cache-Control "no-cache"
+	header /api/ab/* Cache-Control "no-store"
+
+	@abArtifacts path /ab-builds/*
+	header @abArtifacts Cache-Control "public, max-age=31536000, immutable"
+	handle_path /ab-builds/* {
+		root * /var/lib/try-clavastack/ab-builds
+		file_server
+	}
+
+	handle /api/ab/* {
+		reverse_proxy 127.0.0.1:9002
+	}
 
 	root * /var/www/try-clavastack-deploy/current
 	file_server

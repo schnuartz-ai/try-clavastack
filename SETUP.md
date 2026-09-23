@@ -1,6 +1,6 @@
 # Browser simulator setup and deployment
 
-The production site is static. Its only server requirements are HTTPS, correct WASM MIME delivery, and the headers in [`vps-config/Caddyfile`](vps-config/Caddyfile). No VNC, simulator or allocator process runs on the VPS.
+The simulator pages and firmware are static, and the A/B page also uses a small isolated API to resolve and build approved public Specter source links. The VPS needs HTTPS, correct WASM MIME delivery, the headers in [`vps-config/Caddyfile`](vps-config/Caddyfile), and the `try-ab-builder.service`. No interactive simulator, VNC or allocator process runs on the VPS.
 
 ## Local build
 
@@ -29,7 +29,7 @@ Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Resource-Policy: same-origin
 ```
 
-It serves versioned artifacts with immutable caching and `browser/current.json` plus `build-info.json` with revalidation. Caddy should serve the `.wasm` file with `application/wasm` and compress static assets using zstd/gzip. `/etc/caddy/Caddyfile` imports isolated site blocks from `/etc/caddy/sites-enabled/*.caddy`; this public site is installed as `try.clavastack.caddy`. A future CRM can therefore use a separate Tailscale-only listener without changing or exposing the public site. Check the live response headers with `curl -I https://try.clavastack.com/` and `curl -I https://try.clavastack.com/builds/.../micropython.wasm`.
+It serves versioned artifacts with immutable caching, `browser/current.json` plus `build-info.json` with revalidation, and routes `/api/ab/*` to the loopback-only on-demand builder. Generated A/B firmware is served from `/var/lib/try-clavastack/ab-builds` at `/ab-builds/*`. Caddy should serve the `.wasm` file with `application/wasm` and compress static assets using zstd/gzip. `/etc/caddy/Caddyfile` imports isolated site blocks from `/etc/caddy/sites-enabled/*.caddy`; this public site is installed as `try.clavastack.caddy`. A future CRM can therefore use a separate Tailscale-only listener without changing or exposing the public site. Check the live response headers with `curl -I https://try.clavastack.com/` and `curl -I https://try.clavastack.com/builds/.../micropython.wasm`.
 
 ## Publish
 
@@ -56,11 +56,13 @@ Install the mechanism once from a trusted checkout on the VPS as root:
 bash deploy/install-server.sh
 ```
 
-The installer creates the deployment directories and system user, validates
-Caddy before changing it, installs the hardened systemd service and timer, and
-verifies the live HTTPS endpoint. The unprivileged deployment service can
-update only its declared webroot and state paths; GitHub release artifacts
-cannot modify Caddy or private services. It uses no personal GitHub credentials.
+The installer creates the deployment directories and users, validates Caddy
+before changing it, installs the hardened static-deploy and A/B-builder systemd
+services, and verifies the live HTTPS endpoint. The A/B builder runs as the
+unprivileged `clavastack-ab` user and builds only verified Specter repositories
+in an isolated work directory. The deployment service can update only its
+declared webroot and state paths; GitHub release artifacts cannot modify Caddy
+or private services. It uses no personal GitHub credentials.
 To request an immediate check instead of waiting for the timer:
 
 ```bash

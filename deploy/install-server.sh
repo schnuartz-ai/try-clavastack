@@ -9,6 +9,7 @@ fi
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DEPLOY_ROOT="/var/www/try-clavastack-deploy"
 DEPLOY_USER="clavastack-deploy"
+AB_BUILD_USER="clavastack-ab"
 LIBEXEC_DIR="/usr/local/libexec/try-clavastack"
 
 for required in \
@@ -16,6 +17,7 @@ for required in \
   "$ROOT/vps-config/Caddyfile" \
   "$ROOT/vps-config/Caddyfile.root" \
   "$ROOT/vps-config/systemd/try-browser-auto-deploy.service" \
+  "$ROOT/vps-config/systemd/try-ab-builder.service" \
   "$ROOT/vps-config/systemd/try-browser-auto-deploy.timer"; do
   test -f "$required"
 done
@@ -24,8 +26,15 @@ if ! id "$DEPLOY_USER" >/dev/null 2>&1; then
   useradd --system --home-dir /var/lib/try-clavastack \
     --shell /usr/sbin/nologin "$DEPLOY_USER"
 fi
+if ! id "$AB_BUILD_USER" >/dev/null 2>&1; then
+  useradd --system --home-dir /var/lib/try-clavastack/ab-work \
+    --shell /usr/sbin/nologin "$AB_BUILD_USER"
+fi
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0755 \
   "$DEPLOY_ROOT" "$DEPLOY_ROOT/releases" /var/lib/try-clavastack
+install -d -o "$AB_BUILD_USER" -g "$AB_BUILD_USER" -m 0750 \
+  /var/lib/try-clavastack/ab-builds /var/lib/try-clavastack/ab-work \
+  /var/lib/try-clavastack/ab-usage
 chown "$DEPLOY_USER:$DEPLOY_USER" \
   "$DEPLOY_ROOT" "$DEPLOY_ROOT/releases" /var/lib/try-clavastack
 install -d -o root -g root -m 0755 "$LIBEXEC_DIR"
@@ -45,10 +54,14 @@ install -o root -g root -m 0644 \
   "$ROOT/vps-config/systemd/try-browser-auto-deploy.service" \
   /etc/systemd/system/try-browser-auto-deploy.service
 install -o root -g root -m 0644 \
+  "$ROOT/vps-config/systemd/try-ab-builder.service" \
+  /etc/systemd/system/try-ab-builder.service
+install -o root -g root -m 0644 \
   "$ROOT/vps-config/systemd/try-browser-auto-deploy.timer" \
   /etc/systemd/system/try-browser-auto-deploy.timer
 
 systemctl daemon-reload
+systemctl enable --now try-ab-builder.service
 systemctl enable try-browser-auto-deploy.timer
 systemctl restart try-browser-auto-deploy.timer
 if [[ ! -L "$DEPLOY_ROOT/current" ]]; then

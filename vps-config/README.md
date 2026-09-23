@@ -1,7 +1,8 @@
 # VPS configuration
 
-Production serves only the static WebAssembly simulator. No Specter process,
-Xvfb, x11vnc, websockify, noVNC or allocator is required on the VPS.
+Production serves the static WebAssembly simulators and a separate on-demand
+build API for the `/ab/` page. No interactive Specter process, Xvfb, x11vnc,
+websockify, noVNC or simulator allocator is required on the VPS.
 
 `Caddyfile.root` is installed as `/etc/caddy/Caddyfile` and imports independent
 site blocks from `/etc/caddy/sites-enabled/*.caddy`. `Caddyfile` is the public
@@ -22,10 +23,16 @@ Install the mechanism from a trusted checkout as root:
 bash deploy/install-server.sh
 ```
 
-The only production units owned by this repository are:
+The production units owned by this repository are:
 
 - `try-browser-auto-deploy.service`
 - `try-browser-auto-deploy.timer`
+- `try-ab-builder.service`
+
+The A/B builder listens only on `127.0.0.1:9002`, accepts approved public
+Specter DIY and Playground repositories, and publishes generated immutable
+firmware below `/var/lib/try-clavastack/ab-builds`. It runs as the separate
+unprivileged `clavastack-ab` user.
 
 See the repository-level [`SETUP.md`](../SETUP.md) for build, deployment and
 rollback details.

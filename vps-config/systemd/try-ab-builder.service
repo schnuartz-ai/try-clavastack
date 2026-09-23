@@ -1,0 +1,30 @@
+[Unit]
+Description=On-demand WebAssembly builder for the Specter A/B page
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=clavastack-ab
+Group=clavastack-ab
+WorkingDirectory=/opt/try-clavastack/pool
+Environment=AB_API_HOST=127.0.0.1
+Environment=AB_API_PORT=9002
+Environment=AB_SOURCE_ROOT=/opt/try-clavastack
+Environment=AB_WORK_ROOT=/var/lib/try-clavastack/ab-work
+Environment=AB_BUILD_STORAGE=/var/lib/try-clavastack/ab-builds
+Environment=AB_USAGE_ROOT=/var/lib/try-clavastack/ab-usage
+Environment=AB_JOB_STATE_FILE=/var/lib/try-clavastack/ab-work/ab-jobs.json
+Environment=AB_BUILD_USER=clavastack-ab
+UMask=0022
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/try-clavastack/ab-work /var/lib/try-clavastack/ab-builds /var/lib/try-clavastack/ab-usage
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

@@ -79,9 +79,11 @@ See [`SETUP.md`](SETUP.md) for the complete deployment design. Every successful
 GitHub. The VPS pulls that package as an unprivileged deployment user, verifies
 it, and atomically changes a `current` symlink. Previous releases remain
 available for immediate rollback; no source files are copied manually into the
-live webroot. Caddy imports the public site from an isolated site file, so a
-future Tailscale-only CRM can be configured separately without exposing it on
-the public hostname. The previous VNC setup guide is archived at
+live webroot. Caddy imports the public site from an isolated site file; the
+A/B page's separate on-demand builder runs as an unprivileged service and
+accepts approved public Specter source links. A future Tailscale-only CRM can
+be configured separately without exposing it on the public hostname. The
+previous VNC setup guide is archived at
 [`legacy/SETUP-VNC.md`](legacy/SETUP-VNC.md).
 
 Current browser support is aimed at current Chromium and Firefox versions with WebAssembly, Web Workers, and transferable OffscreenCanvas. The DIY build also has a Canvas pixel bridge for WebKit without OffscreenCanvas. The LVGL 9 Playground builds currently require transferable OffscreenCanvas. Camera access additionally requires HTTPS and permission. CI exercises Chromium; local Playwright smoke tests cover Firefox and the WebKit DIY/fallback path. Physical USB enumeration, physical QR scanner settings, battery measurements, hardware RNG/security guarantees, and non-MemoryCard JavaCard applets are not emulated. The optional Virtual Host exposes only the simulator's documented USB protocol to software on the same PC.

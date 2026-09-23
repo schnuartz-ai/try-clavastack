@@ -342,6 +342,22 @@ def _existing_build(spec: dict) -> dict | None:
             if str(candidate).startswith("/var/www/try-clavastack-deploy/current/"):
                 current_root = Path("/var/www/try-clavastack-deploy/current")
                 return _manifest_pointer(candidate, "/" + candidate.relative_to(current_root).as_posix())
+            # A trusted checkout may already contain this tested build, but
+            # Caddy must never serve files directly from the private source
+            # tree. Copy the immutable artifact set into the dedicated
+            # public build store instead.
+            target = AB_STORAGE / _safe_repo_path(repository) / spec["commit"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.exists():
+                staging = target.with_name(target.name + ".staging")
+                if staging.exists():
+                    shutil.rmtree(staging)
+                shutil.copytree(candidate, staging)
+                _manifest_pointer(staging, prefix)
+                staging.rename(target)
+                _publish_permissions(target)
+            _mark_used(repository, spec["commit"])
+            return _manifest_pointer(target, prefix)
     return None
 
 
