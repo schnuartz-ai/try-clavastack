@@ -60,11 +60,13 @@ install -o root -g root -m 0644 \
   "$ROOT/vps-config/systemd/try-browser-auto-deploy.timer" \
   /etc/systemd/system/try-browser-auto-deploy.timer
 
-systemd-analyze verify \
-  /etc/systemd/system/try-browser-auto-deploy.service \
-  /etc/systemd/system/try-ab-builder.service \
-  /etc/systemd/system/try-browser-auto-deploy.timer
 systemctl daemon-reload
+unit_load_state=$(systemctl show --property=LoadState --value try-ab-builder.service)
+if [[ "$unit_load_state" != "loaded" ]]; then
+  echo "try-ab-builder.service did not load cleanly: $unit_load_state" >&2
+  systemctl status --no-pager try-ab-builder.service >&2 || true
+  exit 1
+fi
 systemctl enable --now try-ab-builder.service
 curl --fail --silent --show-error \
   --connect-timeout 5 --max-time 10 \
