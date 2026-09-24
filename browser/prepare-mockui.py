@@ -12,6 +12,22 @@ for needle in (old_platform, old_mount):
         raise RuntimeError(f"Unexpected MockUI entry point: {needle}")
 entry = entry.replace(old_platform, "_ON_HARDWARE = False  # browser has the Unix display driver")
 entry = entry.replace(old_mount, "# /flash is preloaded into Emscripten MEMFS by the browser build.")
+# Recent Playground revisions mount a host-only ``build/sd_image`` directory
+# before importing the UI. In the browser, the shared virtual SD card already
+# lives in Emscripten MEMFS at ``/state/sd``; probing ``/build`` therefore
+# raises ENOENT before MockUI can start. Bridge their SD stub to that existing
+# browser mount instead of creating a disconnected host directory.
+host_sd_mount = """    _sd_dir = os.getcwd() + '/build/sd_image'
+    if 'sd_image' not in os.listdir(os.getcwd() + '/build'):
+        os.mkdir(_sd_dir)
+    os.mount(os.VfsPosix(_sd_dir), '/sd')"""
+if entry.count(host_sd_mount) > 1:
+    raise RuntimeError("Unexpected repeated host SD mount in MockUI entry point")
+if host_sd_mount in entry:
+    entry = entry.replace(
+        host_sd_mount,
+        "    os.mount(os.VfsPosix('/state/sd'), '/sd')  # shared browser SD card",
+    )
 ready_line = "lv.screen_load(scr)" if "lv.screen_load(scr)" in entry else "scr = SpecterGui(specter_state, ui_state)"
 if entry.count(ready_line) != 1:
     raise RuntimeError("Unexpected MockUI screen initialization")
