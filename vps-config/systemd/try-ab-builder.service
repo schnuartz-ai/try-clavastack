@@ -8,6 +8,7 @@ Type=simple
 User=clavastack-ab
 Group=clavastack-ab
 WorkingDirectory=/opt/try-clavastack/pool
+ExecStart=/usr/bin/python3 /opt/try-clavastack/pool/ab_api.py
 Environment=AB_API_HOST=127.0.0.1
 Environment=AB_API_PORT=9002
 Environment=AB_SOURCE_ROOT=/opt/try-clavastack

@@ -60,6 +60,10 @@ install -o root -g root -m 0644 \
   "$ROOT/vps-config/systemd/try-browser-auto-deploy.timer" \
   /etc/systemd/system/try-browser-auto-deploy.timer
 
+systemd-analyze verify \
+  /etc/systemd/system/try-browser-auto-deploy.service \
+  /etc/systemd/system/try-ab-builder.service \
+  /etc/systemd/system/try-browser-auto-deploy.timer
 systemctl daemon-reload
 systemctl enable --now try-ab-builder.service
 curl --fail --silent --show-error \
