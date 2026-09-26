@@ -55,7 +55,7 @@ The MicroPython build disables sockets, SSL, and threads for the wallet runtime.
 The expandable **Virtual USB Connection** section offers **Specter Virtual
 Host** downloads for Windows, Linux x64, macOS Intel and macOS Apple Silicon.
 The buttons point to the pinned, checksummed `v1.0.4` release assets in the
-standalone [`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host/releases/tag/v1.0.4)
+standalone [`cryptoadvance/specter-virtual-host`](https://github.com/cryptoadvance/specter-virtual-host/releases/tag/v1.0.4)
 repository, so the website does not have to host executable files itself. This
 small local program reverse-proxies the simulator onto
 `127.0.0.1:8788` and exposes Specter DIY's established simulator transport on
@@ -63,7 +63,7 @@ small local program reverse-proxies the simulator onto
 USB bytes remain local and traverse the real firmware `USBHost`; the bridge does
 not emulate wallet responses. Its canonical source and cross-platform release
 workflow live in the standalone
-[`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host)
+[`cryptoadvance/specter-virtual-host`](https://github.com/cryptoadvance/specter-virtual-host)
 repository; the local `virtual-host/` copy is retained only for the website's
 integration test.
 The simulated device must first complete wallet setup with public test data and

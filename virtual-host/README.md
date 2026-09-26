@@ -1,7 +1,7 @@
 # Specter Virtual Host (website integration copy)
 
 The canonical source and release workflow live in
-[`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host).
+[`cryptoadvance/specter-virtual-host`](https://github.com/cryptoadvance/specter-virtual-host).
 This copy remains in the website repository so CI can compile the bridge and
 exercise the browser-to-firmware integration test without depending on a
 downloaded executable.

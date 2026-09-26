@@ -74,7 +74,7 @@ HTTPS smoke check. Do not edit files below `releases/` in place.
 
 The normal browser page fetches only `/browser/current.json`, its versioned build manifest/assets, the Worker, local logos/mockup, and the bundled QR decoder. `/api/*`, `/novnc/*`, VNC WebSockets and legacy server pages are not part of the production package. [The previous VNC deployment instructions](legacy/SETUP-VNC.md) remain in Git history as documentation only.
 
-The standalone [`Schnuartz/specter-virtual-host`](https://github.com/Schnuartz/specter-virtual-host)
+The standalone [`cryptoadvance/specter-virtual-host`](https://github.com/cryptoadvance/specter-virtual-host)
 repository owns the Virtual Host source and its tagged release workflow. It
 cross-compiles Windows, Linux x64, macOS Intel and macOS Apple Silicon assets,
 publishes checksums, and the browser page links to the pinned release assets.
