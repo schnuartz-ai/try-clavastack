@@ -24,7 +24,7 @@ async function unlockFirstSchnuartzLogin(page, canvas, tap) {
 for (const variant of [
   { id: 'play', repo: 'k9ert/specter-playground', pointer: '/browser/variants/specter-playground.json', x: .24, y: .38 },
   { id: 'play-fast', url: '/?variant=play&buildVariant=fast', repo: 'schnuartz-ai/specter-playground', pointer: '/browser/variants/specter-playground-fast.json', x: .24, y: .38 },
-  { id: 'schnuartz', repo: 'Schnuartz/specter-playground', pointer: '/browser/variants/specter-playground-schnuartz.json', x: .94, y: .03 },
+  { id: 'schnuartz', repo: 'Schnuartz/specter-playground', pointer: '/browser/variants/specter-playground-schnuartz.json', x: .94, y: .96 },
 ]) {
   const page = await browser.newPage({ viewport: { width: 850, height: 1000 } });
   const errors = [];
@@ -85,7 +85,7 @@ const mobile = await browser.newContext({ ...devices['Pixel 5'],
   viewport: { width: 360, height: 740 }, deviceScaleFactor: 3 });
 for (const variant of [
   { id: 'play', x: .24, y: .38 },
-  { id: 'schnuartz', x: .94, y: .03 },
+  { id: 'schnuartz', x: .94, y: .96 },
 ]) {
   const page = await mobile.newPage();
   await page.goto(`${base}/?variant=${variant.id}`);
