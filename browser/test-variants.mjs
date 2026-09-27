@@ -6,6 +6,21 @@ const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:8765';
 const browser = await chromium.launch(process.env.CI ? { headless: true } : { channel: 'chrome', headless: true });
 await mkdir('test-results', { recursive: true });
 const images = new Map();
+
+async function unlockFirstSchnuartzLogin(page, canvas, tap) {
+  const box = await canvas.boundingBox();
+  const locked = await canvas.screenshot();
+  // The browser MockUI entry point sets the test PIN to 21.
+  for (const [x, y] of [[.50, .44], [.24, .44], [.75, .78]]) {
+    await tap(box.x + box.width * x, box.y + box.height * y);
+    await page.waitForTimeout(200);
+  }
+  await page.waitForTimeout(900);
+  if (locked.equals(await canvas.screenshot())) {
+    throw new Error('schnuartz: test PIN did not open first-seed setup');
+  }
+}
+
 for (const variant of [
   { id: 'play', repo: 'k9ert/specter-playground', pointer: '/browser/variants/specter-playground.json', x: .24, y: .38 },
   { id: 'play-fast', url: '/?variant=play&buildVariant=fast', repo: 'schnuartz-ai/specter-playground', pointer: '/browser/variants/specter-playground-fast.json', x: .24, y: .38 },
@@ -42,6 +57,9 @@ for (const variant of [
   }
   await page.waitForTimeout(700);
   const canvas = page.locator('#screen');
+  if (variant.id === 'schnuartz') {
+    await unlockFirstSchnuartzLogin(page, canvas, (x, y) => page.mouse.click(x, y));
+  }
   const before = await canvas.screenshot({ path: `test-results/${variant.id}-mockui-screen.png` });
   const png = PNG.sync.read(before);
   const colors = new Set();
@@ -73,6 +91,9 @@ for (const variant of [
   await page.goto(`${base}/?variant=${variant.id}`);
   await page.locator('#st').getByText('Running locally').waitFor({ timeout: 65000 });
   const canvas = page.locator('#screen');
+  if (variant.id === 'schnuartz') {
+    await unlockFirstSchnuartzLogin(page, canvas, (x, y) => page.touchscreen.tap(x, y));
+  }
   const before = await canvas.screenshot();
   const box = await canvas.boundingBox();
   let changed = false;
