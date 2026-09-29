@@ -291,6 +291,10 @@
     .camera-status-dot { width:8px; height:8px; border-radius:50%; background:#4c5; box-shadow:0 0 0 3px #4c52, 0 0 12px #4c5; }
     .camera-status-dot[hidden] { display:none; }
     .virtual-host { width:calc(100% - 32px); max-width:822px; margin:0 auto 28px; border:1px solid #35506d; border-radius:14px; background:linear-gradient(135deg,#101b2a,#17283b); color:var(--specter-light); overflow:hidden; }
+    @media (min-width: 900px) {
+      .virtual-host { max-width:1120px; }
+      .sim-panel, .demo-import { max-width:760px; }
+    }
     .virtual-host summary { cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:17px 20px; font-size:15px; font-weight:700; list-style:none; }
     .virtual-host summary::-webkit-details-marker { display:none; }
     .virtual-host summary::after { content:'+'; color:var(--specter-primary); font-size:24px; font-weight:400; line-height:1; }
