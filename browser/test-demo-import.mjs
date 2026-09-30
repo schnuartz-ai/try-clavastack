@@ -98,6 +98,27 @@ await page.locator('#sd-files').getByText('testnet-ghost-payment-high-fee.psbt',
 if (await page.locator('#sd-files').getByText('mainnet-ghost-wallet.json', { exact: false }).count()) {
   throw new Error('Switching back to Testnet kept stale Mainnet files on the SD card');
 }
+await page.locator('#demo-network').selectOption('');
+await page.locator('#demo-network:not(:disabled)').waitFor();
+for (const name of ['01-ghost-PUBLIC-TEST-SEED.txt', 'testnet-ghost-payment-high-fee.psbt',
+  'mainnet-ghost-wallet.json', 'mainnet-ghost-payment-high-fee.psbt']) {
+  if (await page.locator('#sd-files').getByText(name, { exact: false }).count()) {
+    throw new Error(`Selecting None kept demo file ${name}`);
+  }
+}
+if (await page.locator('#sd-toggle').getAttribute('aria-pressed') !== 'false') {
+  throw new Error('Selecting None did not eject the SD card that the demo set inserted');
+}
+if (await page.locator('#card-slots .card-details').count()) {
+  throw new Error('Selecting None kept demo seed details on the Smartcards');
+}
+for (let slot = 0; slot < 2; slot++) {
+  const label = await page.locator('#card-slots > div').nth(slot).locator('button').getAttribute('aria-label');
+  if (!label?.includes('Not inserted')) throw new Error(`Selecting None left Smartcard ${slot + 1} inserted`);
+}
+await page.locator('#demo-network').selectOption('testnet');
+await page.locator('#sd-files').getByText('testnet-ghost-payment-high-fee.psbt', { exact: false }).waitFor();
+await page.locator('#sd-state').getByText('Inserted', { exact: true }).waitFor();
 await page.locator('#sd-picker').setInputFiles({ name: 'payment.signed.demo.psbt',
   mimeType: 'application/octet-stream', buffer: Buffer.from('signed public demo transaction') });
 await page.locator('#sd-files').getByText('payment.signed.demo.psbt', { exact: false }).waitFor();

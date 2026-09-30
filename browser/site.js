@@ -47,6 +47,10 @@ let sdFileSizes = new Map();
 let activeCard = null;
 let cardSlots = [];
 const demoCardMetadata = new Map();
+const demoResetCardSlots = new Set();
+let demoInsertedSd = false;
+let demoPreviousActiveCard = null;
+let demoSessionActive = false;
 let cameraStream;
 let cameraLoop;
 let scannerActive = false;
@@ -423,7 +427,6 @@ function renderCards(slots) {
 async function importDemoData() {
   const networkSelect = $('#demo-network');
   const network = networkSelect.value;
-  if (!network) return;
   if (demoImportBusy) return;
   if (startupPhase !== 'running' || !worker) {
     log('Demo import requested before Specter finished starting.');
@@ -432,6 +435,48 @@ async function importDemoData() {
   demoImportBusy = true;
   networkSelect.disabled = true;
   try {
+    if (!network) {
+      if (!demoSessionActive) return;
+      const { createDemoFiles } = await import('/browser/demo-data.js?v=20260930-mainnet-bip84-psbt-v3');
+      const demoFileNames = new Set([
+        ...createDemoFiles('testnet').files,
+        ...createDemoFiles('mainnet').files,
+      ].map(file => file.name).concat([
+        'mainnet-multisig-unsigned.psbt',
+        'mainnet-ghost-zoo-mirror-2of3.json',
+      ]));
+      stateFiles = await snapshot();
+      for (const file of stateFiles) {
+        if (file.path.startsWith('sd/') && demoFileNames.has(file.path.slice(3))) {
+          send({ type: 'sd-delete', name: file.path.slice(3) });
+        }
+      }
+      for (const slot of demoResetCardSlots) send({ type: 'card-reset', slot });
+      demoResetCardSlots.clear();
+      demoCardMetadata.clear();
+      renderCards(cardSlots);
+      if (activeCard !== demoPreviousActiveCard) {
+        if (activeCard !== null) send({ type: 'card-remove' });
+        if (demoPreviousActiveCard !== null) {
+          send({ type: 'card-insert', slot: demoPreviousActiveCard });
+        }
+      }
+      if (demoInsertedSd && inserted) {
+        send({ type: 'sd-eject' });
+        inserted = false;
+        $('#sd-state').textContent = 'Ejected';
+        $('#sd-toggle').setAttribute('aria-label', 'Insert SD card');
+        $('#sd-toggle').setAttribute('aria-pressed', 'false');
+        $('#sd-toggle').title = 'Click to insert SD card';
+        $('#sd-hint').textContent = 'Click to insert';
+        $('#sd-stage').classList.remove('inserted');
+      }
+      stateFiles = await snapshot();
+      demoInsertedSd = false;
+      demoPreviousActiveCard = null;
+      demoSessionActive = false;
+      return;
+    }
     const { createDemoFiles } = await import('/browser/demo-data.js?v=20260930-mainnet-bip84-psbt-v3');
     const demo = createDemoFiles(network);
     const alternateDemo = createDemoFiles(network === 'mainnet' ? 'testnet' : 'mainnet');
@@ -444,8 +489,13 @@ async function importDemoData() {
       previousDemoFiles.reduce((total, file) => total + file.bytes.byteLength, 0);
     for (const file of demo.files) projected += file.bytes.byteLength;
     if (projected > SD_CAPACITY_BYTES) throw new Error('Virtual SD card is full');
+    if (!demoSessionActive) {
+      demoPreviousActiveCard = activeCard;
+      demoSessionActive = true;
+    }
     if (!inserted) {
       send({ type: 'sd-insert' });
+      demoInsertedSd = true;
       inserted = true;
       $('#sd-state').textContent = 'Inserted';
       $('#sd-toggle').setAttribute('aria-label', 'Remove SD card');
@@ -471,13 +521,16 @@ async function importDemoData() {
         { path: `cards/${card.slot}/pin.bin`, bytes: card.pinDigest },
         { path: `cards/${card.slot}/attempts`, bytes: new Uint8Array([10]) },
       ] });
+      demoResetCardSlots.add(card.slot);
     }
     for (const card of demo.cards) {
-      demoCardMetadata.set(card.slot, {
-        label: card.label,
-        pin: card.pin,
-        seed: `${card.id}-seed`,
-      });
+      if (demoResetCardSlots.has(card.slot)) {
+        demoCardMetadata.set(card.slot, {
+          label: card.label,
+          pin: card.pin,
+          seed: `${card.id}-seed`,
+        });
+      }
     }
     renderCards(cardSlots);
     $('#sd-state').textContent = inserted ? 'Inserted' : 'Ejected';
@@ -880,7 +933,7 @@ $('#demo-network').onchange = event => {
   } else if (event.target.value === 'testnet') {
     event.target.title = "Unsafe public test seeds only. Includes Ghost, Zoo, their BIP85 children, two single-signature PSBT examples, one unsigned Ghost + Zoo + Mirror 2-of-3 PSBT and the matching multisig wallet. Two virtual Smartcards receive Ghost (PIN 1234) and Zoo (PIN 21). Mirror's seed is never stored.";
   }
-  if (event.target.value) importDemoData();
+  importDemoData();
 };
 picker.onchange = () => { importFiles(picker.files); picker.value = ''; };
 $('#sd-drop').ondragover = event => { event.preventDefault(); $('#sd-drop').classList.add('dragging'); };
