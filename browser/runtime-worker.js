@@ -328,6 +328,10 @@ function handle(data) {
       if (!fs.analyzePath(`/state/cards/${slot}/private.key`).exists) createCard(fs, slot);
       fs.writeFile('/bridge/card-slot', new Uint8Array([slot]));
       cardInfo(fs);
+    } else if (data.type === 'card-create') {
+      const slot = cardSlot(data.slot);
+      if (!fs.analyzePath(`/state/cards/${slot}/private.key`).exists) createCard(fs, slot);
+      cardInfo(fs);
     } else if (data.type === 'card-remove') {
       if (fs.analyzePath('/bridge/card-slot').exists) fs.unlink('/bridge/card-slot');
       cardInfo(fs);

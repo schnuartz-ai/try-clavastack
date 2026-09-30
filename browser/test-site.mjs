@@ -31,11 +31,11 @@ if (await virtualHost.evaluate(element => element.open)) {
   throw new Error('Virtual Host panel should be collapsed by default');
 }
 if (!await page.evaluate(() => {
-  const demo = document.querySelector('.demo-import');
+  const demo = document.querySelector('#demo-network');
   const panel = document.querySelector('#virtual-host');
   return demo && panel && Boolean(demo.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING);
 })) {
-  throw new Error('Virtual Host panel should appear below Import Demo Data');
+  throw new Error('Virtual Host panel should appear below the SD demo selector');
 }
 if (!await page.locator('.virtual-host-repository a').evaluate(anchor =>
   anchor.href === 'https://github.com/cryptoadvance/specter-virtual-host')) {

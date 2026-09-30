@@ -17,8 +17,8 @@ try {
   const firstCard = page.locator('#card-slots > div').nth(0);
   await firstCard.locator('.smartcard-graphic').click();
   await firstCard.getByText('Inserted', { exact: true }).waitFor();
-  await page.locator('#demo-load').click();
-  await page.locator('#demo-load').getByText('Import Demo Data Again', { exact: true })
+  await page.locator('#demo-network').selectOption('testnet');
+  await page.locator('#sd-files').getByText('testnet-ghost-payment-high-fee.psbt', { exact: false })
     .waitFor({ timeout: 30000 });
   await page.waitForTimeout(3000);
 

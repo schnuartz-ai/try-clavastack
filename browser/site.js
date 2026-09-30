@@ -62,7 +62,7 @@ let forceCanvasBridge = false;
 let recoveryTimer;
 let startupPhase = 'manifest';
 let displayMode = 'unselected';
-const workerRevision = '2026-09-15.2';
+const workerRevision = '2026-09-30.1';
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;
@@ -74,6 +74,7 @@ const virtualHostStatus = $('#virtual-host-status');
 const virtualHostStatusText = $('#virtual-host-status-text');
 let virtualHostSocket;
 let virtualHostRetry;
+let virtualHostConnectTimeout;
 let virtualHostConnected = false;
 let virtualHostPcConnected = false;
 let virtualUsbEnabled = false;
@@ -228,13 +229,29 @@ function connectVirtualHost() {
     const socket = new WebSocket(virtualHostUrl());
     virtualHostSocket = socket;
     socket.binaryType = 'arraybuffer';
+    virtualHostConnectTimeout = setTimeout(() => {
+      if (virtualHostSocket !== socket || socket.readyState !== WebSocket.CONNECTING) return;
+      virtualHostSocket = undefined;
+      virtualHostConnected = false;
+      virtualHostPcConnected = false;
+      updateVirtualHostStatus('Virtual Host connection timed out; retrying…');
+      socket.close();
+      scheduleVirtualHostRetry();
+    }, 10000);
     socket.onopen = () => {
+      if (virtualHostSocket !== socket) {
+        socket.close();
+        return;
+      }
+      clearTimeout(virtualHostConnectTimeout);
+      virtualHostConnectTimeout = undefined;
       virtualHostSuperseded = false;
       virtualHostConnected = true;
       updateVirtualHostStatus();
       log('Virtual Host connected');
     };
     socket.onmessage = event => {
+      if (virtualHostSocket !== socket) return;
       if (typeof event.data === 'string') {
         try {
           const data = JSON.parse(event.data);
@@ -254,7 +271,10 @@ function connectVirtualHost() {
     };
     socket.onerror = () => { /* onclose updates the visible state and retries */ };
     socket.onclose = event => {
-      if (virtualHostSocket === socket) virtualHostSocket = undefined;
+      if (virtualHostSocket !== socket) return;
+      clearTimeout(virtualHostConnectTimeout);
+      virtualHostConnectTimeout = undefined;
+      virtualHostSocket = undefined;
       virtualHostConnected = false;
       virtualHostPcConnected = false;
       send({ type: 'usb-disconnect' });
@@ -401,31 +421,46 @@ function renderCards(slots) {
   }
 }
 async function importDemoData() {
-  const button = $('#demo-load');
+  const networkSelect = $('#demo-network');
+  const network = networkSelect.value;
+  if (!network) return;
   if (demoImportBusy) return;
   if (startupPhase !== 'running' || !worker) {
     log('Demo import requested before Specter finished starting.');
     return;
   }
   demoImportBusy = true;
-  button.disabled = true;
+  networkSelect.disabled = true;
   try {
-    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260916-multisig-psbt');
-    const demo = createDemoFiles();
-    let projected = sdUsedBytes;
-    for (const file of demo.files) {
-      projected += file.bytes.byteLength - (sdFileSizes.get(file.name) || 0);
-      if (projected > SD_CAPACITY_BYTES) throw new Error('Virtual SD card is full');
+    const { createDemoFiles } = await import('/browser/demo-data.js?v=20260930-mainnet-bip84-psbt-v3');
+    const demo = createDemoFiles(network);
+    const alternateDemo = createDemoFiles(network === 'mainnet' ? 'testnet' : 'mainnet');
+    const retiredDemoFiles = ['mainnet-multisig-unsigned.psbt', 'mainnet-ghost-zoo-mirror-2of3.json'];
+    const demoFileNames = new Set([...demo.files, ...alternateDemo.files].map(file => file.name).concat(retiredDemoFiles));
+    stateFiles = await snapshot();
+    const sdFiles = stateFiles.filter(file => file.path.startsWith('sd/'));
+    const previousDemoFiles = sdFiles.filter(file => demoFileNames.has(file.path.slice(3)));
+    let projected = sdFiles.reduce((total, file) => total + file.bytes.byteLength, 0) -
+      previousDemoFiles.reduce((total, file) => total + file.bytes.byteLength, 0);
+    for (const file of demo.files) projected += file.bytes.byteLength;
+    if (projected > SD_CAPACITY_BYTES) throw new Error('Virtual SD card is full');
+    if (!inserted) {
+      send({ type: 'sd-insert' });
+      inserted = true;
+      $('#sd-state').textContent = 'Inserted';
+      $('#sd-toggle').setAttribute('aria-label', 'Remove SD card');
+      $('#sd-toggle').setAttribute('aria-pressed', 'true');
+      $('#sd-toggle').title = 'Click to remove SD card';
+      $('#sd-hint').textContent = 'Click to remove';
+      $('#sd-stage').classList.add('inserted');
     }
+    for (const file of previousDemoFiles) send({ type: 'sd-delete', name: file.path.slice(3) });
     for (const file of demo.files) send({ type: 'sd-import', name: file.name, bytes: file.bytes });
-    if (!inserted) send({ type: 'sd-insert' });
     stateFiles = await snapshot();
     const hasCard = slot => stateFiles.some(file => file.path === `cards/${slot}/private.key`);
     for (const slot of [1, 2]) {
       if (hasCard(slot)) continue;
-      send({ type: 'card-insert', slot });
-      stateFiles = await snapshot();
-      send({ type: 'card-remove' });
+      send({ type: 'card-create', slot });
       stateFiles = await snapshot();
     }
     const occupied = slot => stateFiles.some(file => file.path === `cards/${slot}/secret.bin` && file.bytes.byteLength);
@@ -444,15 +479,13 @@ async function importDemoData() {
         seed: `${card.id}-seed`,
       });
     }
-    send({ type: 'card-insert', slot: 1 });
-    stateFiles = await snapshot();
     renderCards(cardSlots);
-    button.textContent = 'Import Demo Data Again';
+    $('#sd-state').textContent = inserted ? 'Inserted' : 'Ejected';
   } catch (error) {
     log(`Demo import error: ${error.message}`);
   } finally {
     demoImportBusy = false;
-    button.disabled = false;
+    networkSelect.disabled = false;
   }
 }
 function setLoadingMessage(message) {
@@ -841,7 +874,14 @@ loading.querySelector('[data-loading-details]').onclick = event => {
 $('#sd-toggle').onclick = () => send({ type: inserted ? 'sd-eject' : 'sd-insert' });
 $('#sd-clear').onclick = () => send({ type: 'sd-clear' });
 $('#sd-add').onclick = () => picker.click();
-$('#demo-load').onclick = importDemoData;
+$('#demo-network').onchange = event => {
+  if (event.target.value === 'mainnet') {
+    event.target.title = 'Unsafe public demo seeds and private keys. Never send or store real funds. Mainnet transactions use fictional inputs. The virtual Smartcards receive the public Ghost and Zoo seeds.';
+  } else if (event.target.value === 'testnet') {
+    event.target.title = "Unsafe public test seeds only. Includes Ghost, Zoo, their BIP85 children, two single-signature PSBT examples, one unsigned Ghost + Zoo + Mirror 2-of-3 PSBT and the matching multisig wallet. Two virtual Smartcards receive Ghost (PIN 1234) and Zoo (PIN 21). Mirror's seed is never stored.";
+  }
+  if (event.target.value) importDemoData();
+};
 picker.onchange = () => { importFiles(picker.files); picker.value = ''; };
 $('#sd-drop').ondragover = event => { event.preventDefault(); $('#sd-drop').classList.add('dragging'); };
 $('#sd-drop').ondragleave = () => $('#sd-drop').classList.remove('dragging');
@@ -883,7 +923,7 @@ if (virtualHostDetails) {
 }
 addEventListener('pagehide', () => {
   runGeneration++; clearTimeout(recoveryTimer); clearStartupTimer(); stopLoadingClock();
-  clearTimeout(virtualHostRetry); virtualHostSocket?.close();
+  clearTimeout(virtualHostRetry); clearTimeout(virtualHostConnectTimeout); virtualHostSocket?.close();
   stopCamera(); worker?.terminate(); worker = undefined;
 });
 

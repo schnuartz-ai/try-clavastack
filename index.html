@@ -241,14 +241,6 @@
     .technical-details pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; max-height:180px; overflow:auto; }
     .card-tray .card-hint { color:#aab8c8; display:block; font-size:10px; margin-top:5px; text-align:center; }
     .card-tray .card-details { color:#d8e6f3; display:block; font-size:9px; line-height:1.35; margin-top:5px; min-height:0; overflow-wrap:anywhere; text-align:center; white-space:pre-line; }
-    .demo-import { width:100%; max-width:380px; border:1px solid #3b4a5e; border-radius:10px; background:var(--specter-dark-secondary); color:var(--specter-light-secondary); padding:14px; font-size:13px; line-height:1.45; }
-    .demo-import p { margin:5px 0; }
-    .demo-import strong { color:var(--specter-light); }
-    .demo-import button { background:var(--specter-dark-accent); color:var(--specter-light); border:1px solid #536174; border-radius:6px; padding:8px; cursor:pointer; min-height:36px; }
-    .demo-import #demo-load { width:auto; background:var(--specter-dark-accent); border-color:#536174; font-weight:700; }
-    .demo-import #demo-load:hover { border-color:var(--specter-primary); }
-    .demo-import details { margin-top:8px; color:var(--specter-light-secondary); }
-    .demo-import summary { cursor:pointer; font-size:11px; }
     #sd-drop { border: 1px dashed #536174; border-radius: 8px; padding: 10px; margin-top: 7px; }
     #sd-drop.dragging { border-color: var(--specter-primary); }
     #sd-files { list-style: none; max-height: 180px; overflow: auto; }
@@ -269,6 +261,8 @@
     #camera-screen.active #camera-screen-start { display:none; }
     .peripheral-card { border:1px solid #3b4a5e; border-radius:12px; background:linear-gradient(135deg,#111c2b,#202d3e); padding:12px; margin:9px 0; }
     .sd-stage { display:flex; align-items:center; gap:16px; min-height:100px; }
+    .sd-actions { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.55fr); align-items:center; gap:6px; }
+    .sd-actions > button, .sd-actions select { width:100%; min-width:0; margin:0; padding:7px 4px; font-size:11px; text-align:center; white-space:nowrap; }
     .sd-card-control { display:flex; flex-direction:column; align-items:center; flex:none; gap:4px; }
     .sim-panel #sd-toggle { display:block; width:84px; min-height:84px; padding:0; margin:0; border:0; background:transparent; }
     .sim-panel #sd-toggle:hover { border:0; }
@@ -293,7 +287,7 @@
     .virtual-host { width:calc(100% - 32px); max-width:822px; margin:0 auto 28px; border:1px solid #35506d; border-radius:14px; background:linear-gradient(135deg,#101b2a,#17283b); color:var(--specter-light); overflow:hidden; }
     @media (min-width: 900px) {
       .virtual-host { max-width:1120px; }
-      .sim-panel, .demo-import { max-width:760px; }
+      .sim-panel { max-width:760px; }
     }
     .virtual-host summary { cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:17px 20px; font-size:15px; font-weight:700; list-style:none; }
     .virtual-host summary::-webkit-details-marker { display:none; }
@@ -315,6 +309,7 @@
     .virtual-host-steps li { margin:8px 0; padding-left:4px; }
     .virtual-host-note { margin:12px 0 0; color:var(--specter-light-secondary); font-size:11px; line-height:1.5; }
     @media (max-width:600px) { .card-tray { gap:5px; } .smartcard-graphic { padding:5px; } }
+    @media (max-width:420px) { .sd-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .sd-actions #demo-network { grid-column:1 / -1; } }
 
     footer {
       background: #0b1624;
@@ -330,7 +325,7 @@
     html.gallery-pending::after { content: 'Loading Simulator…'; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; color: var(--specter-light-secondary); font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; z-index: 999; }
     html.gallery-pending.gallery body { visibility: visible; }
     html.gallery-pending.gallery::after { display: none; }
-    .embedded header, .embedded .hardware-link, .embedded .demo-import, .embedded footer, .embedded .technical-details, .embedded .virtual-host, .embedded [data-loading-details] { display:none; }
+    .embedded header, .embedded .hardware-link, .embedded footer, .embedded .technical-details, .embedded .virtual-host, .embedded [data-loading-details] { display:none; }
     .embedded, .embedded body { min-height:0; }
     .embedded .page { padding:10px 12px 22px; }
     .embedded .phone-wrapper { max-width:330px; }
@@ -341,13 +336,12 @@
     .gallery .phone-wrapper .phone-mockup { display:none; }
     .gallery #screen-overlay { left:0; top:0; width:100%; height:100%; border-radius:0; }
     @media (min-width:900px) {
-      .page { display:grid; grid-template-columns:380px 380px; grid-template-areas:'warning warning' 'device peripherals' 'restart peripherals' 'hardware hardware' 'demo demo' 'technical technical'; gap:16px 22px; width:100%; max-width:822px; margin:auto; align-items:start; }
+      .page { display:grid; grid-template-columns:380px 380px; grid-template-areas:'warning warning' 'device peripherals' 'restart peripherals' 'hardware hardware' 'technical technical'; gap:16px 22px; width:100%; max-width:822px; margin:auto; align-items:start; }
       .warning { grid-area:warning; max-width:280px; justify-self:center; }
       .phone-wrapper { grid-area:device; }
       .device-actions { grid-area:restart; }
       .sim-panel { grid-area:peripherals; }
       .hardware-link { grid-area:hardware; justify-self:center; margin-top:16px; }
-      .demo-import { grid-area:demo; justify-self:center; }
       .technical-details { grid-area:technical; justify-self:center; }
       .embedded .page { grid-template-columns:330px 380px; max-width:760px; }
       .gallery .page { display:block; max-width:none; }
@@ -430,8 +424,15 @@
     <div class="peripheral-card">
       <h3>Virtual SD card <span id="sd-state">Ejected</span></h3>
       <div id="sd-stage" class="sd-stage"><div class="sd-card-control"><button id="sd-toggle" type="button" aria-label="Insert SD card" aria-pressed="false" title="Click to insert SD card"><img class="sd-card-graphic" src="/assets/sd-card-8gb.png" alt="microSD card"></button><small id="sd-hint">Click to insert</small></div></div>
-      <button id="sd-add">Add files</button>
-      <button id="sd-clear">Clear card</button>
+      <div class="sd-actions">
+        <button id="sd-add">Add files</button>
+        <button id="sd-clear">Clear card</button>
+        <select id="demo-network" aria-label="Import demo data" title="Choose a demo set. Mainnet uses publicly known seeds; never send funds to these demo addresses.">
+          <option value="" selected>None</option>
+          <option value="testnet">Testnet Demos/Seed</option>
+          <option value="mainnet">Mainnet/Demos Seed</option>
+        </select>
+      </div>
       <input id="sd-picker" type="file" multiple hidden>
       <div id="sd-drop">Drop or paste multiple files here, or use Add files.</div>
       <ul id="sd-files"></ul>
@@ -449,14 +450,6 @@
   </section>
 
   <p class="hardware-link">Everything above is a simulation of <a href="https://clavastack.com" target="_blank" rel="noopener noreferrer">hardware you can buy</a>.</p>
-
-  <section class="demo-import" aria-label="Public demo data">
-    <button id="demo-load" type="button">Import Demo Data</button>
-    <details>
-      <summary>What gets imported?</summary>
-      <p><strong>Unsafe public test seeds only.</strong> Ghost, Zoo, their BIP85 children, two single-signature PSBT examples, one completely unsigned Ghost + Zoo + Mirror 2-of-3 PSBT and the matching multisig wallet. Two blank virtual Smartcards receive Ghost (PIN 1234) and Zoo (PIN 21). Mirror's seed is never stored.</p>
-    </details>
-  </section>
 
 <details id="virtual-host" class="virtual-host">
   <summary>

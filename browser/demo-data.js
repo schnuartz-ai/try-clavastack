@@ -23,34 +23,52 @@ const roots = {
   },
 };
 
-const wallets = [
+const testnetWallets = [
   ['testnet-ghost-zoo-mirror-2of3.json', 'Testnet Ghost + Zoo + Mirror 2-of-3', 'wsh(sortedmulti(2,[8c24a510/48h/1h/0h/2h]tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx/{0,1}/*,[3f635a63/48h/1h/0h/2h]tpubDFPtPArj4GzBEFHohegg1Xatrc1Fi9oSox5LzuSRX91miwQxuUrEpBxpvDRsmZYJKYFhgdK3UStsjC8JKXfUbMinjFqiEM4uNwzVaCaHpys/{0,1}/*,[74d682c3/48h/1h/0h/2h]tpubDFj1hZAYMiqqHgrVQ98sLcStdrnAhNx74ynU6QFDULUhyp1BDeyz6E76HPN16t1fswttuwijEsMnskuZPtCvtdbHt74Rs8Vfk3JsM86wah7/{0,1}/*))#syw6qp8z', 'tb1qem2p9awpmhyts2rrg7wxnze0qm4znep7zl032qwrh0yy4m36364qhza3rn'],
 ];
+const mainnetWallets = [
+  ['mainnet-ghost-wallet.json', 'Mainnet Ghost public demo wallet', 'wpkh([8c24a510/84h/0h/0h]xpub6CjsHfiuBnHMPBkxThQ4DDjTw2Qq3VMEVcPBoMBGejZGkj3WQR15LeJLmymPpSzYHX21C8SdFWHgMw2RUBdAQ2Aj4MMS93a68mxPQeS8oHr/0/*)#0hgg3ucc', 'bc1qwq5rv3p3vp4duhejkd9l88m7umudte4fur4c6q'],
+  ['mainnet-zoo-wallet.json', 'Mainnet Zoo public demo recipient wallet', 'wpkh([3f635a63/84h/0h/0h]xpub6CYYYw6h668PkCSXxH9yxBG32zCMEb6N9DuVY8Ax8U7RSV86qKrrhjJfS6nL5jSoikLpd1Qw9qgHv5vyRi7V4nfV3ymLfGpFShsYsFmQiT8/0/*)#9m66mdj4', 'bc1qk0a9hr7wjfxeenz9nwenw9flhq0tmsf6vsgnn2'],
+];
 
-export function createDemoFiles() {
+export function createDemoFiles(network = 'testnet') {
+  if (!['testnet', 'mainnet'].includes(network)) throw new Error(`Unsupported demo network: ${network}`);
+  const isMainnet = network === 'mainnet';
+  const prefix = isMainnet ? 'mainnet' : 'testnet';
+  const wallets = isMainnet ? mainnetWallets : testnetWallets;
   const primary = 'ghost';
   const secondary = 'zoo';
   const files = [];
   const add = (name, text) => files.push({ name, bytes: new TextEncoder().encode(text) });
   add('00-CLAVASTACK-DEMO-README.txt', [
-    'UNSAFE PUBLIC TEST DATA - NEVER USE FOR REAL FUNDS', '',
+    isMainnet ? 'UNSAFE PUBLIC DEMO DATA - NEVER SEND OR STORE REAL FUNDS' : 'UNSAFE PUBLIC TEST DATA - NEVER USE FOR REAL FUNDS', '',
     `MemoryCard 1 prepared seed: ${roots[primary].label}`,
     `MemoryCard 2 prepared seed: ${roots[secondary].label}`,
-    '2-of-3 multisig: Ghost + Zoo + public-only Mirror cosigner (fingerprint 74d682c3).',
-    'The Mirror mnemonic is deliberately not included or stored.',
+    ...(isMainnet
+      ? ['Mainnet single-signature Ghost wallet. The PSBT signing key is derived from the Ghost MemoryCard seed.']
+      : ['2-of-3 multisig: Ghost + Zoo + public-only Mirror cosigner (fingerprint 74d682c3).',
+        'The Mirror mnemonic is deliberately not included or stored.']),
     'The card seed is written only after you confirm Save key to the card in Specter DIY.',
-    'Testnet only. The multisig JSON contains the single demo receive address.',
+    isMainnet
+      ? 'Mainnet BIP84 demo payment from Ghost to the separate Zoo wallet. Inputs are fictional and have no coins. Both seed phrases and private keys are public. Never send real funds to any demo address.'
+      : 'Testnet only. The multisig JSON contains the single demo receive address.',
   ].join('\n'));
   for (const [id, root] of Object.entries(roots)) {
-    add(`01-${id}-PUBLIC-TEST-SEED.txt`, `${root.mnemonic}\n`);
+    add(`01-${id}-PUBLIC-${isMainnet ? 'MAINNET-DEMO' : 'TEST'}-SEED.txt`, `${root.mnemonic}\n`);
     root.children.forEach((mnemonic, index) => add(`02-${id}-bip85-child-${index}.txt`, `${mnemonic}\n`));
   }
   for (const [name, label, descriptor, address] of wallets) {
-    add(name, `${JSON.stringify({ label, descriptor, address, warning: 'UNSAFE PUBLIC TEST DATA' }, null, 2)}\n`);
+    add(name, `${JSON.stringify({ label, descriptor, address, warning: isMainnet
+      ? 'UNSAFE PUBLIC DEMO DATA - NEVER SEND OR STORE REAL FUNDS' : 'UNSAFE PUBLIC TEST DATA' }, null, 2)}\n`);
   }
-  add('testnet-ghost-payment-low-fee.psbt', 'cHNidP8BAHECAAAAASIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiAAAAAAD9////AmDqAAAAAAAAFgAUx6q7+sTbbs7TU1rVoghQnTkhKctMmgAAAAAAABYAFOeecUR7lROm99MUyL5extM/T11XAAAAAAABAR+ghgEAAAAAABYAFGLab1CVpSs0DBrqUxM0E2SvvC6OIgYDMe3LFs/Q+FmAUveyh7BwR6EcYJZ8Hn6wJX4CVSU52YQYjCSlEFQAAIABAACAAAAAgAAAAAAAAAAAAAAiAgIlH+LuS8Q3KbCQP/rbz4RtnmrLs6pZOwnWAIVkXL42UxiMJKUQVAAAgAEAAIAAAACAAQAAAAAAAAAA\n');
-  add('testnet-ghost-payment-high-fee.psbt', 'cHNidP8BAHECAAAAATMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzAAAAAAD9////AmDqAAAAAAAAFgAUx6q7+sTbbs7TU1rVoghQnTkhKcu4iAAAAAAAABYAFOeecUR7lROm99MUyL5extM/T11XAAAAAAABAR+ghgEAAAAAABYAFGLab1CVpSs0DBrqUxM0E2SvvC6OIgYDMe3LFs/Q+FmAUveyh7BwR6EcYJZ8Hn6wJX4CVSU52YQYjCSlEFQAAIABAACAAAAAgAAAAAAAAAAAAAAiAgIlH+LuS8Q3KbCQP/rbz4RtnmrLs6pZOwnWAIVkXL42UxiMJKUQVAAAgAEAAIAAAACAAQAAAAAAAAAA\n');
-  add('testnet-multisig-unsigned.psbt', 'cHNidP8BAH0CAAAAAVPh/+2JhFAfPrp/zRvelFDxQmZkKeE7mzuxid4jI7HeAAAAAAD9////AsDUAQAAAAAAFgAUYtpvUJWlKzQMGupTEzQTZK+8Lo6YqwIAAAAAACIAILoTspSokGA0cjE8CnfeIvHqzgm0tdVZxxlrhs1HGyUlAAAAAAABASvgkwQAAAAAACIAIM7UEvXB3ci4KGNHnGmLLwbqKeQ+F98VAcO7yEruOo6qAQVpUiECIGrVr1HvJb+EyrVsXvN+zA7qrbkHWZn0FHMNM1a/YW8hAwLIaxKLZzb4vbk/CzPpvpJ1xyK4gdnYsqDRcQj/5AxHIQN2U+Ja/EjsBdkIPdeOUr7cFnnwU7deuC0N1b6VqHoVg1OuIgYCIGrVr1HvJb+EyrVsXvN+zA7qrbkHWZn0FHMNM1a/YW8cjCSlEDAAAIABAACAAAAAgAIAAIAAAAAAAAAAACIGA3ZT4lr8SOwF2Qg9145SvtwWefBTt164LQ3VvpWoehWDHD9jWmMwAACAAQAAgAAAAIACAACAAAAAAAAAAAAiBgMCyGsSi2c2+L25Pwsz6b6SdcciuIHZ2LKg0XEI/+QMRxx01oLDMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAAAABAWlSIQJm1MSsX0fl00vbSLL0WO71Iu2PBZjpqOJ3iKPoztoYACECd+th5B1LbNaBUgaMQ1l5+bJQr6k5DbV+AZVqfuPhOVohA5smzt5dkVK71zJ84yDQxEfmRf2bpDxbkf2STK+bIRnVU64iAgObJs7eXZFSu9cyfOMg0MRH5kX9m6Q8W5H9kkyvmyEZ1RyMJKUQMAAAgAEAAIAAAACAAgAAgAEAAAAAAAAAIgICd+th5B1LbNaBUgaMQ1l5+bJQr6k5DbV+AZVqfuPhOVocP2NaYzAAAIABAACAAAAAgAIAAIABAAAAAAAAACICAmbUxKxfR+XTS9tIsvRY7vUi7Y8FmOmo4neIo+jO2hgAHHTWgsMwAACAAQAAgAAAAIACAACAAQAAAAAAAAAA\n');
+  if (isMainnet) {
+    add('mainnet-ghost-payment-low-fee.psbt', 'cHNidP8BAFICAAAAAUREREREREREREREREREREREREREREREREREREREREREAAAAAAD9////AayEAQAAAAAAFgAUs/pbj86STZzMRZuzNxU/uB69wToAAAAAAAEBH6CGAQAAAAAAFgAUcCg2RDFgat5fMrNL859+5vjV5qkBAwQBAAAAIgYCgpVsTH4e5mjPEhLj54eQxTKjFKGt02UUgohoMWe7h0EYAAAAAFQAAIAAAACAAAAAgAAAAAAAAAAAAAA=');
+    add('mainnet-ghost-payment-high-fee.psbt', 'cHNidP8BAFICAAAAAUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFAAAAAAD9////ARhzAQAAAAAAFgAUs/pbj86STZzMRZuzNxU/uB69wToAAAAAAAEBH6CGAQAAAAAAFgAUPJyacFJspE0e3nDnjnWo+/dmdkMBAwQBAAAAIgYCS0dkGRyK1xlI1VW22Z4Q7FRkRJ3axGguA7j+fTn7opcYAAAAAFQAAIAAAACAAAAAgAAAAAABAAAAAAA=');
+  } else {
+    add('testnet-ghost-payment-low-fee.psbt', 'cHNidP8BAHECAAAAASIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiAAAAAAD9////AmDqAAAAAAAAFgAUx6q7+sTbbs7TU1rVoghQnTkhKctMmgAAAAAAABYAFOeecUR7lROm99MUyL5extM/T11XAAAAAAABAR+ghgEAAAAAABYAFGLab1CVpSs0DBrqUxM0E2SvvC6OIgYDMe3LFs/Q+FmAUveyh7BwR6EcYJZ8Hn6wJX4CVSU52YQYjCSlEFQAAIABAACAAAAAgAAAAAAAAAAAAAAiAgIlH+LuS8Q3KbCQP/rbz4RtnmrLs6pZOwnWAIVkXL42UxiMJKUQVAAAgAEAAIAAAACAAQAAAAAAAAAA\n');
+    add('testnet-ghost-payment-high-fee.psbt', 'cHNidP8BAHECAAAAATMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzAAAAAAD9////AmDqAAAAAAAAFgAUx6q7+sTbbs7TU1rVoghQnTkhKcu4iAAAAAAAABYAFOeecUR7lROm99MUyL5extM/T11XAAAAAAABAR+ghgEAAAAAABYAFGLab1CVpSs0DBrqUxM0E2SvvC6OIgYDMe3LFs/Q+FmAUveyh7BwR6EcYJZ8Hn6wJX4CVSU52YQYjCSlEFQAAIABAACAAAAAgAAAAAAAAAAAAAAiAgIlH+LuS8Q3KbCQP/rbz4RtnmrLs6pZOwnWAIVkXL42UxiMJKUQVAAAgAEAAIAAAACAAQAAAAAAAAAA\n');
+  }
+  if (!isMainnet) add(`${prefix}-multisig-unsigned.psbt`, 'cHNidP8BAH0CAAAAAVPh/+2JhFAfPrp/zRvelFDxQmZkKeE7mzuxid4jI7HeAAAAAAD9////AsDUAQAAAAAAFgAUYtpvUJWlKzQMGupTEzQTZK+8Lo6YqwIAAAAAACIAILoTspSokGA0cjE8CnfeIvHqzgm0tdVZxxlrhs1HGyUlAAAAAAABASvgkwQAAAAAACIAIM7UEvXB3ci4KGNHnGmLLwbqKeQ+F98VAcO7yEruOo6qAQVpUiECIGrVr1HvJb+EyrVsXvN+zA7qrbkHWZn0FHMNM1a/YW8hAwLIaxKLZzb4vbk/CzPpvpJ1xyK4gdnYsqDRcQj/5AxHIQN2U+Ja/EjsBdkIPdeOUr7cFnnwU7deuC0N1b6VqHoVg1OuIgYCIGrVr1HvJb+EyrVsXvN+zA7qrbkHWZn0FHMNM1a/YW8cjCSlEDAAAIABAACAAAAAgAIAAIAAAAAAAAAAACIGA3ZT4lr8SOwF2Qg9145SvtwWefBTt164LQ3VvpWoehWDHD9jWmMwAACAAQAAgAAAAIACAACAAAAAAAAAAAAiBgMCyGsSi2c2+L25Pwsz6b6SdcciuIHZ2LKg0XEI/+QMRxx01oLDMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAAAABAWlSIQJm1MSsX0fl00vbSLL0WO71Iu2PBZjpqOJ3iKPoztoYACECd+th5B1LbNaBUgaMQ1l5+bJQr6k5DbV+AZVqfuPhOVohA5smzt5dkVK71zJ84yDQxEfmRf2bpDxbkf2STK+bIRnVU64iAgObJs7eXZFSu9cyfOMg0MRH5kX9m6Q8W5H9kkyvmyEZ1RyMJKUQMAAAgAEAAIAAAACAAgAAgAEAAAAAAAAAIgICd+th5B1LbNaBUgaMQ1l5+bJQr6k5DbV+AZVqfuPhOVocP2NaYzAAAIABAACAAAAAgAIAAIABAAAAAAAAACICAmbUxKxfR+XTS9tIsvRY7vUi7Y8FmOmo4neIo+jO2hgAHHTWgsMwAACAAQAAgAAAAIACAACAAQAAAAAAAAAA\n');
   const bytes = value => Uint8Array.from(atob(value), character => character.charCodeAt(0));
   const cards = [primary, secondary].map((id, index) => ({
     slot: index + 1,
