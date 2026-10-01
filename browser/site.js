@@ -633,8 +633,11 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     if (resolve) { snapshots.delete(data.requestId); resolve(data.files); }
   } else if (data.type === 'qr-delivered') {
     log(`QR delivered locally (${data.size} bytes)`);
+  } else if (data.type === 'qr-output') {
+    notifyParent({ type: 'simulator-qr-output', variant, frame: data.frame });
   } else if (data.type === 'scanner-state') {
     scannerActive = data.active;
+    notifyParent({ type: 'simulator-scanner-state', variant, active: scannerActive });
     clearTimeout(scannerStopTimer);
     if (scannerActive) {
       log('Specter scanner active');
@@ -777,6 +780,22 @@ addEventListener('message', async event => {
   } else if (event.data?.type === 'peripherals-export') {
     notifyParent({ type: 'peripherals-snapshot', variant,
       requestId: event.data.requestId, files: await snapshot() });
+  } else if (event.data?.type === 'simulator-inject-qr') {
+    const frame = event.data.frame;
+    if (variant !== 'diy') {
+      notifyParent({ type: 'simulator-qr-result', requestId: event.data.requestId,
+        ok: false, message: 'QR bridge is enabled only for the Specter DIY wallet.' });
+    } else if (!scannerActive) {
+      notifyParent({ type: 'simulator-qr-result', requestId: event.data.requestId,
+        ok: false, message: 'Open a QR scanner on Specter DIY first.' });
+    } else if (typeof frame !== 'string' || !frame.length || frame.length > 4094) {
+      notifyParent({ type: 'simulator-qr-result', requestId: event.data.requestId,
+        ok: false, message: 'The QR frame is empty or too large for Specter DIY.' });
+    } else {
+      const bytes = new TextEncoder().encode(frame);
+      send({ type: 'qr', bytes: bytes.buffer }, [bytes.buffer]);
+      notifyParent({ type: 'simulator-qr-result', requestId: event.data.requestId, ok: true });
+    }
   } else if (gallery && event.data?.type === 'peripheral-command') {
     const command = event.data.command;
     if (['sd-insert', 'sd-eject', 'sd-import', 'sd-clear', 'sd-delete', 'card-insert',
@@ -785,6 +804,8 @@ addEventListener('message', async event => {
     }
   } else if (gallery && event.data?.type === 'runtime-restart') {
     restart(false).catch(error => failure(`Restart failed: ${error.stack || error}`, runGeneration));
+  } else if (gallery && event.data?.type === 'simulator-factory-reset' && variant === 'diy') {
+    restart(true).catch(error => failure(`Factory reset failed: ${error.stack || error}`, runGeneration));
   }
 });
 function awaitPeripherals() {

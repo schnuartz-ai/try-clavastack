@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Run Bitcoin Keeper alongside the real Specter DIY browser simulator. Testnet only; never enter a real seed.">
+  <title>Bitcoin Keeper + Specter DIY — ClavaStack</title>
+  <style>
+    :root { color-scheme:dark; --bg:#070a0e; --panel:#101923; --line:#283443; --muted:#a9b7c7; --blue:#48a8df; --green:#b2d17d; --red:#ff8b8b; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(ellipse at top,#101d2a 0,#070a0e 58%); color:#f4f6f8; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button,input { font:inherit; }
+    header { min-height:55px; padding:10px max(18px,calc((100vw - 1480px)/2)); display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid #243140; background:#07101abf; }
+    header a { color:#c5d3e2; font-size:13px; text-decoration:none; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; }
+    .brand img { max-height:25px; max-width:120px; }
+    .brand .separator { color:#65758a; font-size:18px; }
+    main { max-width:1480px; margin:auto; padding:23px 18px 35px; }
+    h1 { margin:0 0 5px; font-size:clamp(27px,4vw,38px); letter-spacing:-.03em; }
+    .intro { margin:0 0 16px; color:var(--muted); line-height:1.5; font-size:14px; }
+    .warning { padding:11px 14px; margin:0 0 17px; border:1px solid #9e575e; border-radius:11px; background:#2b161b; color:#f3dfe0; line-height:1.45; font-size:12px; }
+    .warning strong { color:#ff9da5; }
+    #keeper-notice { display:none; max-width:1000px; padding:10px 13px; margin:0 auto 14px; border:1px solid #9e575e; border-radius:10px; background:#2b161b; color:#ffdfe0; font-size:12px; line-height:1.45; }
+    #keeper-notice:not([hidden]) { display:block; }
+    .workspace { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr); gap:16px; align-items:start; }
+    .device-card { min-width:0; padding:15px; border:1px solid var(--line); border-radius:18px; background:linear-gradient(155deg,#111b26,#0c1118); box-shadow:0 14px 35px #0005; }
+    .device-head { display:flex; align-items:start; justify-content:space-between; gap:12px; margin:0 0 12px; }
+    .device-head h2 { margin:0; font-size:18px; }
+    .device-head p { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.4; }
+    .pill { white-space:nowrap; padding:5px 8px; border:1px solid #344456; border-radius:99px; color:#aab9c7; font-size:10px; }
+    .pill.online { border-color:#49744c; color:#b8e5ad; }
+    .specter-screen { position:relative; width:min(100%,450px); margin:auto; aspect-ratio:479/905; }
+    .specter-screen iframe { position:absolute; left:calc(12.5% + 2px); top:calc(17.9% + 2px); z-index:1; display:block; width:76%; height:66%; border:0; border-radius:4px; background:#000; }
+    .specter-shell { position:relative; z-index:2; display:block; width:100%; height:100%; object-fit:contain; pointer-events:none; }
+    .specter-footer { display:grid; justify-items:center; gap:9px; margin-top:10px; }
+    .status { color:#aab7c6; min-height:16px; font-size:11px; text-align:center; }
+    .controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:7px; }
+    .button { min-height:35px; padding:7px 11px; border:1px solid #52657b; border-radius:8px; color:#f2f6fa; background:#1a2938; cursor:pointer; font-size:11px; font-weight:650; }
+    .button:hover { border-color:#80cfff; background:#20394d; }
+    .button.primary { border-color:#3986af; background:#185577; }
+    .button.primary:hover { background:#21698e; }
+    .button.danger { border-color:#7b5157; background:#321e24; }
+    .button:disabled { cursor:not-allowed; opacity:.48; }
+    .keeper-card { display:flex; flex-direction:column; align-items:center; }
+    .keeper-card .device-head { width:100%; }
+    .phone { position:relative; width:min(100%,375px); aspect-ratio:9/19.25; min-height:530px; max-height:740px; padding:8px; border:2px solid #51565e; border-radius:43px; background:linear-gradient(145deg,#222832,#030405 38%,#111318); box-shadow:0 20px 40px #0009,inset 0 0 0 2px #08090b; }
+    .phone::before { content:""; position:absolute; z-index:4; top:10px; left:50%; width:30%; height:21px; transform:translateX(-50%); border-radius:16px; background:#030405; }
+    .phone-screen { position:relative; height:100%; overflow:hidden; border-radius:35px; background:#f6f4ef; color:#1c2926; }
+    .phone-status { height:32px; padding:7px 19px 0; display:flex; justify-content:space-between; color:#21302d; font-size:10px; font-weight:700; }
+    .phone-status .network { color:#8f913b; font-size:9px; letter-spacing:.04em; }
+    #keeper-app { display:flex; height:calc(100% - 32px); flex-direction:column; }
+    .keeper-topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 17px; border-bottom:1px solid #e0dfd9; }
+    .keeper-title { display:flex; align-items:center; gap:8px; font-size:16px; font-weight:720; }
+    .keeper-title img { width:23px; height:23px; object-fit:contain; }
+    .testnet-tag { color:#63662f; padding:4px 7px; border-radius:99px; background:#e7e9c5; font-size:9px; font-weight:800; letter-spacing:.05em; }
+    .keeper-content { flex:1; overflow-y:auto; padding:17px 16px 14px; }
+    .keeper-content h3 { margin:0 0 6px; color:#233c37; font-size:20px; letter-spacing:-.02em; }
+    .keeper-content p { margin:0 0 12px; color:#68716d; font-size:11px; line-height:1.5; }
+    .wallet-card { padding:12px; margin:10px 0; border:1px solid #e1e0d8; border-radius:13px; background:#fffefa; }
+    .wallet-card h4 { margin:0 0 5px; font-size:13px; }
+    .wallet-card .subtle { margin:0; color:#71807a; font-size:10px; }
+    .address { display:block; padding:9px; margin:7px 0 0; border-radius:9px; background:#f0f2e7; color:#404a2d; font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+    .qr-wrap { width:min(100%,245px); padding:9px; margin:12px auto; border-radius:14px; background:white; box-shadow:0 3px 11px #1d28261a; }
+    .qr-wrap canvas,.qr-wrap img { display:block; width:100%; height:auto; image-rendering:pixelated; }
+    .scan-panel { display:grid; gap:8px; padding:12px; margin:10px 0; border:1px solid #d5d9c8; border-radius:12px; background:#eff1e5; }
+    .scan-panel h4 { margin:0; font-size:12px; }
+    .scan-panel .scan-status { min-height:17px; color:#566149; font-size:10px; }
+    .keep-actions { display:grid; gap:8px; margin-top:13px; }
+    .keep-actions .button { color:#fff; border-color:#536641; background:#586941; }
+    .keep-actions .button.secondary { color:#35443e; border-color:#c6c8bb; background:#f2f0e9; }
+    .keep-actions .button.danger { color:#642d31; border-color:#ddc2c0; background:#f7e9e6; }
+    .keep-nav { display:flex; justify-content:space-around; padding:10px 5px 13px; border-top:1px solid #e0dfd9; color:#64716a; font-size:9px; }
+    .keep-nav span.active { color:#3e5334; font-weight:800; }
+    .tx-detail { padding:9px; margin-top:8px; border-radius:9px; background:#edf2e8; color:#3c5738; font-size:10px; line-height:1.5; }
+    .input { width:100%; min-height:36px; padding:8px 10px; border:1px solid #b7beb3; border-radius:8px; color:#24312b; background:#fff; font-size:10px; }
+    .manual-frame { display:grid; gap:6px; }
+    .small { color:#79827c !important; font-size:9px !important; }
+    .details { margin:15px 0 0; border:1px solid #2c3948; border-radius:11px; background:#0b131d; color:#adbbca; }
+    .details summary { cursor:pointer; padding:10px 13px; font-size:11px; }
+    .details p { margin:0; padding:0 13px 12px; font-size:10px; line-height:1.5; }
+    footer { padding:17px 18px 25px; text-align:center; color:#91a0af; font-size:11px; }
+    footer a { color:#6ab8e8; text-decoration:none; }
+    @media(max-width:900px) { .workspace { grid-template-columns:1fr; } .specter-screen { width:min(100%,370px); } .phone { width:min(100%,360px); } }
+    @media(max-width:480px) { header { padding:9px 12px; } main { padding:18px 10px 25px; } .device-card { padding:12px 8px; border-radius:13px; } .phone { min-height:500px; padding:6px; border-radius:37px; } .phone-screen { border-radius:30px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="brand" href="/"><img src="/assets/clavastack-logo.png" alt="ClavaStack"><span class="separator">×</span><img src="/builds/keeper-web/keeper-logo.svg" alt="Bitcoin Keeper"></a>
+    <a href="/simulators/">← All simulators</a>
+  </header>
+  <main>
+    <h1>Bitcoin Keeper + Specter DIY</h1>
+    <p class="intro">Two separate devices, running together in your browser. Exchange the same QR frames you would scan between a phone and a hardware wallet.</p>
+    <div class="warning" role="note"><strong>TESTNET SIMULATOR.</strong> Never enter a real seed or use real funds. Keeper state is kept in this tab only. The signing example uses a clearly marked local test fixture and is never broadcast.</div>
+    <div id="keeper-notice" role="status" aria-live="polite" hidden></div>
+    <section class="workspace" aria-label="Bitcoin Keeper and Specter DIY simulators">
+      <article class="device-card" aria-labelledby="specter-heading">
+        <div class="device-head"><div><h2 id="specter-heading">Specter DIY</h2><p>Real Specter DIY firmware in the existing WebAssembly simulator.</p></div><span class="pill" id="specter-badge">Starting</span></div>
+        <div class="specter-screen"><img class="specter-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe id="specter-simulator" title="Specter DIY hardware wallet simulator" src="/?embedded=1&amp;gallery=1&amp;variant=diy" allow="camera"></iframe></div>
+        <div class="specter-footer">
+          <div class="status" id="specter-status" role="status" aria-live="polite">Loading the Specter DIY firmware…</div>
+          <div class="controls"><button class="button" id="specter-restart" type="button">Restart Specter</button><button class="button danger" id="specter-reset" type="button">Reset Specter test state</button></div>
+          <div class="controls"><button class="button primary" id="send-keeper-qr" type="button" disabled>Scan from Bitcoin Keeper</button></div>
+          <div class="status" id="specter-qr-status">Open the Specter QR scanner to receive frames from Keeper.</div>
+        </div>
+      </article>
+      <article class="device-card keeper-card" aria-labelledby="keeper-heading">
+        <div class="device-head"><div><h2 id="keeper-heading">Bitcoin Keeper</h2><p>Keeper source wallet, descriptor, QR and PSBT logic · disposable TESTNET</p></div><span class="pill online">Browser</span></div>
+        <div class="phone" aria-label="Bitcoin Keeper phone simulator frame">
+          <div class="phone-screen">
+            <div class="phone-status"><span id="clock">9:41</span><span class="network">TESTNET&nbsp; ▴ ▣</span></div>
+            <div id="keeper-app" aria-live="polite"></div>
+          </div>
+        </div>
+      </article>
+    </section>
+    <details class="details">
+      <summary>Browser compatibility and source</summary>
+      <p>The Keeper code is pinned to <a href="https://github.com/KeeperCommunity/bitcoin-keeper/commit/1adf4f66399a2bfac4572d9da94440323bff02f2" target="_blank" rel="noopener noreferrer">upstream sprint commit 1adf4f6</a> (<a href="/bitcoin-keeper/LICENSE.txt">MIT license</a>). <a href="/bitcoin-keeper/THIRD-PARTY-NOTICES.txt">Third-party notices</a> and <a href="/builds/keeper-web/app.js.LEGAL.txt">bundle notices</a> are included. Its React Native app currently has no web entry point. This page uses Keeper's wallet/vault factories, address derivation, PSBT input construction, UR encode/decode and transaction parsing. Camera permission, session-only simulator storage and direct QR transport use browser adapters. Specter DIY remains its own firmware Worker and storage.</p>
+      <p>Reset Keeper clears its session state. Reset Specter test state invokes the simulator's factory reset. No wallet data or QR frames are sent to the server.</p>
+    </details>
+  </main>
+  <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="https://github.com/KeeperCommunity/bitcoin-keeper" target="_blank" rel="noopener noreferrer">Bitcoin Keeper source</a> · Simulator software does not provide hardware-wallet security.</footer>
+  <script src="/assets/jsQR-1.4.0.js"></script>
+  <script src="/builds/keeper-web/app.js" defer></script>
+</body>
+</html>

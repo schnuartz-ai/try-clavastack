@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Apply narrow WebAssembly ABI/GC fixes to the pinned simulator submodules.
+"""Apply narrow browser compatibility patches to the pinned Specter source.
 
-This deliberately does not edit Specter's application Python. Source patterns are
-checked so an upstream revision cannot silently receive a partial patch.
+Wallet and UI behavior stays upstream. Source patterns are checked so an upstream
+revision cannot silently receive a partial patch. The QR hook exposes the exact
+payload already passed to Specter's QR renderer for simulator-to-simulator use.
 """
 from pathlib import Path
 import shutil
@@ -48,6 +49,17 @@ def replace(path, old, new, expected):
     if count != expected:
         raise RuntimeError(f"Unexpected source at {target}: {count} matches, expected {expected}")
     target.write_text(data.replace(old, new))
+
+
+# Capture the exact text the real Specter screen passes to its QR generator.
+# The browser Worker forwards this marked line to its parent page; no framebuffer
+# decoding or alternate wallet protocol is involved.
+replace(
+    "src/gui/components/qrcode.py",
+    "        print(text)\n        self.set_style(qr_style)",
+    "        if platform.simulator:\n            print(\"SIMULATOR_QR_OUTPUT:\" + str(text))\n        else:\n            print(text)\n        self.set_style(qr_style)",
+    1,
+)
 
 
 # This older MicroPython uses an unsigned sizeof expression as an iterator

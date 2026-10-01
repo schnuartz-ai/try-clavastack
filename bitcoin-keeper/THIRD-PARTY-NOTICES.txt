@@ -1,0 +1,12 @@
+Bitcoin Keeper browser simulator
+Copyright (c) 2023 bithyve
+License: MIT (see LICENSE.txt)
+Source: https://github.com/KeeperCommunity/bitcoin-keeper
+
+The browser bundle also includes upstream dependencies identified in the
+project package-lock.json. Their copyright and license notices are preserved
+in builds/keeper-web/app.js.LEGAL.txt where supplied by their source packages.
+
+The bundled Specter DIY noble_ecc adapter is adapted from BitGo BitGoJS.
+Source: https://github.com/BitGo/BitGoJS/blob/bitcoinjs_lib_6_sync/modules/utxo-lib/src/noble_ecc.ts
+License: Apache License 2.0 (see LICENSE-APACHE-2.0.txt).

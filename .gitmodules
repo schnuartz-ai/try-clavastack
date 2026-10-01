@@ -1,0 +1,4 @@
+[submodule "upstream/bitcoin-keeper"]
+	path = upstream/bitcoin-keeper
+	url = https://github.com/KeeperCommunity/bitcoin-keeper.git
+	branch = sprint

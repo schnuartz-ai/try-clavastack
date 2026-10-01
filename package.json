@@ -2,18 +2,44 @@
   "private": true,
   "scripts": {
     "test:pointer-gc": "node browser/test-pointer-gc.mjs",
-    "test:browser": "node browser/test-sd-capacity.mjs && node browser/test-demo-data.mjs && node browser/test-site.mjs && node browser/test-source-link.mjs && node browser/test-qr.mjs && node browser/test-camera.mjs && node browser/test-card.mjs && node browser/test-variants.mjs && node browser/test-simulators.mjs && node browser/test-ab.mjs && node browser/test-demo-import.mjs",
+    "build:keeper": "node browser/build-keeper.mjs",
+    "test:browser": "node browser/test-sd-capacity.mjs && node browser/test-demo-data.mjs && node browser/test-site.mjs && node browser/test-source-link.mjs && node browser/test-qr.mjs && node browser/test-camera.mjs && node browser/test-card.mjs && node browser/test-variants.mjs && node browser/test-simulators.mjs && node browser/test-ab.mjs && node browser/test-demo-import.mjs && node browser/test-keeper.mjs",
     "test:compat": "node browser/test-compat.mjs && node browser/test-gallery-compat.mjs",
     "test:virtual-host": "node browser/test-virtual-host.mjs",
     "test:startup": "node browser/test-startup.mjs",
     "test:native-stack": "node browser/test-native-stack.mjs"
   },
   "devDependencies": {
+    "esbuild": "0.25.12",
     "playwright": "1.63.0",
     "pngjs": "7.0.0",
-    "qrcode": "1.5.4"
+    "qrcode": "1.5.4",
+    "tiny-secp256k1": "2.2.4"
   },
   "dependencies": {
-    "jsqr": "1.4.0"
+    "@bitcoinerlab/miniscript": "1.4.0",
+    "@ngraveio/bc-ur": "1.1.6",
+    "@noble/secp256k1": "1.6.3",
+    "base-64": "1.0.0",
+    "bip21": "2.0.3",
+    "bip32": "4.0.0",
+    "bip39": "3.0.4",
+    "bitcoinjs-lib": "6.1.5",
+    "bitcoinjs-message": "2.2.0",
+    "bs58check": "2.1.2",
+    "buffer": "6.0.3",
+    "coinselect": "3.1.13",
+    "create-hash": "1.2.0",
+    "crypto-browserify": "3.12.1",
+    "crypto-js": "4.2.0",
+    "ecpair": "2.0.1",
+    "events": "3.3.0",
+    "idx": "2.5.6",
+    "jsqr": "1.4.0",
+    "lodash": "4.17.21",
+    "path-browserify": "1.0.1",
+    "process": "0.11.10",
+    "stream-browserify": "3.0.0",
+    "varuint-bitcoin": "1.1.2"
   }
 }

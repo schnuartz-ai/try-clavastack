@@ -93,6 +93,14 @@ PY
 
 for required in \
   index.html \
+  bitcoin-keeper/index.html \
+  bitcoin-keeper/LICENSE.txt \
+  bitcoin-keeper/LICENSE-APACHE-2.0.txt \
+  bitcoin-keeper/THIRD-PARTY-NOTICES.txt \
+  builds/keeper-web/app.js \
+  builds/keeper-web/app.js.LEGAL.txt \
+  builds/keeper-web/keeper-logo.svg \
+  builds/keeper-web/keeper-icon.svg \
   ab/index.html \
   browser/site.js \
   browser/runtime-worker.js \

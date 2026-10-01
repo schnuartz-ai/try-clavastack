@@ -96,10 +96,16 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+      - name: Install browser build and test dependencies
+        run: npm ci
+      - name: Build Bitcoin Keeper browser source adapter
+        run: npm run build:keeper
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -134,9 +140,7 @@ jobs:
         working-directory: .browser-work/specter-diy/test
         run: python3 run_native_tests.py
       - name: Install browser test tools
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/specter-static.log 2>&1 &
       - name: Test PC Virtual Host through the real firmware USB shim

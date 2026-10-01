@@ -415,7 +415,11 @@ onmessage = async ({ data }) => {
         if (data.cardSlot) fs.writeFile('/bridge/card-slot', new Uint8Array([cardSlot(data.cardSlot)]));
       }],
       print: message => {
-        send('log', { message });
+        if (message.startsWith('SIMULATOR_QR_OUTPUT:')) {
+          send('qr-output', { frame: message.slice('SIMULATOR_QR_OUTPUT:'.length) });
+        } else {
+          send('log', { message });
+        }
         if (message === 'SPECTER_MAIN_IMPORTED' || message === 'MOCKUI_READY' || message === 'DIAG_SPECTER_CREATED' || message === 'QR_PROBE_READY' || message === 'USB_PROBE_READY' || message === 'SD_PROBE_WRITTEN' || message === 'CARD_PROBE_READY') {
           runtimeReady = true;
           for (const item of pending.splice(0)) handle(item);
