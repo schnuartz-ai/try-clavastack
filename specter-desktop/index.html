@@ -90,18 +90,16 @@
             <button class="media-token memory-token" type="button" data-media="card" data-slot="3" aria-pressed="false"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 3</strong></span><small>Not inserted</small></button>
           </div>
           <p class="drop-help">Drag a MemoryCard onto Specter DIY. Right-click a card to reset it.</p>
-          <section class="cable-panel" aria-labelledby="cable-heading">
-            <h3 id="cable-heading">Cable Connection</h3>
-            <div class="cable-route" role="group" aria-label="Specter DIY file connection to Specter Desktop">
-              <span class="cable-endpoint">Specter DIY</span>
-              <span class="cable-arrow" aria-hidden="true"></span>
-              <span class="cable-file">File</span>
-              <span class="cable-arrow" aria-hidden="true"></span>
-              <span class="cable-endpoint">Specter Desktop</span>
-              <label class="cable-toggle"><input type="checkbox" id="cable-toggle"><span>On/Off</span></label>
-            </div>
-            <p class="visually-hidden" id="cable-status" role="status" aria-live="polite">Off</p>
-          </section>
+        </section>
+        <section class="media-group cable-group cable-panel" aria-labelledby="cable-heading">
+          <h3 id="cable-heading">Cable Connection</h3>
+          <div class="cable-route" role="group" aria-label="Bidirectional cable from Specter DIY to Specter Desktop">
+            <span class="cable-endpoint">Specter DIY</span>
+            <span class="cable-link" aria-hidden="true"></span>
+            <span class="cable-endpoint">Specter Desktop</span>
+            <label class="cable-toggle"><input type="checkbox" id="cable-toggle"><span>On/Off</span></label>
+          </div>
+          <p class="visually-hidden" id="cable-status" role="status" aria-live="polite">Off</p>
         </section>
       </div>
       <p class="media-insertion" id="media-selection">Drag a card onto a device, or select a card and tap the device. Click an inserted card to eject it.</p>

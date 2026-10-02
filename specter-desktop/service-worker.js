@@ -15,6 +15,7 @@ function needsWsgi(pathname) {
   return pathname.startsWith(`${SCOPE_PREFIX}app/`) ||
     pathname.startsWith(`${SCOPE_PREFIX}static/`) ||
     pathname.startsWith(`${SCOPE_PREFIX}spc/`) ||
+    pathname.startsWith(`${SCOPE_PREFIX}hwi/`) ||
     pathname.startsWith(`${SCOPE_PREFIX}ext/`);
 }
 

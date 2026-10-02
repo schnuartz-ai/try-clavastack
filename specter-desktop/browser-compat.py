@@ -102,6 +102,21 @@ def install_import_adapters():
         device=_disabled("USB HID"),
         HIDException=type("HIDException", (Exception,), {}),
     )
+    class BrowserUSBContext:
+        """Report no physical USB devices while leaving DIY's virtual cable intact."""
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def open(self):
+            return self
+
+        def close(self):
+            pass
+
+        def getDeviceIterator(self, *_args, **_kwargs):
+            return iter(())
+
     for name in (
         "USBError",
         "USBErrorNoDevice",
@@ -109,7 +124,7 @@ def install_import_adapters():
         "USBErrorPipe",
     ):
         setattr(sys.modules.setdefault("usb1", types.ModuleType("usb1")), name, type(name, (Exception,), {}))
-    sys.modules["usb1"].USBContext = _disabled("USB")
+    sys.modules["usb1"].USBContext = BrowserUSBContext
     _module("pgpy")
     _module("cbor2", dumps=_disabled("Jade USB CBOR transport"), loads=_disabled("Jade USB CBOR transport"))
 
@@ -275,6 +290,12 @@ def patch_qr_scanner_template(app):
                 if source.count(old_attribute) != 1:
                     raise RuntimeError("Specter Desktop QR compatibility patch could not locate camera start seam")
                 source = source.replace(old_attribute, new_attribute, 1)
+            if template.replace("\\", "/").endswith("includes/hwi/hwi.jinja"):
+                old_hwi_url = "let hwiURL = '/hwi/api/';"
+                new_hwi_url = "let hwiURL = '/specter-desktop/hwi/api/';"
+                if source.count(old_hwi_url) != 1:
+                    raise RuntimeError("Specter Desktop HWI template no longer exposes its expected API URL")
+                source = source.replace(old_hwi_url, new_hwi_url, 1)
 
             def refreshed():
                 return uptodate()

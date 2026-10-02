@@ -10,6 +10,7 @@ const requests = [];
 const consoleErrors = [];
 const failedRequests = [];
 const desktopNavigations = [];
+const hwiResponses = [];
 page.on('request', request => requests.push(request.url()));
 page.on('pageerror', error => consoleErrors.push(error.stack || error.message));
 page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
@@ -23,6 +24,9 @@ page.on('framenavigated', frame => {
   if (frame.url().includes('/specter-desktop/app/')) desktopNavigations.push({ type: 'navigation', url: frame.url() });
 });
 page.on('response', response => {
+  if (response.url().includes('/specter-desktop/hwi/api/')) {
+    response.text().then(body => hwiResponses.push({ status: response.status(), body })).catch(() => {});
+  }
   if (response.url().includes('/specter-desktop/app/spc/welcome')) {
     desktopNavigations.push({ type: 'response', status: response.status(), location: response.headers()['location'] || null, url: response.url() });
   }
@@ -102,6 +106,11 @@ try {
   assert(diyPointer.build.includes(diyManifest.commit) && diyManifest.repository === 'cryptoadvance/specter-diy', 'DIY iframe is not pinned to the upstream WebAssembly firmware');
   assert(await page.locator('#diy-app').getAttribute('src') === '/?embedded=1&gallery=1&variant=diy&qr-bridge=1', 'The existing Specter DIY simulator iframe is not reused');
   assert(await page.locator('#desktop-app').isVisible(), 'Real Desktop and DIY are not visible simultaneously');
+  const mediaHeadings = await page.locator('.media-grid > .media-group h3').allTextContents();
+  assert(mediaHeadings.join('|') === 'Virtual SD card|Virtual MemoryCards|Cable Connection', `Removable media must have three separate boxes: ${mediaHeadings.join('|')}`);
+  assert(await page.locator('.cable-file').count() === 0, 'The Cable Connection box still contains the removed File chip');
+  const cableLabels = await page.locator('.cable-route .cable-endpoint').allTextContents();
+  assert(cableLabels.join('|') === 'Specter DIY|Specter Desktop', `Unexpected cable endpoints: ${cableLabels.join('|')}`);
 
   const desktopFrame = page.frameLocator('#desktop-app');
   await page.waitForFunction(() => document.querySelector('#desktop-app')?.contentDocument?.title === 'Specter', { timeout: 120000 });
@@ -235,6 +244,44 @@ try {
   const decodedAnimatedDesktopBytes = Buffer.from(animatedDesktopResult, 'base64');
   assert(decodedAnimatedDesktopBytes.equals(expectedAnimatedDiyBytes), `Desktop animated QR mismatch: result=${JSON.stringify(animatedDesktopResult.slice(0, 96))}, actualBytes=${decodedAnimatedDesktopBytes.length}, expectedBytes=${expectedAnimatedDiyBytes.length}, actualPrefix=${decodedAnimatedDesktopBytes.subarray(0, 48).toString('hex')}, expectedPrefix=${expectedAnimatedDiyBytes.subarray(0, 48).toString('hex')}`);
 
+  const diyRuntimeFrame = page.frames().find(frame => frame.url().includes('variant=diy'));
+  assert(diyRuntimeFrame, 'The running Specter DIY simulator frame was not found');
+  await diyRuntimeFrame.evaluate(() => {
+    window.__specterCableRequests = [];
+    window.addEventListener('message', event => {
+      if (event.source !== parent || event.origin !== location.origin || event.data?.type !== 'peripheral-command') return;
+      if (event.data.command?.type !== 'usb-data') return;
+      const request = new TextDecoder().decode(new Uint8Array(event.data.command.bytes));
+      const command = request.split(/\r?\n/).filter(Boolean).at(-1) || '';
+      window.__specterCableRequests.push(request);
+      if (command !== 'fingerprint') return;
+      event.stopImmediatePropagation();
+      parent.postMessage({ type: 'simulator-usb-output', variant: 'diy',
+        bytes: new TextEncoder().encode('ACK\r\ndeadbeef\r\n') }, location.origin);
+    }, true);
+    parent.postMessage({ type: 'simulator-usb-state', variant: 'diy', enabled: true }, location.origin);
+  });
+  await page.evaluate(() => {
+    window.__specterCableMessages = [];
+    window.addEventListener('message', event => {
+      if (/usb|cable/i.test(event.data?.type || '')) window.__specterCableMessages.push(event.data.type);
+    });
+  });
+  await page.waitForFunction(() => {
+    const toggle = document.querySelector('#cable-toggle');
+    return toggle && !toggle.disabled;
+  }, null, { timeout: 30000 });
+  await page.locator('#cable-toggle').check();
+  await page.locator('.cable-panel.connected').waitFor({ state: 'visible', timeout: 10000 });
+  assert(await appFrame.evaluate(() => window.hwi?.url) === '/specter-desktop/hwi/api/', 'Specter Desktop HWI requests are not routed through the browser WSGI bridge');
+  await appFrame.evaluate(() => {
+    window.__desktopCableEnumeration = window.hwi.enumerate('', false);
+  });
+  const cableEnumeration = await appFrame.evaluate(async () => await window.__desktopCableEnumeration);
+  assert(cableEnumeration.some(device => device.type === 'specter' && device.fingerprint === 'deadbeef'), `Specter Desktop did not discover the DIY over USB: ${JSON.stringify(cableEnumeration)}`);
+  const usbRequest = await diyRuntimeFrame.evaluate(() => window.__specterCableRequests[0] || '');
+  assert(usbRequest.split(/\r?\n/).filter(Boolean).at(-1) === 'fingerprint', `Specter Desktop did not send the expected fingerprint query over USB: ${JSON.stringify(usbRequest)}`);
+
   const secretBefore = await page.evaluate(() => localStorage.getItem('specter-desktop-browser-secret'));
   const databaseNamesBefore = await page.evaluate(async () => (await indexedDB.databases?.() || []).map(db => db.name));
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -278,6 +325,9 @@ try {
     },
     externalHosts: [...externalHosts],
     failedRequests,
+    hwiResponses,
+    hwiRequests: requests.filter(url => /hwi\/api/i.test(url)),
+    cableMessages: await page.evaluate(() => window.__specterCableMessages || []).catch(() => []),
     desktopNavigations,
     consoleErrors,
   }, null, 2));
