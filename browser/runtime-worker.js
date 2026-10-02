@@ -8,7 +8,7 @@ let usbEnabled = false;
 let program = 'wallet';
 self.screen = { width: 480, height: 800 };
 const send = (type, details = {}) => postMessage({ type, ...details });
-const workerRevision = '2026-09-15.2';
+const workerRevision = '2026-10-02.1';
 const SD_CAPACITY_BYTES = 8_000_000_000;
 const SD_ENOSPC = 51;
 let fatalReported = false;
@@ -394,7 +394,7 @@ onmessage = async ({ data }) => {
       headlessDisplay,
       // Browser MicroPython heap is independent of hardware RAM. The full
       // wallet import needs the previously proven 64M; MockUI stays lean.
-      arguments: ['-X', `heapsize=${program === 'mockui' ? '16M' : '64M'}`, data.usbProbe ? '/browser/usb-probe.py' : data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state'],
+      arguments: ['-X', `heapsize=${program === 'mockui' ? '16M' : '64M'}`, data.usbProbe ? '/browser/usb-probe.py' : data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.qrOutputProbe ? '/browser/qr-output-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state', ...(data.qrOutputProbe ? [data.qrOutputAnimated ? 'animated' : 'static'] : [])],
       monitorRunDependencies: remaining => send('loading-progress', { remaining }),
       locateFile: path => data.build + path + assetSuffix,
       preRun: [() => {
@@ -416,11 +416,17 @@ onmessage = async ({ data }) => {
       }],
       print: message => {
         if (message.startsWith('SIMULATOR_QR_OUTPUT:')) {
-          send('qr-output', { frame: message.slice('SIMULATOR_QR_OUTPUT:'.length) });
+          const output = message.slice('SIMULATOR_QR_OUTPUT:'.length);
+          const separator = output.indexOf(':');
+          send('qr-output', separator < 0
+            ? { token: '', frame: output }
+            : { token: output.slice(0, separator), frame: output.slice(separator + 1) });
+        } else if (message.startsWith('SIMULATOR_QR_CLEAR:')) {
+          send('qr-clear', { token: message.slice('SIMULATOR_QR_CLEAR:'.length) });
         } else {
           send('log', { message });
         }
-        if (message === 'SPECTER_MAIN_IMPORTED' || message === 'MOCKUI_READY' || message === 'DIAG_SPECTER_CREATED' || message === 'QR_PROBE_READY' || message === 'USB_PROBE_READY' || message === 'SD_PROBE_WRITTEN' || message === 'CARD_PROBE_READY') {
+        if (message === 'SPECTER_MAIN_IMPORTED' || message === 'MOCKUI_READY' || message === 'DIAG_SPECTER_CREATED' || message === 'QR_PROBE_READY' || message === 'DIY_QR_OUTPUT_READY' || message === 'USB_PROBE_READY' || message === 'SD_PROBE_WRITTEN' || message === 'CARD_PROBE_READY') {
           runtimeReady = true;
           for (const item of pending.splice(0)) handle(item);
           setInterval(flushQr, 50);

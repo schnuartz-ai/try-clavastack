@@ -39,6 +39,7 @@ paths=(
   bitcoin-keeper
   ab
   simulators
+  specter-desktop
 )
 
 for path in "${paths[@]}"; do
@@ -53,6 +54,7 @@ mkdir -p "$SITE_DIR/browser/variants"
 cp "$ROOT/browser/site.js" "$ROOT/browser/runtime-worker.js" \
   "$ROOT/browser/current.json" "$ROOT/browser/demo-data.js" \
   "$SITE_DIR/browser/"
+cp "$ROOT/browser/specter-desktop-current.json" "$SITE_DIR/browser/"
 cp "$ROOT/browser/variants/"*.json "$SITE_DIR/browser/variants/"
 
 if [[ $(find "$SITE_DIR/builds" -type f -name 'micropython.wasm' | wc -l) -lt 4 ]]; then

@@ -30,3 +30,29 @@ for pointer_file, repository in (
         assert path.is_file() and path.stat().st_size == record['bytes'], name
         assert sha256(path.read_bytes()).hexdigest() == record['sha256'], name
     print('Verified browser build', repository, manifest['commit'])
+
+desktop_pointer = json.loads((root / 'browser' / 'specter-desktop-current.json').read_text())
+assert desktop_pointer['repository'] == 'cryptoadvance/specter-desktop'
+assert re.fullmatch(r'[a-f0-9]{40}', desktop_pointer['commit'])
+assert desktop_pointer['build'].endswith(f"/{desktop_pointer['commit']}/")
+desktop_root = root / desktop_pointer['build'].lstrip('/')
+desktop_manifest = json.loads((desktop_root / 'build-info.json').read_text())
+assert desktop_manifest['repository'] == desktop_pointer['repository']
+assert desktop_manifest['commit'] == desktop_pointer['commit']
+assert desktop_manifest['diy_repository'] == 'cryptoadvance/specter-diy'
+assert desktop_manifest['web_simulator_repository'] == 'cryptoadvance/specter-diy-web-simulator'
+archive_record = desktop_manifest['source_archive']
+archive_path = desktop_root / archive_record['path']
+assert archive_path.is_file() and archive_path.stat().st_size == archive_record['bytes']
+assert sha256(archive_path.read_bytes()).hexdigest() == archive_record['sha256']
+with __import__('zipfile').ZipFile(archive_path) as source_archive:
+    names = set(source_archive.namelist())
+    assert 'cryptoadvance/specter/server.py' in names
+    assert 'cryptoadvance/specter/templates/includes/qr-scanner.html' in names
+    assert 'embit/__init__.py' in names
+    assert 'hwilib/__init__.py' in names
+    assert 'hwi-3.1.0.dist-info/METADATA' in names
+    for name, record in archive_record['files'].items():
+        payload = source_archive.read(name)
+        assert len(payload) == record['bytes'] and sha256(payload).hexdigest() == record['sha256'], name
+print('Verified Specter Desktop source archive', desktop_manifest['repository'], desktop_manifest['commit'])

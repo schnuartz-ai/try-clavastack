@@ -2,12 +2,15 @@ const $ = selector => document.querySelector(selector);
 const params = new URLSearchParams(location.search);
 const embedded = params.get('embedded') === '1' && window.parent !== window;
 const gallery = embedded && params.get('gallery') === '1';
+const qrBridge = gallery && params.get('qr-bridge') === '1';
 const variant = ['diy', 'play', 'schnuartz'].includes(params.get('variant')) ? params.get('variant') : 'diy';
 const buildVariant = variant === 'schnuartz' && params.get('buildVariant') === 'alternative'
   ? 'schnuartz-alternative' : variant === 'play' && params.get('buildVariant') === 'fast'
   ? 'play-fast' : variant;
 const diagnosticQrProbe = params.get('probe') === 'qr' &&
   ['127.0.0.1', 'localhost', 'try.clavastack.com'].includes(location.hostname);
+const diagnosticQrOutputProbe = ['qr-output-static', 'qr-output-animated'].includes(params.get('probe')) &&
+  ['127.0.0.1', 'localhost'].includes(location.hostname);
 const diagnosticUsbProbe = params.get('probe') === 'usb' &&
   ['127.0.0.1', 'localhost'].includes(location.hostname);
 if (embedded) document.documentElement.classList.add('embedded');
@@ -54,6 +57,7 @@ let demoSessionActive = false;
 let cameraStream;
 let cameraLoop;
 let scannerActive = false;
+let qrBridgeSource = 'none';
 let scannerStopTimer;
 let backupEnabled = false;
 let cameraRequest = 0;
@@ -66,7 +70,7 @@ let forceCanvasBridge = false;
 let recoveryTimer;
 let startupPhase = 'manifest';
 let displayMode = 'unselected';
-const workerRevision = '2026-09-30.1';
+const workerRevision = '2026-10-02.1';
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;
@@ -634,20 +638,29 @@ function onWorkerMessage({ data }, generation = runGeneration) {
   } else if (data.type === 'qr-delivered') {
     log(`QR delivered locally (${data.size} bytes)`);
   } else if (data.type === 'qr-output') {
-    notifyParent({ type: 'simulator-qr-output', variant, frame: data.frame });
+    notifyParent({ type: 'simulator-qr-output', variant, frame: data.frame, token: data.token });
+  } else if (data.type === 'qr-clear') {
+    notifyParent({ type: 'simulator-qr-output-clear', variant, token: data.token });
   } else if (data.type === 'scanner-state') {
     scannerActive = data.active;
-    notifyParent({ type: 'simulator-scanner-state', variant, active: scannerActive });
+    notifyParent({ type: 'simulator-scanner-state', variant, active: scannerActive, choices: qrBridge });
     clearTimeout(scannerStopTimer);
     if (scannerActive) {
       log('Specter scanner active');
       cameraPanel.hidden = false;
-      screenCamera.hidden = false;
-      if (cameraStream) {
-        screenVideo.hidden = false;
-        screenCamera.classList.add('active');
+      if (qrBridge) {
+        qrBridgeSource = 'none';
+        screenCamera.hidden = true;
+        stopCamera();
+        notifyParent({ type: 'simulator-qr-source-state', source: qrBridgeSource });
       } else {
-        startCamera();
+        screenCamera.hidden = false;
+        if (cameraStream) {
+          screenVideo.hidden = false;
+          screenCamera.classList.add('active');
+        } else {
+          startCamera();
+        }
       }
     } else {
       scannerStopTimer = setTimeout(() => {
@@ -727,6 +740,7 @@ async function start() {
     const offscreen = transferable ? canvas.transferControlToOffscreen() : undefined;
     send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
       stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe,
+      qrOutputProbe: diagnosticQrOutputProbe, qrOutputAnimated: params.get('probe') === 'qr-output-animated',
       usbProbe: diagnosticUsbProbe }, offscreen ? [offscreen] : []);
     startupPhase = 'runtime-assets';
   } catch (error) {
@@ -796,6 +810,18 @@ addEventListener('message', async event => {
       send({ type: 'qr', bytes: bytes.buffer }, [bytes.buffer]);
       notifyParent({ type: 'simulator-qr-result', requestId: event.data.requestId, ok: true });
     }
+  } else if (event.data?.type === 'simulator-qr-source' && qrBridge && scannerActive) {
+    qrBridgeSource = event.data.source === 'desktop' ? 'desktop' : 'camera';
+    if (qrBridgeSource === 'desktop') {
+      stopCamera();
+      screenCamera.hidden = true;
+      cameraPanel.hidden = false;
+    } else {
+      screenCamera.hidden = false;
+      cameraPanel.hidden = false;
+      startCamera();
+    }
+    notifyParent({ type: 'simulator-qr-source-state', source: qrBridgeSource });
   } else if (gallery && event.data?.type === 'peripheral-command') {
     const command = event.data.command;
     if (['sd-insert', 'sd-eject', 'sd-import', 'sd-clear', 'sd-delete', 'card-insert',

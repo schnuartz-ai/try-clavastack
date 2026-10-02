@@ -76,7 +76,33 @@ jobs:
             fi
           }
 
+          check_fork_commit() {
+            local repository="$1"
+            local branch="$2"
+            local pointer_path="$3"
+            local field="$4"
+            local source_sha
+            local pointer_sha
+
+            source_sha="$(git ls-remote "https://github.com/$repository.git" "refs/heads/$branch" | awk 'NR == 1 {print $1}')"
+            if [[ -z "$source_sha" ]]; then
+              echo "Could not resolve $repository:$branch; forcing a build" >&2
+              changed=true
+              return
+            fi
+            pointer_sha="$(curl --fail --silent --show-error --location --retry 3 \
+              "$SITE_ORIGIN$pointer_path" | jq -r ".$field")"
+            if [[ "$pointer_sha" != "$source_sha" ]]; then
+              echo "$repository changed: live=$pointer_sha latest=$source_sha"
+              changed=true
+            else
+              echo "$repository unchanged at $source_sha"
+            fi
+          }
+
           check_fork cryptoadvance/specter-diy master /browser/current.json
+          check_fork cryptoadvance/specter-desktop master /browser/specter-desktop-current.json
+          check_fork_commit cryptoadvance/specter-diy-web-simulator master /browser/specter-desktop-current.json web_simulator_commit
           check_fork k9ert/specter-playground main /browser/variants/specter-playground.json
           check_fork schnuartz-ai/specter-playground main /browser/variants/specter-playground-fast.json
           check_fork Schnuartz/specter-playground main /browser/variants/specter-playground-schnuartz.json
@@ -125,6 +151,8 @@ jobs:
           .browser-work/emsdk/emsdk activate 3.1.74
       - name: Build real Specter/LVGL browser runtime
         run: bash browser/build-browser.sh
+      - name: Package pinned real Specter Desktop source for CPython WASM
+        run: python3 browser/build-specter-desktop.py
       - name: Build Playground firmware variants
         run: |
           bash browser/build-playground.sh k9ert
@@ -153,6 +181,10 @@ jobs:
         env:
           CI: 'true'
         run: npm run test:browser
+      - name: Run Specter Desktop + DIY browser integration tests
+        env:
+          CI: 'true'
+        run: npm run test:specter-desktop
       - name: Package the complete tested production site
         if: github.event_name != 'pull_request'
         run: bash deploy/package-site.sh dist
@@ -185,8 +217,10 @@ jobs:
             builds/**/*.js
             builds/**/*.wasm
             builds/**/*.data
+            builds/**/*.zip
             builds/**/build-info.json
             browser/current.json
+            browser/specter-desktop-current.json
             browser/variants/*.json
 
   release:

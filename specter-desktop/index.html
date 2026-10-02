@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Run real Specter Desktop and Specter DIY side by side in your browser.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cdn.jsdelivr.net https://pypi.org https://files.pythonhosted.org; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
+  <title>Specter Desktop + DIY — ClavaStack</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/specter-desktop/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><img src="/assets/clavastack-logo.png" alt="ClavaStack"><span>×</span><img src="/assets/specter-logo.png" alt="Specter"></a>
+    <a href="/simulators/">All simulators</a>
+  </header>
+  <main>
+    <section class="intro">
+      <div>
+        <p class="eyebrow">SPECTER IN THE BROWSER</p>
+        <h1>Desktop meets DIY</h1>
+        <p class="lede">Two real Specter applications running side by side. Move QR and animated UR frames between them as if you were scanning a screen.</p>
+      </div>
+      <div class="warning"><strong>TEST DATA ONLY</strong><span>Never enter a real seed phrase, private key, wallet backup, or funds. This browser simulation is not secure hardware.</span></div>
+    </section>
+
+    <div class="workspace" aria-label="Specter simulators">
+      <section class="pane desktop-pane" aria-labelledby="desktop-heading">
+        <div class="pane-heading">
+          <div><p class="eyebrow">BROWSER PYTHON + FLASK</p><h2 id="desktop-heading">Specter Desktop</h2></div>
+          <span class="status" id="desktop-status" role="status">Preparing browser runtime…</span>
+        </div>
+        <div class="desktop-loader" id="desktop-loader">
+          <span class="spinner" aria-hidden="true"></span>
+          <strong id="loader-title">Starting upstream Specter Desktop</strong>
+          <span id="loader-detail">Loading CPython WebAssembly and the pinned application source…</span>
+          <div class="progress"><span id="loader-progress"></span></div>
+        </div>
+        <iframe id="desktop-app" title="Real Specter Desktop application" allow="camera" hidden></iframe>
+        <div class="pane-foot">
+          <span>Runs locally in this browser tab</span>
+          <button type="button" id="desktop-reset">Reset Desktop data</button>
+        </div>
+      </section>
+
+      <section class="pane diy-pane" aria-labelledby="diy-heading">
+        <div class="pane-heading">
+          <div><p class="eyebrow">REAL MICROCONTROLLER FIRMWARE</p><h2 id="diy-heading">Specter DIY</h2></div>
+          <span class="status" id="diy-status" role="status">Starting firmware…</span>
+        </div>
+        <div class="device-frame">
+          <img class="device-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt="Specter Shield Metal device frame">
+          <iframe id="diy-app" title="Specter DIY firmware simulator" allow="camera"></iframe>
+        </div>
+        <section id="diy-scanner-controls" class="scanner-controls" hidden aria-live="polite">
+          <strong>Specter DIY is scanning</strong>
+          <span>Choose where its QR scanner reads frames from.</span>
+          <div class="scanner-buttons">
+            <button type="button" data-diy-source="camera">Use camera</button>
+            <button type="button" data-diy-source="desktop">Scan from Specter Desktop</button>
+          </div>
+          <small id="diy-scan-status">No QR source selected.</small>
+        </section>
+        <div class="pane-foot diy-foot"><span id="diy-build-label">Loading exact firmware source…</span><a id="diy-source-link" target="_blank" rel="noopener noreferrer">Source</a></div>
+      </section>
+    </div>
+
+    <details class="source-details" id="source-details">
+      <summary>Build and source information</summary>
+      <div class="source-grid">
+        <section><h3>Specter Desktop</h3><p>Repository: <a id="desktop-repository" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Commit: <a id="desktop-commit" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Browser runtime: Pyodide / CPython 3.12</p><p id="desktop-built-at"></p></section>
+        <section><h3>Specter DIY</h3><p>Repository: <a id="diy-repository" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Commit: <a id="diy-commit" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Runtime: MicroPython + Emscripten / WebAssembly</p><p id="diy-built-at"></p></section>
+      </div>
+      <p class="adapter-note">Browser adapters disable OS processes, TCP/RPC services, Tor and physical USB access. Specter’s Flask routes, templates, wallet and device logic remain sourced from upstream. Browser data is stored locally and can be cleared with Reset Desktop data.</p>
+    </details>
+  </main>
+  <footer>ClavaStack · <a href="/simulators/">Simulator drafts</a> · Browser simulation only; never use real funds or real seeds.</footer>
+  <script src="/assets/jsQR-1.4.0.js"></script>
+  <script type="module" src="/specter-desktop/site.js"></script>
+</body>
+</html>

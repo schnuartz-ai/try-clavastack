@@ -1,0 +1,317 @@
+const $ = selector => document.querySelector(selector);
+const origin = location.origin;
+const desktopStatus = $('#desktop-status');
+const diyStatus = $('#diy-status');
+const desktopLoader = $('#desktop-loader');
+const desktopFrame = $('#desktop-app');
+const diyFrame = $('#diy-app');
+const diyScannerControls = $('#diy-scanner-controls');
+const diyScanStatus = $('#diy-scan-status');
+let desktopWorker;
+let diyScannerActive = false;
+let diySource = 'none';
+let desktopFrameSeen = '';
+let diyFrameSeen = '';
+let lastDesktopFrameAt = 0;
+let lastDiyFrameAt = 0;
+let sourceBuildInfo;
+let ready = false;
+
+function setStatus(element, message, state = 'loading') {
+  element.textContent = message;
+  element.classList.toggle('ready', state === 'ready');
+  element.classList.toggle('error', state === 'error');
+}
+
+function makeSecret() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+
+function bytesToBase64(value) {
+  const bytes = new Uint8Array(value);
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value || '');
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+async function loadSourceInfo() {
+  const pointer = await (await fetch('/browser/specter-desktop-current.json', { cache: 'no-store' })).json();
+  if (!/^[a-f0-9]{40}$/.test(pointer.commit) || !pointer.build.includes(pointer.commit)) {
+    throw new Error('The Desktop source pointer is invalid');
+  }
+  const base = pointer.build;
+  const info = await (await fetch(`${base}build-info.json`, { cache: 'no-store' })).json();
+  if (info.repository !== 'cryptoadvance/specter-desktop' || info.commit !== pointer.commit ||
+      info.source_archive?.sha256?.length !== 64) {
+    throw new Error('Specter Desktop source provenance did not verify');
+  }
+  sourceBuildInfo = { ...info, sourceUrl: `${base}${info.source_archive.path}` };
+  const repository = $('#desktop-repository');
+  repository.href = `https://github.com/${info.repository}`;
+  repository.textContent = info.repository;
+  const commit = $('#desktop-commit');
+  commit.href = info.source_url;
+  commit.textContent = info.commit;
+  $('#desktop-built-at').textContent = `Built: ${info.built_at} · Source archive SHA-256: ${info.source_archive.sha256}`;
+
+  const diyPointer = await (await fetch('/browser/current.json', { cache: 'no-store' })).json();
+  const diyInfo = await (await fetch(`${diyPointer.build}build-info.json`, { cache: 'no-store' })).json();
+  const diyRepository = $('#diy-repository');
+  diyRepository.href = `https://github.com/${diyInfo.repository}`;
+  diyRepository.textContent = diyInfo.repository;
+  const diyCommit = $('#diy-commit');
+  diyCommit.href = `https://github.com/${diyInfo.repository}/commit/${diyInfo.commit}`;
+  diyCommit.textContent = diyInfo.commit;
+  $('#diy-built-at').textContent = `Built: ${diyInfo.build_timestamp || diyInfo.built_at || 'see firmware manifest'} · Emscripten ${diyInfo.emscripten_version || '3.1.74'}`;
+  $('#diy-source-link').href = diyCommit.href;
+  $('#diy-source-link').textContent = `GitHub · ${diyInfo.commit.slice(0, 9)}`;
+  $('#diy-build-label').textContent = `Upstream ${diyInfo.firmware_version ? `v${diyInfo.firmware_version}` : diyInfo.commit.slice(0, 9)}`;
+  return diyInfo;
+}
+
+function startRuntime() {
+  desktopWorker = new Worker('/specter-desktop/runtime-worker.js', { name: 'Specter Desktop · CPython WASM' });
+  desktopWorker.addEventListener('message', event => {
+    const data = event.data;
+    if (data.type === 'progress') {
+      $('#loader-detail').textContent = data.label;
+      $('#loader-progress').style.width = `${data.progress}%`;
+      setStatus(desktopStatus, 'Starting upstream app…');
+    } else if (data.type === 'ready') {
+      ready = true;
+      $('#loader-progress').style.width = '100%';
+      $('#loader-title').textContent = `Upstream Flask app ready · ${data.routeCount} routes`;
+      $('#loader-detail').textContent = `${data.runtime} · ${data.sourceCommit}`;
+      desktopLoader.hidden = true;
+      desktopFrame.hidden = false;
+      desktopFrame.src = '/specter-desktop/app/spc/welcome/';
+      setStatus(desktopStatus, 'Running locally', 'ready');
+      setTimeout(() => desktopFrame.contentWindow?.focus(), 1500);
+    } else if (data.type === 'reset-complete') {
+      setStatus(desktopStatus, 'Desktop data reset', 'ready');
+      desktopFrame.src = `/specter-desktop/app/spc/welcome/?reset=${Date.now()}`;
+    } else if (data.type === 'error') {
+      $('#loader-title').textContent = 'Specter Desktop could not start';
+      $('#loader-detail').textContent = data.error;
+      $('#loader-detail').classList.add('error-text');
+      setStatus(desktopStatus, 'Startup failed', 'error');
+    }
+  });
+  desktopWorker.addEventListener('error', event => {
+    setStatus(desktopStatus, 'Browser worker failed', 'error');
+    $('#loader-title').textContent = 'Specter Desktop browser worker failed';
+    $('#loader-detail').textContent = event.message || 'The browser worker stopped unexpectedly.';
+  });
+}
+
+async function startBridge() {
+  if (!('serviceWorker' in navigator)) throw new Error('This browser does not support the request bridge required by Specter Desktop');
+  await navigator.serviceWorker.register('/specter-desktop/service-worker.js', { scope: '/specter-desktop/', updateViaCache: 'none' });
+  const registration = await navigator.serviceWorker.ready;
+  if (!navigator.serviceWorker.controller) {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Browser request bridge did not take control of this page')), 10000);
+      navigator.serviceWorker.addEventListener('controllerchange', () => { clearTimeout(timeout); resolve(); }, { once: true });
+      if (registration.active && navigator.serviceWorker.controller) { clearTimeout(timeout); resolve(); }
+    });
+  }
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'specter-session-cookies' && event.ports[0]) {
+      for (const cookie of event.data.cookies || []) document.cookie = cookie;
+      event.ports[0].postMessage({ ok: true });
+      event.ports[0].close();
+      return;
+    }
+    if (event.data?.type !== 'specter-wsgi-request' || !event.ports[0]) return;
+    const channel = event.ports[0];
+    const request = event.data.request;
+    const sessionCookie = document.cookie.split(';').map(value => value.trim())
+      .find(value => value.startsWith('session='));
+    if (sessionCookie) request.headers.Cookie = sessionCookie;
+    desktopWorker.postMessage({ type: 'request', request },
+      request.body?.byteLength ? [channel, request.body] : [channel]);
+  });
+  return registration;
+}
+
+function sendDiyMessage(message) {
+  diyFrame.contentWindow?.postMessage(message, origin);
+}
+
+function decodeCanvas(canvas) {
+  if (!canvas || canvas.width < 32 || canvas.height < 32 || !window.jsQR) return null;
+  try {
+    const context = scratchCanvas.getContext('2d', { willReadFrequently: true });
+    scratchCanvas.width = canvas.width;
+    scratchCanvas.height = canvas.height;
+    context.drawImage(canvas, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+    return window.jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: 'attemptBoth' });
+  } catch {
+    return null;
+  }
+}
+
+const scratchCanvas = document.createElement('canvas');
+
+function captureDesktopQr() {
+  try {
+    const document = desktopFrame.contentDocument;
+    if (!document) return null;
+    for (const element of document.querySelectorAll('qr-code')) {
+      const rect = element.getBoundingClientRect();
+      if (rect.width < 40 || rect.height < 40 || getComputedStyle(element).visibility === 'hidden') continue;
+      const codeBox = element.shadowRoot?.querySelector('.qr-code');
+      const canvas = codeBox?.querySelector('canvas');
+      if (canvas) {
+        const decoded = decodeCanvas(canvas);
+        if (decoded?.data) return decoded.data;
+      }
+      const image = codeBox?.querySelector('img');
+      if (image?.complete && image.naturalWidth > 0) {
+        const imageCanvas = document.createElement('canvas');
+        imageCanvas.width = image.naturalWidth;
+        imageCanvas.height = image.naturalHeight;
+        const context = imageCanvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(image, 0, 0);
+        const pixels = context.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+        const decoded = window.jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: 'attemptBoth' });
+        if (decoded?.data) return decoded.data;
+      }
+    }
+  } catch {
+    // The desktop document may be between upstream route navigations.
+  }
+  return null;
+}
+
+function captureDiyQr() {
+  try {
+    const canvas = diyFrame.contentDocument?.querySelector('#screen');
+    return decodeCanvas(canvas)?.data || null;
+  } catch {
+    return null;
+  }
+}
+
+setInterval(() => {
+  if (diyScannerActive && diySource === 'desktop') {
+    const frame = captureDesktopQr();
+    const now = performance.now();
+    if (frame && (frame !== desktopFrameSeen || now - lastDesktopFrameAt > 1200) && now - lastDesktopFrameAt > 175) {
+      desktopFrameSeen = frame;
+      lastDesktopFrameAt = now;
+      sendDiyMessage({ type: 'simulator-inject-qr', frame, requestId: `desktop-${Math.round(now)}` });
+      diyScanStatus.textContent = frame.startsWith('ur:') || frame.startsWith('UR:')
+        ? 'Reading a Specter Desktop animated UR frame…' : 'Reading the QR frame displayed by Specter Desktop…';
+    }
+  }
+  if (document.activeElement !== diyFrame && !desktopFrame.hidden) {
+    const scanners = [...(desktopFrame.contentDocument?.querySelectorAll('qr-scanner[open][data-scan-source="diy"]') || [])];
+    if (scanners.length) {
+      const frame = captureDiyQr();
+      const now = performance.now();
+      if (frame && (frame !== diyFrameSeen || now - lastDiyFrameAt > 1200) && now - lastDiyFrameAt > 175) {
+        diyFrameSeen = frame;
+        lastDiyFrameAt = now;
+        for (const scanner of scanners) scanner.receiveFrame(frame);
+      }
+    }
+  }
+}, 90);
+
+window.addEventListener('message', event => {
+  if (event.origin !== origin || !event.data) return;
+  if (event.source === diyFrame.contentWindow) {
+    const data = event.data;
+    if (data.type === 'child-awaiting-peripherals') {
+      sendDiyMessage({ type: 'peripherals-provide', files: [] });
+      sendDiyMessage({ type: 'gallery-parent-ready' });
+      setStatus(diyStatus, 'Starting real firmware…');
+    } else if (data.type === 'simulator-running') {
+      setStatus(diyStatus, 'Running locally', 'ready');
+    } else if (data.type === 'simulator-error') {
+      setStatus(diyStatus, 'Firmware error', 'error');
+    } else if (data.type === 'simulator-scanner-state') {
+      diyScannerActive = Boolean(data.active);
+      diyScannerControls.hidden = !diyScannerActive;
+      if (diyScannerActive) {
+        diySource = 'none';
+        diyFrameSeen = '';
+        diyScanStatus.textContent = 'Select camera or scan from Specter Desktop.';
+        document.querySelectorAll('[data-diy-source]').forEach(button => button.setAttribute('aria-pressed', 'false'));
+      } else {
+        diySource = 'none';
+      }
+    } else if (data.type === 'simulator-qr-result') {
+      if (!data.ok && diyScannerActive && diySource === 'desktop') diyScanStatus.textContent = data.message;
+    }
+    return;
+  }
+  if (event.source === desktopFrame.contentWindow && event.data.type === 'simulator-diy-scan') {
+    desktopFrame.dataset.qrSource = 'diy';
+  }
+});
+
+document.querySelectorAll('[data-diy-source]').forEach(button => {
+  button.addEventListener('click', () => {
+    if (!diyScannerActive) return;
+    diySource = button.dataset.diySource;
+    desktopFrameSeen = '';
+    lastDesktopFrameAt = 0;
+    document.querySelectorAll('[data-diy-source]').forEach(choice => {
+      choice.setAttribute('aria-pressed', String(choice === button));
+    });
+    sendDiyMessage({ type: 'simulator-qr-source', source: diySource });
+    diyScanStatus.textContent = diySource === 'camera'
+      ? 'The firmware scanner will use your selected camera.'
+      : 'Pointing the firmware scanner at the QR frame rendered by Specter Desktop.';
+  });
+});
+
+$('#desktop-reset').addEventListener('click', () => {
+  if (!ready) return;
+  const secret = makeSecret();
+  localStorage.setItem('specter-desktop-browser-secret', secret);
+  document.cookie = 'session=; Max-Age=0; Path=/specter-desktop; SameSite=Lax';
+  setStatus(desktopStatus, 'Resetting browser data…');
+  desktopWorker.postMessage({ type: 'reset', secret });
+});
+
+async function boot() {
+  try {
+    const diyInfo = await loadSourceInfo();
+    diyFrame.addEventListener('load', () => {
+      sendDiyMessage({ type: 'gallery-parent-ready' });
+    });
+    diyFrame.src = '/?embedded=1&gallery=1&variant=diy&qr-bridge=1';
+    startRuntime();
+    await startBridge();
+    const secret = localStorage.getItem('specter-desktop-browser-secret') || makeSecret();
+    localStorage.setItem('specter-desktop-browser-secret', secret);
+    desktopWorker.postMessage({
+      type: 'init',
+      secret,
+      sourceCommit: sourceBuildInfo.commit,
+      sourceSha256: sourceBuildInfo.source_archive.sha256,
+      sourceUrl: sourceBuildInfo.sourceUrl,
+    });
+    $('#diy-build-label').classList.remove('diy-build-loading');
+  } catch (error) {
+    setStatus(desktopStatus, 'Browser setup failed', 'error');
+    $('#loader-title').textContent = 'Specter browser setup failed';
+    $('#loader-detail').textContent = error?.stack || String(error);
+  }
+}
+
+boot();
