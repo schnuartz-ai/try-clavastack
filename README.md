@@ -74,7 +74,7 @@ fingerprint Specter Desktop requests during discovery.
 
 ## Deployment and rollback
 
-Enable **Advanced Options** on the main DIY simulator page to open the Developer
+Enable **Developer Options** on the main DIY simulator page to open the Developer
 Inspector. It reports real MicroPython heap allocation, WebAssembly memory size,
 the firmware screen/menu and peripheral state. Refresh lists flash, QSPI, RAM-disk,
 SD and card files; select a file for a text/hex preview (first 64 KiB), or read a
