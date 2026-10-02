@@ -260,6 +260,7 @@ try {
         bytes: new TextEncoder().encode('ACK\r\ndeadbeef\r\n') }, location.origin);
     }, true);
     window.__specterUsbStateTimer = setInterval(() => {
+      parent.postMessage({ type: 'simulator-running', variant: 'diy' }, location.origin);
       parent.postMessage({ type: 'simulator-usb-state', variant: 'diy', enabled: true }, location.origin);
     }, 50);
   });
@@ -331,6 +332,10 @@ try {
     hwiResponses,
     hwiRequests: requests.filter(url => /hwi\/api/i.test(url)),
     cableMessages: await page.evaluate(() => window.__specterCableMessages || []).catch(() => []),
+    cableAvailability: await page.evaluate(() => ({ isolated: crossOriginIsolated,
+      sharedArrayBuffer: typeof SharedArrayBuffer, disabled: document.querySelector('#cable-toggle')?.disabled,
+      desktopStatus: document.querySelector('#desktop-status')?.textContent,
+      diyStatus: document.querySelector('#diy-status')?.textContent })).catch(() => ({})),
     desktopNavigations,
     consoleErrors,
   }, null, 2));
