@@ -74,6 +74,17 @@ fingerprint Specter Desktop requests during discovery.
 
 ## Deployment and rollback
 
+Enable **Advanced Options** on the main DIY simulator page to open the Developer
+Inspector. It reports real MicroPython heap allocation, WebAssembly memory size,
+the firmware screen/menu and peripheral state. Refresh lists flash, QSPI, RAM-disk,
+SD and card files; select a file for a text/hex preview (first 64 KiB), or read a
+256-byte range of WebAssembly RAM by address. Take a baseline before an action and
+compare afterwards to find added, removed or modified files and firmware states.
+File comparisons use size and a checksum of all bytes; RAM metrics refresh every
+three seconds. Restart invalidates the baseline. The panel defaults to off and
+clears its previews when disabled; all inspection stays in the browser tab. This
+reflects simulator memory, not the STM32 hardware memory layout.
+
 See [`SETUP.md`](SETUP.md) for the complete deployment design. Every successful
 `main` build publishes a checksummed, commit-labelled production package on
 GitHub. The VPS pulls that package as an unprivileged deployment user, verifies

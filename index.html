@@ -234,6 +234,20 @@
     .sim-panel a { color: var(--specter-primary); }
     .sim-panel details { margin-top: 10px; }
     .sim-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; max-height: 180px; overflow: auto; }
+    .developer-options { width:100%; max-width:760px; font-size:13px; line-height:1.5; grid-column:1 / -1; }
+    .developer-options > label { display:block; text-align:center; cursor:pointer; }
+    #developer-inspector { margin-top:12px; padding:18px; border:1px solid var(--specter-dark-secondary); border-radius:12px; background:var(--specter-dark-accent); }
+    #developer-inspector[hidden], .embedded .developer-options { display:none; }
+    #developer-inspector h2 { font-size:18px; } #developer-inspector h3 { margin-top:16px; font-size:14px; }
+    #developer-inspector p { margin:8px 0; color:var(--specter-light-secondary); }
+    #developer-inspector pre { background:var(--specter-dark); padding:10px; max-height:260px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+    #inspector-files { width:100%; background:var(--specter-dark); color:var(--specter-light); margin:8px 0; }
+    .inspector-actions { display:flex; flex-wrap:wrap; gap:8px; }
+    #inspector-address { width:130px; }
+    #developer-inspector button, #inspector-address { border:1px solid #506070; border-radius:6px; padding:7px 10px; background:var(--specter-dark); color:var(--specter-light); font:inherit; }
+    #developer-inspector button { margin:4px 0; cursor:pointer; }
+    #developer-inspector button:hover { border-color:var(--specter-primary); }
+    #developer-inspector button:disabled { opacity:.5; cursor:wait; }
     .technical-details { width:100%; max-width:380px; color:var(--specter-light-secondary); font-size:12px; line-height:1.45; }
     .technical-details summary { cursor:pointer; color:var(--specter-light-secondary); }
     .technical-details p { margin:8px 0; }
@@ -481,6 +495,23 @@
   </div>
 </details>
 
+  <section class="developer-options">
+    <label><input type="checkbox" id="advanced-options" aria-controls="developer-inspector"> Advanced Options</label>
+    <div id="developer-inspector" hidden>
+      <h2>Developer Inspector</h2>
+      <p>Live simulator memory, not STM32 hardware RAM. Contents stay in this tab. Use test seeds only.</p>
+      <div class="inspector-actions"><button id="inspector-refresh">Refresh</button><button id="inspector-baseline">Take baseline</button><button id="inspector-compare">Compare to baseline</button></div>
+      <p id="inspector-status" role="status">Waiting for firmware…</p>
+      <h3>RAM &amp; firmware state</h3><pre id="inspector-state"></pre>
+      <h3>Internal flash, RAM disk &amp; peripherals</h3>
+      <select id="inspector-files" size="7" aria-label="Simulator files"></select>
+      <pre id="inspector-content">Select a file to inspect its text and hex bytes.</pre>
+      <h3>WebAssembly RAM bytes</h3>
+      <label>Address (decimal or 0x hex) <input id="inspector-address" value="0x0" aria-label="RAM address"></label>
+      <button id="inspector-read-memory">Read 256 bytes</button><pre id="inspector-memory"></pre>
+      <h3>Changes since baseline</h3><pre id="inspector-changes">Take a baseline, use the simulator, then compare.</pre>
+    </div>
+  </section>
   <details id="technical-details" class="technical-details">
     <summary>Technical details</summary>
     <p>Repository: <a id="build-repository-link" href="#">Loading…</a></p>
@@ -499,6 +530,6 @@
 </footer>
 
 <script src="/assets/jsQR-1.4.0.js"></script>
-<script type="module" src="/browser/site.js?v=20260919-virtual-host-v5"></script>
+<script type="module" src="/browser/site.js?v=20261002-inspector-v1"></script>
 </body>
 </html>

@@ -70,7 +70,7 @@ let forceCanvasBridge = false;
 let recoveryTimer;
 let startupPhase = 'manifest';
 let displayMode = 'unselected';
-const workerRevision = '2026-10-02.2';
+const workerRevision = '2026-10-02.inspector1';
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;
@@ -91,6 +91,120 @@ const virtualHostClientId = typeof crypto.randomUUID === 'function' ? crypto.ran
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const startupTimeoutMs = 60000;
+
+let inspectorPending = null;
+let inspectorBaseline = null;
+let inspectorFileRequest = 0;
+let inspectorGeneration = -1;
+function inspectorBusy(busy) {
+  for (const id of ['inspector-refresh', 'inspector-baseline', 'inspector-compare']) $(`#${id}`).disabled = busy;
+}
+function inspect(action = 'refresh', includeFiles = true) {
+  if (!$('#advanced-options').checked || startupPhase !== 'running' || !worker) return;
+  if (inspectorGeneration !== runGeneration) {
+    inspectorGeneration = runGeneration;
+    inspectorBaseline = null;
+    inspectorPending = null;
+    $('#inspector-changes').textContent = 'New firmware run. Take a new baseline.';
+    $('#inspector-files').replaceChildren();
+    $('#inspector-content').textContent = 'Select a file to inspect its text and hex bytes.';
+  }
+  if (inspectorPending && Date.now() - inspectorPending.started < 5000) return;
+  const id = ++requestId;
+  inspectorPending = { id, action, started: Date.now() };
+  inspectorBusy(true);
+  send({ type: 'inspector-enable', enabled: true });
+  send({ type: 'inspector-state', requestId: id, includeFiles });
+  $('#inspector-status').textContent = 'Reading simulator state…';
+}
+function hexDump(bytes, address = 0) {
+  const lines = [];
+  for (let i = 0; i < bytes.length; i += 16) {
+    const chunk = bytes.slice(i, i + 16);
+    lines.push(`${(address + i).toString(16).padStart(8, '0')}  ${Array.from(chunk, b => b.toString(16).padStart(2, '0')).join(' ').padEnd(47)}  ${Array.from(chunk, b => b >= 32 && b < 127 ? String.fromCharCode(b) : '.').join('')}`);
+  }
+  return lines.join('\n');
+}
+function comparableState(data) {
+  const { allocatedBytes, freeBytes, requestId: ignored, ...firmware } = data.firmware;
+  return { firmware, scannerActive: data.scannerActive, usbEnabled: data.usbEnabled,
+    sdInserted: data.sdInserted, cardSlot: data.cardSlot };
+}
+function receiveInspection(data) {
+  if (!$('#advanced-options').checked) return;
+  if (data.type === 'inspector-state') {
+    if (data.requestId !== inspectorPending?.id) return;
+    const action = inspectorPending.action;
+    inspectorPending = null;
+    inspectorBusy(false);
+    const { files, type, requestId: ignored, ...state } = data;
+    $('#inspector-state').textContent = JSON.stringify(state, null, 2);
+    $('#inspector-status').textContent = `Updated ${new Date().toLocaleTimeString()} · RAM metrics refresh every 3 seconds; Refresh updates files.`;
+    if (files) {
+      const selected = $('#inspector-files').value;
+      $('#inspector-files').replaceChildren(...files.map(file => {
+        const option = document.createElement('option');
+        option.value = file.path;
+        option.textContent = `${file.path} (${file.size.toLocaleString()} bytes)`;
+        return option;
+      }));
+      $('#inspector-files').value = selected;
+      if ($('#inspector-files').value) $('#inspector-files').onchange();
+    }
+    if (action === 'baseline') {
+      inspectorBaseline = { files: new Map(files.map(file => [file.path, file])), state: comparableState(data) };
+      $('#inspector-changes').textContent = `Baseline captured at ${new Date().toLocaleTimeString()}. Use the simulator, then compare.`;
+    } else if (action === 'compare') {
+      if (!inspectorBaseline) { $('#inspector-changes').textContent = 'Take a baseline first.'; return; }
+      const current = new Map(files.map(file => [file.path, file]));
+      const changes = [];
+      for (const [path, file] of current) {
+        const before = inspectorBaseline.files.get(path);
+        if (!before) changes.push(`Added: ${path} (${file.size} bytes)`);
+        else if (before.size !== file.size || before.hash !== file.hash) changes.push(`Changed: ${path} (${before.size} → ${file.size} bytes)`);
+      }
+      for (const path of inspectorBaseline.files.keys()) if (!current.has(path)) changes.push(`Removed: ${path}`);
+      const currentState = comparableState(data);
+      for (const key of Object.keys(currentState)) {
+        if (JSON.stringify(inspectorBaseline.state[key]) !== JSON.stringify(currentState[key])) {
+          changes.push(`${key}: ${JSON.stringify(inspectorBaseline.state[key])} → ${JSON.stringify(currentState[key])}`);
+        }
+      }
+      $('#inspector-changes').textContent = changes.join('\n') || 'No file or firmware-state changes detected.';
+    }
+  } else if (data.type === 'inspector-file' && data.requestId === inspectorFileRequest && data.path === $('#inspector-files').value) {
+    $('#inspector-content').textContent = `${data.path} · ${data.size} bytes${data.size > data.bytes.length ? ' · preview limited to first 64 KiB' : ''}\n\nTEXT\n${new TextDecoder().decode(data.bytes)}\n\nHEX\n${hexDump(data.bytes)}`;
+  } else if (data.type === 'inspector-memory') {
+    $('#inspector-memory').textContent = hexDump(data.bytes, data.address);
+  }
+}
+$('#advanced-options').addEventListener('change', () => {
+  const enabled = $('#advanced-options').checked;
+  $('#developer-inspector').hidden = !enabled;
+  inspectorPending = null;
+  inspectorBusy(false);
+  send({ type: 'inspector-enable', enabled });
+  if (enabled) inspect();
+  else {
+    inspectorBaseline = null;
+    for (const id of ['inspector-state', 'inspector-content', 'inspector-memory', 'inspector-changes']) $(`#${id}`).textContent = '';
+    $('#inspector-files').replaceChildren();
+  }
+});
+$('#inspector-refresh').onclick = () => inspect();
+$('#inspector-baseline').onclick = () => inspect('baseline');
+$('#inspector-compare').onclick = () => inspect('compare');
+$('#inspector-files').onchange = () => {
+  inspectorFileRequest = ++requestId;
+  send({ type: 'inspector-file', path: $('#inspector-files').value, requestId: inspectorFileRequest });
+};
+$('#inspector-read-memory').onclick = () => {
+  const input = $('#inspector-address').value.trim();
+  const address = /^(?:0x[0-9a-f]+|[0-9]+)$/i.test(input) ? Number(input) : NaN;
+  if (!Number.isSafeInteger(address) || address < 0) { $('#inspector-status').textContent = 'Enter a valid decimal or hexadecimal address.'; return; }
+  send({ type: 'inspector-memory', address });
+};
+setInterval(() => inspect('refresh', inspectorGeneration !== runGeneration), 3000);
 
 function log(message) {
   debug.textContent += `[${new Date().toISOString()}] ${String(message)}\n`;
@@ -550,7 +664,9 @@ function setLoadingMessage(message) {
 }
 function onWorkerMessage({ data }, generation = runGeneration) {
   if (generation !== runGeneration) return;
-  if (data.type === 'loading-progress') {
+  if (data.type.startsWith('inspector-')) {
+    receiveInspection(data);
+  } else if (data.type === 'loading-progress') {
     workerDependencyCount = data.remaining;
     const steps = data.remaining === 1 ? 'startup step' : 'startup steps';
     setLoadingMessage(data.remaining > 0
@@ -597,6 +713,11 @@ function onWorkerMessage({ data }, generation = runGeneration) {
   } else if (data.type === 'abort') {
     crashRecover(`WebAssembly.Abort: ${data.message}\n${data.stack || ''}`, generation);
   } else if (data.type === 'operation-error') {
+    if (data.operation.startsWith('inspector-')) {
+      inspectorPending = null;
+      inspectorBusy(false);
+      $('#inspector-status').textContent = data.message;
+    }
     log(`${data.operation}: ${data.message}`);
     if (data.operation.startsWith('sd-')) {
       $('#sd-state').textContent = data.code === 'ENOSPC' ? 'SD full (8 GB)' : `SD error: ${data.message}`;
