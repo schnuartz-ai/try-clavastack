@@ -51,21 +51,23 @@ try {
   }
   assert(await workbench.locator('#desktop-app').count() === 1, 'Upstream Specter Desktop frame is missing');
   assert(await workbench.locator('#diy-app').count() === 1, 'Specter DIY frame is missing');
-  assert(await workbench.getByRole('heading', { name: 'Virtual SD card' }).count() === 1, 'Shared SD card UI is missing');
-  assert(await workbench.getByRole('heading', { name: 'Virtual MemoryCards' }).count() === 1, 'MemoryCard tray is missing');
+  const mediaGroupHeadings = await workbench.locator('.media-grid > .media-group h3').allTextContents();
+  assert(mediaGroupHeadings.join('|') === 'Virtual SD card|Virtual MemoryCards|Cable Connection',
+    `SD card, MemoryCards and cable must be three sibling media groups: ${mediaGroupHeadings.join('|')}`);
   assert(await workbench.locator('.memory-token').count() === 3, 'Expected three simulated MemoryCards');
   assert((await workbench.locator('.drop-help').allTextContents()).some(text => text.includes('Right-click a card to reset it')),
     'MemoryCard reset instruction is missing');
-  const cablePanel = workbench.locator('.cable-panel');
+  assert(await workbench.locator('.cable-file').count() === 0, 'The cable panel should not contain a File chip');
+  const cablePanel = workbench.locator('.media-grid > .media-group.cable-panel');
   assert(await cablePanel.locator('h3').textContent() === 'Cable Connection', 'Compact cable label is missing');
   assert(await cablePanel.locator('.cable-endpoint').allTextContents().then(labels => labels.join('|')) === 'Specter DIY|Specter Desktop',
     'Compact cable endpoints are missing or mislabeled');
-  assert(await cablePanel.locator('.cable-file').textContent() === 'File', 'Compact file label is missing');
   assert(await cablePanel.locator('.cable-toggle span').textContent() === 'On/Off', 'Compact cable toggle label is missing');
   assert(await cablePanel.locator('#cable-status').evaluate(element => element.classList.contains('visually-hidden')),
     'Cable status text should stay visually hidden');
-  assert(await cablePanel.evaluate(element => element.closest('.memory-group') !== null),
-    'Cable connection should be grouped with the MemoryCards');
+  assert(await cablePanel.evaluate(element => element.parentElement?.classList.contains('media-grid') &&
+    !element.closest('.memory-group') && !element.closest('#sd-drop')),
+  'Cable connection should be a separate media group beside the SD card and MemoryCards');
   assert(await page.getByText('No wallet data is passed between Sparrow and the Specter workbench on this page.').count() === 1,
     'Sparrow and Specter integration boundary is not stated clearly');
 
