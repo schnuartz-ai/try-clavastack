@@ -171,6 +171,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Start static server
         run: python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/specter-static.log 2>&1 &
+      - name: Start isolated static server for the Specter Desktop cable test
+        run: python3 browser/test-isolated-server.py --port 8766 > /tmp/specter-isolated-static.log 2>&1 &
       - name: Test PC Virtual Host through the real firmware USB shim
         run: |
           /tmp/clavastack-virtual-host --site http://127.0.0.1:8765 --no-open > /tmp/virtual-host.log 2>&1 &
@@ -188,6 +190,7 @@ jobs:
       - name: Run Specter Desktop + DIY browser integration tests
         env:
           CI: 'true'
+          TEST_BASE_URL: http://127.0.0.1:8766
         run: npm run test:specter-desktop
       - name: Package the complete tested production site
         if: github.event_name != 'pull_request'
