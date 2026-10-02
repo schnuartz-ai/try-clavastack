@@ -7,7 +7,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cdn.jsdelivr.net https://pypi.org https://files.pythonhosted.org; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
   <title>Specter Desktop + DIY — ClavaStack</title>
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/specter-desktop/style.css?v=2026-10-02.2">
+  <link rel="stylesheet" href="/specter-desktop/style.css?v=2026-10-02.3">
 </head>
 <body>
   <header class="topbar">
@@ -27,16 +27,19 @@
     <div class="workspace" aria-label="Specter simulators">
       <section class="pane desktop-pane" aria-labelledby="desktop-heading">
         <div class="pane-heading">
-          <div><p class="eyebrow">BROWSER PYTHON + FLASK</p><h2 id="desktop-heading">Specter Desktop</h2></div>
+          <div><h2 id="desktop-heading">Specter Desktop</h2></div>
           <span class="status" id="desktop-status" role="status">Preparing browser runtime…</span>
         </div>
-        <div class="desktop-loader" id="desktop-loader">
-          <span class="spinner" aria-hidden="true"></span>
-          <strong id="loader-title">Starting upstream Specter Desktop</strong>
-          <span id="loader-detail">Loading CPython WebAssembly and the pinned application source…</span>
-          <div class="progress"><span id="loader-progress"></span></div>
+        <div class="desktop-runtime" id="desktop-drop">
+          <div class="desktop-loader" id="desktop-loader">
+            <span class="spinner" aria-hidden="true"></span>
+            <strong id="loader-title">Starting upstream Specter Desktop</strong>
+            <span id="loader-detail">Loading CPython WebAssembly and the pinned application source…</span>
+            <div class="progress"><span id="loader-progress"></span></div>
+          </div>
+          <iframe id="desktop-app" title="Real Specter Desktop application" allow="camera" hidden></iframe>
+          <button class="device-hitbox" type="button" data-media-target="desktop" aria-label="Insert the virtual SD card into Specter Desktop"></button>
         </div>
-        <iframe id="desktop-app" title="Real Specter Desktop application" allow="camera" hidden></iframe>
         <div class="pane-foot">
           <span>Runs locally in this browser tab</span>
           <button type="button" id="desktop-reset">Reset Desktop data</button>
@@ -45,12 +48,13 @@
 
       <section class="pane diy-pane" aria-labelledby="diy-heading">
         <div class="pane-heading">
-          <div><p class="eyebrow">REAL MICROCONTROLLER FIRMWARE</p><h2 id="diy-heading">Specter DIY</h2></div>
+          <div><h2 id="diy-heading">Specter DIY</h2></div>
           <span class="status" id="diy-status" role="status">Starting firmware…</span>
         </div>
         <div class="device-frame">
           <img class="device-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt="Specter Shield Metal device frame">
           <iframe id="diy-app" title="Specter DIY firmware simulator" allow="camera"></iframe>
+          <button class="device-hitbox" type="button" data-media-target="diy" aria-label="Insert a virtual card into Specter DIY"></button>
         </div>
         <section id="diy-scanner-controls" class="scanner-controls" hidden aria-live="polite">
           <strong>Specter DIY is scanning</strong>
@@ -75,31 +79,26 @@
       <div class="media-heading"><div><p class="eyebrow">SHARED VIRTUAL STORAGE</p><h2 id="media-heading">Removable media</h2></div><p>Insert the same card into either application to move files between them.</p></div>
       <div class="media-grid">
         <section class="media-group" id="sd-drop" aria-labelledby="sd-heading">
-          <h3 id="sd-heading">Virtual SD card · 8 GB</h3>
-          <button class="media-token sd-token" id="sd-token" type="button" data-media="sd" aria-pressed="false" aria-label="Select the virtual SD card">
+          <h3 id="sd-heading">Virtual SD card</h3>
+          <button class="media-token sd-token" id="sd-token" type="button" data-media="sd" aria-pressed="false" aria-label="Drag 8 GB SD card onto a device">
             <img src="/assets/sd-card-8gb.png" alt="8 GB microSD card">
             <small id="sd-location">Not inserted</small>
           </button>
           <div class="media-actions"><button type="button" id="sd-add">Add files</button><button type="button" id="sd-refresh">Refresh files</button><button type="button" id="sd-clear">Clear</button><input id="sd-picker" type="file" multiple hidden></div>
-          <p class="drop-help">Select, drop, or paste files. Desktop’s “Open SD card” uses these files.</p>
+          <p class="drop-help">Select, drop, or paste multiple files at once. Drag this card onto a device to insert it.</p>
           <ul id="sd-files" class="sd-files"><li>No files on card</li></ul>
         </section>
         <section class="media-group memory-group" aria-labelledby="memory-heading">
           <h3 id="memory-heading">Virtual MemoryCards</h3>
           <div class="memory-tray">
-            <button class="media-token memory-token" type="button" data-media="card" data-slot="1" aria-pressed="false"><span class="card-art"><img src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 1</strong></span><small>Not inserted</small></button>
-            <button class="media-token memory-token" type="button" data-media="card" data-slot="2" aria-pressed="false"><span class="card-art"><img src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 2</strong></span><small>Not inserted</small></button>
-            <button class="media-token memory-token" type="button" data-media="card" data-slot="3" aria-pressed="false"><span class="card-art"><img src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 3</strong></span><small>Not inserted</small></button>
+            <button class="media-token memory-token" type="button" data-media="card" data-slot="1" aria-pressed="false"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 1</strong></span><small>Not inserted</small></button>
+            <button class="media-token memory-token" type="button" data-media="card" data-slot="2" aria-pressed="false"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 2</strong></span><small>Not inserted</small></button>
+            <button class="media-token memory-token" type="button" data-media="card" data-slot="3" aria-pressed="false"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 3</strong></span><small>Not inserted</small></button>
           </div>
-          <p class="drop-help">MemoryCards are available in Specter DIY.</p>
+          <p class="drop-help">Drag a MemoryCard onto Specter DIY. Right-click a card to reset it.</p>
         </section>
       </div>
-      <div class="media-insertion" role="group" aria-label="Insert selected card">
-        <span id="media-selection">Select a card to insert or eject it.</span>
-        <button type="button" data-media-target="desktop" disabled>Insert in Specter Desktop</button>
-        <button type="button" data-media-target="diy" disabled>Insert in Specter DIY</button>
-        <button type="button" id="media-eject" disabled>Eject selected card</button>
-      </div>
+      <p class="media-insertion" id="media-selection">Drag a card onto a device, or select a card and tap the device. Click an inserted card to eject it.</p>
       <p id="media-status" role="status" aria-live="polite">Cards are ejected.</p>
     </section>
 

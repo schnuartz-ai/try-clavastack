@@ -84,12 +84,14 @@ async function initialize(message) {
   micropip.destroy();
 
   notify('progress', { label: 'Verifying pinned Specter Desktop upstream source…', progress: 48 });
-  const archiveResponse = await fetch(message.sourceUrl, { cache: 'force-cache' });
+  const archiveResponse = await fetch(message.sourceUrl, { cache: 'no-store' });
   if (!archiveResponse.ok) throw new Error(`Specter source archive returned HTTP ${archiveResponse.status}`);
   const archive = await archiveResponse.arrayBuffer();
   const archiveHash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', archive))]
     .map(value => value.toString(16).padStart(2, '0')).join('');
-  if (archiveHash !== message.sourceSha256) throw new Error('Specter Desktop source archive SHA-256 mismatch');
+  if (archiveHash !== message.sourceSha256) {
+    throw new Error(`Specter Desktop source archive SHA-256 mismatch (expected ${message.sourceSha256}, received ${archiveHash})`);
+  }
   pyodide.FS.mkdirTree('/specter-src');
   pyodide.FS.writeFile('/specter-source.zip', new Uint8Array(archive));
   const compatResponse = await fetch('/specter-desktop/browser-compat.py', { cache: 'no-store' });

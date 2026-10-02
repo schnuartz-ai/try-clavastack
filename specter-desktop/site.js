@@ -26,11 +26,12 @@ const cardOwners = new Map([[1, null], [2, null], [3, null]]);
 let sdOwner = null;
 let selectedMedia = null;
 let mediaBusy = false;
+let mediaDrag = null;
 let mediaRequestId = 0;
 const mediaRequests = new Map();
 const SD_CAPACITY_BYTES = 8_000_000_000;
 const MEDIA_DB_NAME = 'clavastack-specter-removable-media-v1';
-const desktopRuntimeRevision = '2026-10-02.2';
+const desktopRuntimeRevision = '2026-10-02.3';
 
 function setStatus(element, message, state = 'loading') {
   element.textContent = message;
@@ -244,15 +245,15 @@ function mediaFor(prefix) {
 function ownerFor(kind, slot) { return kind === 'sd' ? sdOwner : cardOwners.get(slot); }
 
 function renderMedia() {
-  const selectedOwner = selectedMedia ? ownerFor(selectedMedia.kind, selectedMedia.slot) : null;
   $('#sd-location').textContent = sdOwner ? `Inserted in ${sdOwner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}` : 'Not inserted';
   $('#sd-token').setAttribute('aria-pressed', String(selectedMedia?.kind === 'sd'));
+  $('#sd-token').setAttribute('aria-label', `Drag 8 GB SD card onto a device. ${sdOwner ? `Inserted in ${sdOwner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}.` : 'Not inserted.'}`);
   for (const token of document.querySelectorAll('.memory-token')) {
     const slot = Number(token.dataset.slot);
     const owner = cardOwners.get(slot);
     token.querySelector('small').textContent = owner ? 'Inserted in Specter DIY' : 'Not inserted';
     token.setAttribute('aria-pressed', String(selectedMedia?.kind === 'card' && selectedMedia.slot === slot));
-    token.setAttribute('aria-label', `MemoryCard ${slot}. ${owner ? 'Inserted in Specter DIY' : 'Not inserted'}.`);
+    token.setAttribute('aria-label', `MemoryCard ${slot}. ${owner ? 'Inserted in Specter DIY' : 'Not inserted'}. Drag onto Specter DIY; right-click to reset.`);
   }
   const list = $('#sd-files');
   list.replaceChildren();
@@ -300,18 +301,17 @@ function renderMedia() {
   $('#sd-clear').disabled = mediaBusy || files.length === 0;
   $('#sd-refresh').disabled = mediaBusy || sdOwner !== 'diy';
   $('#sd-add').disabled = mediaBusy;
-  const selection = selectedMedia
-    ? `${selectedMedia.kind === 'sd' ? 'Virtual SD card' : `MemoryCard ${selectedMedia.slot}`} selected${selectedOwner ? ` · inserted in ${selectedOwner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}` : ''}`
-    : 'Select a card to insert or eject it.';
-  $('#media-selection').textContent = selection;
-  document.querySelectorAll('[data-media-target="desktop"]').forEach(button => {
-    button.disabled = mediaBusy || !ready || !selectedMedia || selectedMedia.kind !== 'sd' || selectedOwner === 'desktop';
+  document.querySelectorAll('.device-hitbox').forEach(hitbox => {
+    const target = hitbox.dataset.mediaTarget;
+    const canInsert = selectedMedia && !mediaBusy && (target === 'diy' ? diyRunning : ready) &&
+      (target === 'diy' || selectedMedia.kind === 'sd') && ownerFor(selectedMedia.kind, selectedMedia.slot) !== target;
+    hitbox.disabled = !canInsert;
+    hitbox.classList.toggle('armed', Boolean(canInsert));
+    hitbox.textContent = canInsert ? 'Insert here' : '';
   });
-  document.querySelectorAll('[data-media-target="diy"]').forEach(button => {
-    button.disabled = mediaBusy || !diyRunning || !selectedMedia || selectedOwner === 'diy';
-  });
-  $('#media-eject').disabled = mediaBusy || !selectedOwner;
-  $('#media-eject').textContent = selectedOwner ? 'Eject selected card' : 'Eject selected card';
+  $('#media-selection').textContent = selectedMedia
+    ? `Selected ${selectedMedia.kind === 'sd' ? 'SD card' : `MemoryCard ${selectedMedia.slot}`} · tap a highlighted device to insert.`
+    : 'Drag a card onto a device, or select a card and tap the device. Click an inserted card to eject it.';
   const sdDrop = $('#sd-drop');
   sdDrop.dataset.used = `${used}`;
   notifyDesktopMediaState();
@@ -391,29 +391,94 @@ async function insertMedia(kind, slot, target) {
   reportMedia(`${kind === 'sd' ? 'Virtual SD card' : `MemoryCard ${slot}`} inserted in ${target === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}.`);
 }
 
-function mediaSelected(kind, slot) {
-  selectedMedia = { kind, slot };
-  renderMedia();
-  reportMedia(ownerFor(kind, slot)
-    ? 'Card selected. Eject it here or insert it into the other application.'
-    : 'Card selected. Choose Specter Desktop or Specter DIY to insert it.');
+function selectMedia(media) {
+  const owner = ownerFor(media.kind, media.slot);
+  if (owner) {
+    selectedMedia = null;
+    runMediaOperation(async () => {
+      await detachMedia(media.kind, media.slot);
+      reportMedia(`${media.kind === 'sd' ? 'SD card' : `MemoryCard ${media.slot}`} ejected from ${owner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}.`);
+    });
+  } else {
+    selectedMedia = media;
+    renderMedia();
+    reportMedia('Tap a device to insert the selected card.');
+  }
 }
 
-$('#sd-token').addEventListener('click', () => mediaSelected('sd', null));
-for (const token of document.querySelectorAll('.memory-token')) {
-  token.addEventListener('click', () => mediaSelected('card', Number(token.dataset.slot)));
-}
-document.querySelectorAll('[data-media-target]').forEach(button => button.addEventListener('click', () => {
-  if (!selectedMedia) return;
-  runMediaOperation(() => insertMedia(selectedMedia.kind, selectedMedia.slot, button.dataset.mediaTarget));
-}));
-$('#media-eject').addEventListener('click', () => {
-  if (!selectedMedia) return;
-  runMediaOperation(async () => {
-    await detachMedia(selectedMedia.kind, selectedMedia.slot);
-    reportMedia(`${selectedMedia.kind === 'sd' ? 'Virtual SD card' : `MemoryCard ${selectedMedia.slot}`} ejected.`);
+for (const token of document.querySelectorAll('.media-token')) {
+  token.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || mediaBusy) return;
+    event.preventDefault();
+    token.setPointerCapture(event.pointerId);
+    mediaDrag = { token, kind: token.dataset.media, slot: Number(token.dataset.slot) || null,
+      x: event.clientX, y: event.clientY, ghost: null };
   });
-});
+  token.addEventListener('pointermove', event => {
+    if (!mediaDrag || mediaDrag.token !== token) return;
+    if (!mediaDrag.ghost && Math.hypot(event.clientX - mediaDrag.x, event.clientY - mediaDrag.y) > 7) {
+      mediaDrag.ghost = document.createElement('div');
+      mediaDrag.ghost.className = 'drag-ghost';
+      mediaDrag.ghost.append((token.querySelector('img') || token.querySelector('.card-art')).cloneNode(true));
+      document.body.append(mediaDrag.ghost);
+      selectedMedia = null;
+      renderMedia();
+    }
+    if (!mediaDrag.ghost) return;
+    mediaDrag.ghost.style.left = `${event.clientX}px`;
+    mediaDrag.ghost.style.top = `${event.clientY}px`;
+    const target = mediaTargetAt(event.clientX, event.clientY, mediaDrag.kind);
+    document.querySelectorAll('.desktop-runtime, .device-frame').forEach(zone => zone.classList.remove('drop-target'));
+    if (target) mediaTargetZone(target).classList.add('drop-target');
+  });
+  token.addEventListener('pointerup', event => {
+    if (!mediaDrag || mediaDrag.token !== token) return;
+    const item = mediaDrag;
+    const target = item.ghost && mediaTargetAt(event.clientX, event.clientY, item.kind);
+    cleanupMediaDrag();
+    if (target) {
+      selectedMedia = null;
+      runMediaOperation(() => insertMedia(item.kind, item.slot, target));
+    } else if (!item.ghost) selectMedia({ kind: item.kind, slot: item.slot });
+  });
+  token.addEventListener('pointercancel', cleanupMediaDrag);
+  if (token.dataset.media === 'card') token.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    const slot = Number(token.dataset.slot);
+    if (!confirm(`Reset MemoryCard ${slot}? Its simulated keys and PIN will be wiped.`)) return;
+    runMediaOperation(async () => {
+      await detachMedia('card', slot);
+      for (const path of [...mediaFiles.keys()]) if (path.startsWith(`cards/${slot}/`)) mediaFiles.delete(path);
+      await persistMedia();
+      persistMediaOwners();
+      reportMedia(`MemoryCard ${slot} reset.`);
+    });
+  });
+}
+
+function mediaTargetZone(target) { return target === 'desktop' ? $('#desktop-drop') : diyFrame.closest('.device-frame'); }
+function mediaTargetAt(x, y, kind) {
+  for (const target of ['desktop', 'diy']) {
+    if (kind === 'card' && target !== 'diy') continue;
+    const rect = mediaTargetZone(target).getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return target;
+  }
+  return null;
+}
+function cleanupMediaDrag() {
+  mediaDrag?.ghost?.remove();
+  mediaDrag = null;
+  document.querySelectorAll('.desktop-runtime, .device-frame').forEach(zone => zone.classList.remove('drop-target'));
+}
+document.querySelectorAll('.device-hitbox').forEach(hitbox => hitbox.addEventListener('click', () => {
+  if (!selectedMedia || mediaBusy) return;
+  const media = selectedMedia;
+  const target = hitbox.dataset.mediaTarget;
+  if (media.kind === 'card' && target !== 'diy') return;
+  selectedMedia = null;
+  runMediaOperation(() => insertMedia(media.kind, media.slot, target));
+}));
+addEventListener('keydown', event => { if (event.key === 'Escape') { selectedMedia = null; cleanupMediaDrag(); renderMedia(); } });
 
 const sdPicker = $('#sd-picker');
 $('#sd-add').addEventListener('click', () => sdPicker.click());
