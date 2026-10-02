@@ -259,7 +259,9 @@ try {
       parent.postMessage({ type: 'simulator-usb-output', variant: 'diy',
         bytes: new TextEncoder().encode('ACK\r\ndeadbeef\r\n') }, location.origin);
     }, true);
-    parent.postMessage({ type: 'simulator-usb-state', variant: 'diy', enabled: true }, location.origin);
+    window.__specterUsbStateTimer = setInterval(() => {
+      parent.postMessage({ type: 'simulator-usb-state', variant: 'diy', enabled: true }, location.origin);
+    }, 50);
   });
   await page.evaluate(() => {
     window.__specterCableMessages = [];
@@ -273,6 +275,7 @@ try {
   }, null, { timeout: 30000 });
   await page.locator('#cable-toggle').check();
   await page.locator('.cable-panel.connected').waitFor({ state: 'visible', timeout: 10000 });
+  await diyRuntimeFrame.evaluate(() => clearInterval(window.__specterUsbStateTimer));
   assert(await appFrame.evaluate(() => window.hwi?.url) === '/specter-desktop/hwi/api/', 'Specter Desktop HWI requests are not routed through the browser WSGI bridge');
   await appFrame.evaluate(() => {
     window.__desktopCableEnumeration = window.hwi.enumerate('', false);
