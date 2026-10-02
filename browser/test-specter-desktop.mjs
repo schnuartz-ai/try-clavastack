@@ -246,6 +246,15 @@ try {
 
   const diyRuntimeFrame = page.frames().find(frame => frame.url().includes('variant=diy'));
   assert(diyRuntimeFrame, 'The running Specter DIY simulator frame was not found');
+  await diyRuntimeFrame.evaluate(() => parent.postMessage({
+    type: 'simulator-usb-state', variant: 'diy', enabled: false,
+  }, location.origin));
+  const cableToggle = page.locator('#cable-toggle');
+  assert(await cableToggle.isEnabled(), 'The cable toggle must stay clickable while USB communication is off');
+  await cableToggle.check();
+  assert(await cableToggle.isChecked(), 'The cable toggle did not retain the requested On state');
+  assert(await page.locator('.cable-panel.armed').isVisible(), 'The cable should show a waiting state until DIY USB is available');
+  assert(!(await page.locator('.cable-panel.connected').isVisible()), 'The cable reported connected before DIY USB was enabled');
   await diyRuntimeFrame.evaluate(() => {
     window.__specterCableRequests = [];
     window.addEventListener('message', event => {
@@ -270,11 +279,6 @@ try {
       if (/usb|cable/i.test(event.data?.type || '')) window.__specterCableMessages.push(event.data.type);
     });
   });
-  await page.waitForFunction(() => {
-    const toggle = document.querySelector('#cable-toggle');
-    return toggle && !toggle.disabled;
-  }, null, { timeout: 30000 });
-  await page.locator('#cable-toggle').check();
   await page.locator('.cable-panel.connected').waitFor({ state: 'visible', timeout: 10000 });
   await diyRuntimeFrame.evaluate(() => clearInterval(window.__specterUsbStateTimer));
   assert(await appFrame.evaluate(() => window.hwi?.url) === '/specter-desktop/hwi/api/', 'Specter Desktop HWI requests are not routed through the browser WSGI bridge');

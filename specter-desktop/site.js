@@ -559,11 +559,23 @@ function updateCableState() {
   const status = $('#cable-status');
   const supported = crossOriginIsolated && typeof SharedArrayBuffer === 'function';
   const available = Boolean(diyUsbEnabled && diyRunning && ready && supported);
-  toggle.disabled = !available;
-  if (!available) toggle.checked = false;
+  const waitingFor = [
+    !supported && 'an isolated browser context',
+    !ready && 'Specter Desktop to finish starting',
+    !diyRunning && 'Specter DIY to finish starting',
+    !diyUsbEnabled && 'USB communication to be enabled in Specter DIY',
+  ].filter(Boolean);
   const connected = Boolean(toggle.checked && available);
   panel.classList.toggle('connected', connected);
-  status.textContent = connected ? 'On' : 'Off';
+  panel.classList.toggle('armed', Boolean(toggle.checked && !available));
+  status.textContent = connected ? 'Cable connected.' : toggle.checked
+    ? `Cable is on; waiting for ${waitingFor.join(', ')}.` : 'Cable is off.';
+  toggle.title = connected ? 'Disconnect the virtual USB cable.' : toggle.checked
+    ? `Cable is on; waiting for ${waitingFor.join(', ')}.`
+    : 'Connect Specter DIY and Specter Desktop.';
+  toggle.setAttribute('aria-label', connected ? 'Cable connection on'
+    : toggle.checked ? `Cable connection on, waiting for ${waitingFor.join(', ')}`
+      : 'Cable connection off');
   if (connected !== cableConnected) {
     cableConnected = connected;
     desktopWorker?.postMessage({ type: 'cable-state', connected });
