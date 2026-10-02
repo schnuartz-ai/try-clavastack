@@ -8,7 +8,7 @@ let usbEnabled = false;
 let program = 'wallet';
 self.screen = { width: 480, height: 800 };
 const send = (type, details = {}) => postMessage({ type, ...details });
-const workerRevision = '2026-10-02.inspector1';
+const workerRevision = '2026-10-02.inspector2';
 let inspectorEnabled = false;
 // Runs on the firmware's own asyncio loop; never re-enter the WASM VM from JS.
 const inspectorPython = `import os, gc, json, asyncio
@@ -18,15 +18,31 @@ def install(main):
         while True:
             try:
                 with open('/bridge/inspector-request', 'r') as f:
-                    request = f.read()
+                    request = json.loads(f.read())
                 os.remove('/bridge/inspector-request')
                 store = device.keystore
                 screen = getattr(device.gui, 'scr', None)
-                data = {'requestId': int(request), 'allocatedBytes': gc.mem_alloc(), 'freeBytes': gc.mem_free(),
+                mnemonic = getattr(store, 'mnemonic', None)
+                mnemonic_text = mnemonic if isinstance(mnemonic, str) else None
+                root = getattr(store, 'root', None)
+                enc_secret = getattr(store, 'enc_secret', None)
+                data = {'requestId': int(request.get('requestId')), 'allocatedBytes': gc.mem_alloc(), 'freeBytes': gc.mem_free(),
                     'network': device.network, 'menu': getattr(device.current_menu, '__name__', 'unknown'),
                     'screen': type(screen).__name__ if screen is not None else 'unavailable',
                     'keystore': type(store).__name__ if store is not None else None,
+                    'keystoreObjects': {
+                        'keystore.mnemonic': {'present': mnemonic_text is not None,
+                            'wordCount': len(mnemonic_text.split()) if mnemonic_text is not None else 0,
+                            'utf8Bytes': len(mnemonic_text.encode()) if mnemonic_text is not None else 0},
+                        'keystore.root': {'present': root is not None,
+                            'type': type(root).__name__ if root is not None else None},
+                        'keystore.enc_secret': {'loaded': enc_secret is not None,
+                            'bytes': len(enc_secret) if enc_secret is not None else 0},
+                        'bip39_seed': {'retainedAsKeystoreField': False,
+                            'note': 'Temporary local value during mnemonic derivation.'}},
                     'apps': [type(app).__name__ for app in device.apps]}
+                if request.get('includeSensitive') and mnemonic_text is not None:
+                    data['sensitiveValues'] = {'keystore.mnemonic': mnemonic_text}
                 with open('/bridge/inspector-state.json', 'w') as f:
                     json.dump(data, f)
             except OSError:
@@ -68,8 +84,12 @@ function sendInspection(data, attempts = 0) {
   catch (error) { send('operation-error', { operation: 'inspector-state', message: error.message || String(error) }); }
 }
 function collectInspection(data, attempts) {
-  if (!inspectorEnabled) return;
   const fs = Module.FS;
+  if (!inspectorEnabled) {
+    const statePath = '/bridge/inspector-state.json';
+    if (fs.analyzePath(statePath).exists) fs.unlink(statePath);
+    return;
+  }
   let firmware = null;
   if (fs.analyzePath('/bridge/inspector-state.json').exists) {
     firmware = JSON.parse(fs.readFile('/bridge/inspector-state.json', { encoding: 'utf8' }));
@@ -78,12 +98,18 @@ function collectInspection(data, attempts) {
     setTimeout(() => sendInspection(data, attempts + 1), 50);
     return;
   }
+  const matchingFirmware = firmware?.requestId === data.requestId ? firmware : null;
+  const { sensitiveValues, ...firmwareState } = matchingFirmware || {};
   send('inspector-state', { requestId: data.requestId, files: data.includeFiles ? inspectFiles(fs) : null,
     memoryBytes: Module.HEAPU8.buffer.byteLength,
-    firmware: firmware?.requestId === data.requestId ? firmware : { error: 'Firmware metrics unavailable during this operation; refresh to retry.' },
+    firmware: matchingFirmware ? firmwareState : { error: 'Firmware metrics unavailable during this operation; refresh to retry.' },
+    sensitiveValues: data.includeSensitive ? sensitiveValues || {} : undefined,
     scannerActive, usbEnabled, qrQueued: qrQueue.length, usbQueued: usbQueue.length,
     sdInserted: fs.analyzePath('/bridge/sd-inserted').exists,
     cardSlot: fs.analyzePath('/bridge/card-slot').exists ? fs.readFile('/bridge/card-slot')[0] : null });
+  if (data.includeSensitive && fs.analyzePath('/bridge/inspector-state.json').exists) {
+    fs.unlink('/bridge/inspector-state.json');
+  }
 }
 const SD_CAPACITY_BYTES = 8_000_000_000;
 const SD_ENOSPC = 51;
@@ -349,8 +375,27 @@ function handle(data) {
     } else if (data.type.startsWith('inspector-')) {
       if (!inspectorEnabled) throw new Error('Advanced Options are disabled');
       if (data.type === 'inspector-state') {
-        fs.writeFile('/bridge/inspector-request', String(data.requestId));
+        fs.writeFile('/bridge/inspector-request', JSON.stringify({
+          requestId: data.requestId,
+          includeSensitive: data.includeSensitive === true,
+        }));
         sendInspection(data);
+      } else if (data.type === 'inspector-hide-sensitive') {
+        const requestPath = '/bridge/inspector-request';
+        if (fs.analyzePath(requestPath).exists) {
+          try {
+            const request = JSON.parse(fs.readFile(requestPath, { encoding: 'utf8' }));
+            if (request.includeSensitive) fs.unlink(requestPath);
+          } catch { fs.unlink(requestPath); }
+        }
+        const statePath = '/bridge/inspector-state.json';
+        if (fs.analyzePath(statePath).exists) {
+          try {
+            const state = JSON.parse(fs.readFile(statePath, { encoding: 'utf8' }));
+            delete state.sensitiveValues;
+            fs.writeFile(statePath, JSON.stringify(state));
+          } catch { fs.unlink(statePath); }
+        }
       } else if (data.type === 'inspector-file') {
         const path = data.path;
         if (typeof path !== 'string' || !path.startsWith('/state/') && !(program === 'mockui' && path.startsWith('/flash/'))) throw new Error('Invalid inspector path');

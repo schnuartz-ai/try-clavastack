@@ -97,7 +97,7 @@ let inspectorBaseline = null;
 let inspectorFileRequest = 0;
 let inspectorGeneration = -1;
 function inspectorBusy(busy) {
-  for (const id of ['inspector-refresh', 'inspector-baseline', 'inspector-compare']) $(`#${id}`).disabled = busy;
+  for (const id of ['inspector-refresh', 'inspector-baseline', 'inspector-compare', 'inspector-read-sensitive']) $(`#${id}`).disabled = busy;
 }
 function inspect(action = 'refresh', includeFiles = true) {
   if (!$('#advanced-options').checked || startupPhase !== 'running' || !worker) return;
@@ -106,6 +106,9 @@ function inspect(action = 'refresh', includeFiles = true) {
     inspectorBaseline = null;
     inspectorPending = null;
     $('#inspector-changes').textContent = 'New firmware run. Take a new baseline.';
+    $('#inspector-objects').textContent = '';
+    clearInspectorSensitiveValues(false);
+    $('#inspector-sensitive-panel').open = false;
     $('#inspector-files').replaceChildren();
     $('#inspector-content').textContent = 'Select a file to inspect its text and hex bytes.';
   }
@@ -114,8 +117,8 @@ function inspect(action = 'refresh', includeFiles = true) {
   inspectorPending = { id, action, started: Date.now() };
   inspectorBusy(true);
   send({ type: 'inspector-enable', enabled: true });
-  send({ type: 'inspector-state', requestId: id, includeFiles });
-  $('#inspector-status').textContent = 'Reading simulator state…';
+  send({ type: 'inspector-state', requestId: id, includeFiles, includeSensitive: action === 'sensitive' });
+  $('#inspector-status').textContent = action === 'sensitive' ? 'Reading live keystore value…' : 'Reading simulator state…';
 }
 function hexDump(bytes, address = 0) {
   const lines = [];
@@ -137,9 +140,20 @@ function receiveInspection(data) {
     const action = inspectorPending.action;
     inspectorPending = null;
     inspectorBusy(false);
-    const { files, type, requestId: ignored, ...state } = data;
+    const { files, type, requestId: ignored, sensitiveValues, ...state } = data;
     $('#inspector-state').textContent = JSON.stringify(state, null, 2);
+    $('#inspector-objects').textContent = JSON.stringify(state.firmware?.keystoreObjects || {}, null, 2);
     $('#inspector-status').textContent = `Updated ${new Date().toLocaleTimeString()} · RAM metrics refresh every 3 seconds; Refresh updates files.`;
+    if (action === 'sensitive') {
+      const output = $('#inspector-sensitive-values');
+      const phrase = sensitiveValues?.['keystore.mnemonic'];
+      output.textContent = state.firmware?.error
+        ? `Could not read the keystore value: ${state.firmware.error}`
+        : typeof phrase === 'string'
+          ? `keystore.mnemonic (live firmware RAM)\n${phrase}`
+          : 'No mnemonic is currently retained in the running keystore.';
+      output.hidden = false;
+    }
     if (files) {
       const selected = $('#inspector-files').value;
       $('#inspector-files').replaceChildren(...files.map(file => {
@@ -178,6 +192,20 @@ function receiveInspection(data) {
     $('#inspector-memory').textContent = hexDump(data.bytes, data.address);
   }
 }
+function clearInspectorSensitiveValues(clearWorker = true) {
+  const output = $('#inspector-sensitive-values');
+  if (output) {
+    output.textContent = '';
+    output.hidden = true;
+  }
+  if (inspectorPending?.action === 'sensitive') {
+    inspectorPending = null;
+    inspectorBusy(false);
+  }
+  if (clearWorker && $('#advanced-options').checked && worker && startupPhase === 'running') {
+    send({ type: 'inspector-hide-sensitive' });
+  }
+}
 $('#advanced-options').addEventListener('change', () => {
   const enabled = $('#advanced-options').checked;
   $('#developer-inspector').hidden = !enabled;
@@ -187,7 +215,9 @@ $('#advanced-options').addEventListener('change', () => {
   if (enabled) inspect();
   else {
     inspectorBaseline = null;
-    for (const id of ['inspector-state', 'inspector-content', 'inspector-memory', 'inspector-changes']) $(`#${id}`).textContent = '';
+    for (const id of ['inspector-state', 'inspector-objects', 'inspector-content', 'inspector-memory', 'inspector-changes']) $(`#${id}`).textContent = '';
+    clearInspectorSensitiveValues();
+    $('#inspector-sensitive-panel').open = false;
     $('#inspector-files').replaceChildren();
   }
 });
@@ -204,6 +234,16 @@ $('[data-loading-details]').addEventListener('click', event => {
 $('#inspector-refresh').onclick = () => inspect();
 $('#inspector-baseline').onclick = () => inspect('baseline');
 $('#inspector-compare').onclick = () => inspect('compare');
+$('#inspector-read-sensitive').onclick = () => {
+  $('#inspector-sensitive-panel').open = true;
+  const output = $('#inspector-sensitive-values');
+  output.textContent = 'Reading the live keystore value…';
+  output.hidden = false;
+  inspect('sensitive', false);
+};
+$('#inspector-sensitive-panel').addEventListener('toggle', () => {
+  if (!$('#inspector-sensitive-panel').open) clearInspectorSensitiveValues();
+});
 $('#inspector-files').onchange = () => {
   inspectorFileRequest = ++requestId;
   send({ type: 'inspector-file', path: $('#inspector-files').value, requestId: inspectorFileRequest });

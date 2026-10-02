@@ -11,11 +11,27 @@ try {
   await page.addInitScript(() => {
     const NativeWorker = window.Worker;
     window.inspectorMessages = [];
+    window.inspectorRequests = [];
     window.Worker = class extends NativeWorker {
       constructor(...args) {
         super(...args);
         window.inspectorTestWorker = this;
         this.addEventListener('message', event => window.inspectorMessages.push(event.data));
+      }
+      postMessage(message, ...postArgs) {
+        window.inspectorRequests.push(message);
+        if (message.type === 'inspector-state' && message.includeSensitive === true) {
+          const fakePhrase = 'fake test phrase only';
+          queueMicrotask(() => this.dispatchEvent(new MessageEvent('message', { data: {
+            type: 'inspector-state', requestId: message.requestId, files: null, memoryBytes: 65536,
+            scannerActive: false, usbEnabled: false, qrQueued: 0, usbQueued: 0, sdInserted: false, cardSlot: null,
+            firmware: { requestId: message.requestId, allocatedBytes: 1024, freeBytes: 2048, screen: 'test',
+              keystore: 'FlashKeyStore', keystoreObjects: { 'keystore.mnemonic': { present: true, wordCount: 4, utf8Bytes: fakePhrase.length } } },
+            sensitiveValues: { 'keystore.mnemonic': fakePhrase },
+          } })));
+          return;
+        }
+        return super.postMessage(message, ...postArgs);
       }
     };
   });
@@ -31,6 +47,17 @@ try {
   assert(state.firmware.freeBytes > 0);
   assert(state.memoryBytes > state.firmware.allocatedBytes);
   assert.notEqual(state.firmware.screen, 'unavailable');
+  assert.equal(state.firmware.keystoreObjects['keystore.mnemonic'].present, false);
+  assert.equal(await page.evaluate(() => window.inspectorRequests.some(message => message.includeSensitive === true)), false);
+  assert.equal(await page.locator('#inspector-sensitive-values').isVisible(), false);
+  await page.locator('#inspector-sensitive-panel').evaluate(element => { element.open = true; });
+  await page.locator('#inspector-read-sensitive').click();
+  await page.waitForFunction(() => document.querySelector('#inspector-sensitive-values').textContent.includes('fake test phrase only'));
+  assert.equal(await page.evaluate(() => window.inspectorRequests.some(message => message.includeSensitive === true)), true);
+  assert.equal(await page.locator('#inspector-sensitive-values').isVisible(), true);
+  assert(!(await page.locator('#inspector-state').textContent()).includes('fake test phrase only'));
+  await page.locator('#inspector-sensitive-panel').evaluate(element => { element.open = false; });
+  await page.waitForFunction(() => document.querySelector('#inspector-sensitive-values').textContent === '');
   await page.locator('#inspector-baseline').click();
   await page.waitForFunction(() => document.querySelector('#inspector-changes').textContent.startsWith('Baseline captured'));
   await page.evaluate(() => window.inspectorTestWorker.postMessage({ type: 'sd-import', name: 'inspector-test.txt', bytes: new TextEncoder().encode('<test>alpha</test>') }));
@@ -53,6 +80,7 @@ try {
   await page.locator('#advanced-options').uncheck();
   assert.equal(await page.locator('#developer-inspector').isVisible(), false);
   assert.equal(await page.locator('#inspector-content').textContent(), '');
+  assert.equal(await page.locator('#inspector-sensitive-values').textContent(), '');
   await page.locator('#advanced-options').check();
   await page.waitForFunction(() => document.querySelector('#inspector-state').textContent.includes('allocatedBytes'));
   await page.locator('#inspector-baseline').click();

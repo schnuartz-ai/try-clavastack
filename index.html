@@ -241,6 +241,8 @@
     #developer-inspector h2 { font-size:18px; } #developer-inspector h3 { margin-top:16px; font-size:14px; }
     #developer-inspector p { margin:8px 0; color:var(--specter-light-secondary); }
     #developer-inspector pre { background:var(--specter-dark); padding:10px; max-height:260px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+    #developer-inspector > .inspector-sensitive-panel { margin-top:12px; padding:10px; border:1px solid var(--specter-dark-secondary); border-radius:8px; }
+    #developer-inspector > .inspector-sensitive-panel > summary { cursor:pointer; color:var(--specter-light); }
     #inspector-files { width:100%; background:var(--specter-dark); color:var(--specter-light); margin:8px 0; }
     .inspector-actions { display:flex; flex-wrap:wrap; gap:8px; }
     #inspector-address { width:130px; }
@@ -504,6 +506,15 @@
       <div class="inspector-actions"><button id="inspector-refresh">Refresh</button><button id="inspector-baseline">Take baseline</button><button id="inspector-compare">Compare to baseline</button></div>
       <p id="inspector-status" role="status">Waiting for firmware…</p>
       <h3>RAM &amp; firmware state</h3><pre id="inspector-state"></pre>
+      <h3>Named keystore objects in firmware RAM</h3>
+      <p>Shows which runtime objects are present. Values remain hidden unless you explicitly read them below.</p>
+      <pre id="inspector-objects">Waiting for firmware…</pre>
+      <details id="inspector-sensitive-panel" class="inspector-sensitive-panel">
+        <summary>Read sensitive values (test phrases only)</summary>
+        <p>This reads the live <code>keystore.mnemonic</code> value from the running firmware. The simulator cannot tell a fake phrase from a real one.</p>
+        <button id="inspector-read-sensitive">Read mnemonic from RAM</button>
+        <pre id="inspector-sensitive-values" hidden></pre>
+      </details>
       <h3>Internal flash, RAM disk &amp; peripherals</h3>
       <select id="inspector-files" size="7" aria-label="Simulator files"></select>
       <pre id="inspector-content">Select a file to inspect its text and hex bytes.</pre>

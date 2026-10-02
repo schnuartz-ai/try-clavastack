@@ -85,6 +85,11 @@ File comparisons use size and a checksum of all bytes; RAM metrics refresh every
 three seconds. Restart invalidates the baseline. The panel defaults to off and
 clears its previews when disabled; all inspection stays in the browser tab. This
 reflects simulator memory, not the STM32 hardware memory layout.
+Named keystore objects show presence and size without exposing their contents.
+Opening **Read sensitive values** and clicking **Read mnemonic from RAM** makes a
+one-time request for the live `keystore.mnemonic`; closing that section clears the
+display. Use only test phrases because the simulator cannot distinguish them from
+real wallet backups.
 
 See [`SETUP.md`](SETUP.md) for the complete deployment design. Every successful
 `main` build publishes a checksummed, commit-labelled production package on
