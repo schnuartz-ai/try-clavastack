@@ -17,11 +17,11 @@ try {
     await page.route('**/browser/runtime-worker.js', route => route.abort());
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     const link = page.locator('#source-commit-link');
-    await link.filter({ hasText: 'GitHub' }).waitFor();
-    if (await link.textContent() !== 'GitHub' ||
-        await link.getAttribute('href') !== `https://github.com/${repository}`) {
-      throw new Error(`Wrong repository link for ${repository}`);
-    }
+    await page.waitForFunction(expectedRepository => {
+      const source = document.querySelector('#source-commit-link');
+      return source?.textContent === 'GitHub' &&
+        source.getAttribute('href') === `https://github.com/${expectedRepository}`;
+    }, repository);
     await page.close();
   }
 } finally {
