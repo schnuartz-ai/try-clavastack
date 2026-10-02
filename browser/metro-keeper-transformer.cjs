@@ -1,0 +1,48 @@
+const path = require('node:path');
+
+const upstreamRoot = path.resolve(__dirname, '..', 'upstream', 'bitcoin-keeper');
+const upstreamTransformer = require(require.resolve('react-native-svg-transformer', {
+  paths: [upstreamRoot],
+}));
+const signerPickerPath = path.join(
+  upstreamRoot,
+  'src',
+  'screens',
+  'Vault',
+  'AddSigningDevice.tsx',
+);
+
+// The pinned Keeper upstream assumes every signer has all three xpub families.
+// Hardware signers such as Specter DIY normally expose only the script type they
+// support, so this selector crashes while reading an absent family. Keep the
+// upstream checkout immutable and apply this guarded compatibility fix only to
+// its browser bundle.
+const unsafeXpubReads = [
+  'const amfXpub: signerXpubs[XpubTypes][0] = signer.signerXpubs[XpubTypes.AMF][0];',
+  'const ssXpub: signerXpubs[XpubTypes][0] = signer.signerXpubs[XpubTypes.P2WPKH][0];',
+  'const msXpub: signerXpubs[XpubTypes][0] = signer.signerXpubs[XpubTypes.P2WSH][0];',
+].join('\n  ');
+
+const safeXpubReads = [
+  'const amfXpub: signerXpubs[XpubTypes][0] = idx(signer, (_) => _.signerXpubs[XpubTypes.AMF][0]);',
+  'const ssXpub: signerXpubs[XpubTypes][0] = idx(signer, (_) => _.signerXpubs[XpubTypes.P2WPKH][0]);',
+  'const msXpub: signerXpubs[XpubTypes][0] = idx(signer, (_) => _.signerXpubs[XpubTypes.P2WSH][0]);',
+].join('\n  ');
+
+module.exports = {
+  ...upstreamTransformer,
+  async transform(args) {
+    const filename = path.resolve(args.filename);
+    if (filename === signerPickerPath) {
+      const normalizedSource = args.src.replace(/\r\n/g, '\n');
+      const matches = normalizedSource.split(unsafeXpubReads).length - 1;
+      if (matches !== 1) {
+        throw new Error(
+          `Expected the pinned Keeper signer xpub reads exactly once, found ${matches}; review the web compatibility patch.`,
+        );
+      }
+      args = { ...args, src: normalizedSource.replace(unsafeXpubReads, safeXpubReads) };
+    }
+    return upstreamTransformer.transform(args);
+  },
+};

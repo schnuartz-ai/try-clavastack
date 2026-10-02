@@ -130,6 +130,11 @@ jobs:
           cache: npm
       - name: Install browser build and test dependencies
         run: npm ci
+      - name: Install pinned Bitcoin Keeper source dependencies
+        working-directory: upstream/bitcoin-keeper
+        run: |
+          corepack yarn install --frozen-lockfile --ignore-scripts --ignore-engines
+          corepack yarn patch-package
       - name: Build Bitcoin Keeper browser source adapter
         run: npm run build:keeper
       - uses: actions/setup-python@v5

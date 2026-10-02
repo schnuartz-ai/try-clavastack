@@ -97,8 +97,8 @@ for required in \
   bitcoin-keeper/LICENSE.txt \
   bitcoin-keeper/LICENSE-APACHE-2.0.txt \
   bitcoin-keeper/THIRD-PARTY-NOTICES.txt \
-  builds/keeper-web/app.js \
-  builds/keeper-web/app.js.LEGAL.txt \
+  builds/keeper-web/keeper-app.js \
+  builds/keeper-web/keeper-app.js.LEGAL.txt \
   builds/keeper-web/keeper-logo.svg \
   builds/keeper-web/keeper-icon.svg \
   ab/index.html \
