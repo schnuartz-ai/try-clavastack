@@ -80,6 +80,7 @@ the firmware screen/menu and peripheral state. Refresh lists flash, QSPI, RAM-di
 SD and card files; select a file for a text/hex preview (first 64 KiB), or read a
 256-byte range of WebAssembly RAM by address. Take a baseline before an action and
 compare afterwards to find added, removed or modified files and firmware states.
+Technical build details and diagnostics are inside the same panel.
 File comparisons use size and a checksum of all bytes; RAM metrics refresh every
 three seconds. Restart invalidates the baseline. The panel defaults to off and
 clears its previews when disabled; all inspection stays in the browser tab. This

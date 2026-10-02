@@ -27,6 +27,7 @@ await rows.nth(0).locator('.smartcard-graphic').click();
 await rows.nth(0).getByText('Inserted').waitFor();
 await restartAndWait(page.locator('#restart-btn'));
 await rows.nth(0).getByText('Inserted').waitFor();
+await page.locator('#advanced-options').check();
 await page.locator('#technical-details summary').click();
 await restartAndWait(page.locator('#factory-btn'));
 await rows.nth(0).getByText('Inserted').waitFor();

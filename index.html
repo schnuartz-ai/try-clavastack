@@ -248,6 +248,7 @@
     #developer-inspector button { margin:4px 0; cursor:pointer; }
     #developer-inspector button:hover { border-color:var(--specter-primary); }
     #developer-inspector button:disabled { opacity:.5; cursor:wait; }
+    #developer-inspector > .technical-details { max-width:none; margin-top:18px; padding-top:10px; border-top:1px solid var(--specter-dark-secondary); }
     .technical-details { width:100%; max-width:380px; color:var(--specter-light-secondary); font-size:12px; line-height:1.45; }
     .technical-details summary { cursor:pointer; color:var(--specter-light-secondary); }
     .technical-details p { margin:8px 0; }
@@ -510,18 +511,18 @@
       <label>Address (decimal or 0x hex) <input id="inspector-address" value="0x0" aria-label="RAM address"></label>
       <button id="inspector-read-memory">Read 256 bytes</button><pre id="inspector-memory"></pre>
       <h3>Changes since baseline</h3><pre id="inspector-changes">Take a baseline, use the simulator, then compare.</pre>
+      <details id="technical-details" class="technical-details">
+        <summary>Technical details</summary>
+        <p>Repository: <a id="build-repository-link" href="#">Loading…</a></p>
+        <p id="build-context" hidden></p>
+        <p>Source commit: <a id="build-link" href="#">Loading…</a></p>
+        <p>Restart keeps simulated flash, SD and Smartcard contents in this tab. Factory reset wipes flash and keeps peripherals. Clear, eject or reset them separately.</p>
+        <button id="factory-btn">Factory reset simulated flash</button>
+        <pre id="build-details"></pre>
+        <pre id="debug-log"></pre>
+      </details>
     </div>
   </section>
-  <details id="technical-details" class="technical-details">
-    <summary>Technical details</summary>
-    <p>Repository: <a id="build-repository-link" href="#">Loading…</a></p>
-    <p id="build-context" hidden></p>
-    <p>Source commit: <a id="build-link" href="#">Loading…</a></p>
-    <p>Restart keeps simulated flash, SD and Smartcard contents in this tab. Factory reset wipes flash and keeps peripherals. Clear, eject or reset them separately.</p>
-    <button id="factory-btn">Factory reset simulated flash</button>
-    <pre id="build-details"></pre>
-    <pre id="debug-log"></pre>
-  </details>
 
 </div>
 

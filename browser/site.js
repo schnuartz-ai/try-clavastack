@@ -191,6 +191,16 @@ $('#advanced-options').addEventListener('change', () => {
     $('#inspector-files').replaceChildren();
   }
 });
+$('[data-loading-details]').addEventListener('click', event => {
+  event.preventDefault();
+  const options = $('#advanced-options');
+  if (!options.checked) {
+    options.checked = true;
+    options.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  $('#technical-details').open = true;
+  $('#technical-details').scrollIntoView({ block: 'nearest' });
+});
 $('#inspector-refresh').onclick = () => inspect();
 $('#inspector-baseline').onclick = () => inspect('baseline');
 $('#inspector-compare').onclick = () => inspect('compare');
