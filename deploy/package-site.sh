@@ -39,6 +39,7 @@ paths=(
   bitcoin-keeper
   ab
   simulators
+  sparrow-wallet
   specter-desktop
 )
 
