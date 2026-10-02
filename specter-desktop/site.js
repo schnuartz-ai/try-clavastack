@@ -558,13 +558,12 @@ function updateCableState() {
   const panel = document.querySelector('.cable-panel');
   const status = $('#cable-status');
   const supported = crossOriginIsolated && typeof SharedArrayBuffer === 'function';
-  const connected = Boolean(toggle.checked && diyUsbEnabled && diyRunning && ready && supported);
+  const available = Boolean(diyUsbEnabled && diyRunning && ready && supported);
+  toggle.disabled = !available;
+  if (!available) toggle.checked = false;
+  const connected = Boolean(toggle.checked && available);
   panel.classList.toggle('connected', connected);
-  if (!supported) status.textContent = 'Cable mode needs cross-origin isolation (COOP/COEP response headers).';
-  else if (!diyUsbEnabled) status.textContent = 'USB communication is disabled on Specter DIY. Open Device settings → Communication → USB communication.';
-  else if (!toggle.checked) status.textContent = 'USB communication is enabled. Connect the cable here when you are ready.';
-  else if (!ready || !diyRunning) status.textContent = 'Waiting for both Specter applications to finish starting…';
-  else status.textContent = 'Cable connected. Specter Desktop is communicating with the Specter DIY firmware.';
+  status.textContent = connected ? 'On' : 'Off';
   if (connected !== cableConnected) {
     cableConnected = connected;
     desktopWorker?.postMessage({ type: 'cable-state', connected });
