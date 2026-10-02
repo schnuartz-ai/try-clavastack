@@ -7,7 +7,8 @@ function wsgiPath(pathname) {
   const appRoute = `${SCOPE_PREFIX}app`;
   if (pathname === appRoute) return '/spc';
   if (pathname.startsWith(`${appRoute}/`)) return pathname.slice(appRoute.length) || '/spc';
-  return pathname.slice(SCOPE_PREFIX.length - 1) || '/';
+  const path = pathname.slice(SCOPE_PREFIX.length);
+  return path ? `/${path}` : '/';
 }
 
 function needsWsgi(pathname) {
@@ -75,6 +76,10 @@ async function routeThroughWsgi(request, url) {
   await applySessionCookies(client, result.headers || []);
   const responseHeaders = new Headers(result.headers || []);
   responseHeaders.set('Cache-Control', 'no-store');
+  // Caddy cannot decorate responses synthesized by this service worker. Keep
+  // the Flask document and its assets compatible with the site's COEP policy.
+  responseHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  responseHeaders.set('Cross-Origin-Resource-Policy', 'same-origin');
   responseHeaders.set('Content-Security-Policy', "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'");
   responseHeaders.delete('Content-Length');
   return new Response(result.body || null, { status: Number(String(result.status).split(' ')[0]), headers: responseHeaders });

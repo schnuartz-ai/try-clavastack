@@ -52,6 +52,50 @@ def install_import_adapters():
     serial_ports = _module("serial.tools.list_ports", comports=lambda *_a, **_k: [])
     serial_tools.list_ports = serial_ports
 
+    class BrowserSimulatorSocket:
+        """Synchronous adapter for Specter DIY's simulator USB serial protocol."""
+
+        def __init__(self, *_args, **_kwargs):
+            self.connected = False
+            self.response = b""
+            self.offset = 0
+
+        def connect(self, address):
+            from js import specterBrowserCableIsConnected
+
+            if tuple(address) != ("127.0.0.1", 8789) or not bool(specterBrowserCableIsConnected()):
+                raise ConnectionRefusedError("Specter DIY simulator USB cable is not connected")
+            self.connected = True
+
+        def setblocking(self, _enabled):
+            return None
+
+        def send(self, command):
+            if not self.connected:
+                raise ConnectionError("Specter DIY simulator USB cable is not connected")
+            import base64
+            from js import specterBrowserCableQuerySync
+
+            encoded = base64.b64encode(bytes(command)).decode("ascii")
+            result = str(specterBrowserCableQuerySync(encoded, 300000))
+            self.response = base64.b64decode(result)
+            self.offset = 0
+            return len(command)
+
+        def recv(self, size):
+            if not self.connected:
+                raise ConnectionError("Specter DIY simulator USB cable is not connected")
+            chunk = self.response[self.offset : self.offset + size]
+            self.offset += len(chunk)
+            return chunk
+
+        def close(self):
+            self.connected = False
+            self.response = b""
+            self.offset = 0
+
+    socket.socket = BrowserSimulatorSocket
+
     _module(
         "hid",
         enumerate=lambda *_args, **_kwargs: [],

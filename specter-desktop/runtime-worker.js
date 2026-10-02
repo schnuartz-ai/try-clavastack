@@ -4,6 +4,8 @@ let pyodide;
 let appReady = false;
 let browserCompat;
 let requestQueue = Promise.resolve();
+let cableConnectionAvailable = false;
+const CABLE_RESPONSE_CAPACITY = 4 * 1024 * 1024;
 
 function notify(type, data = {}) {
   self.postMessage({ type, ...data });
@@ -24,6 +26,27 @@ function decodeBase64(value) {
   for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
   return bytes;
 }
+
+self.specterBrowserCableIsConnected = () => cableConnectionAvailable;
+self.specterBrowserCableQuerySync = (requestBase64, timeoutMs = 300000) => {
+  if (!cableConnectionAvailable) throw new Error('The virtual USB cable is not connected.');
+  if (!self.crossOriginIsolated || typeof SharedArrayBuffer !== 'function') {
+    throw new Error('The virtual USB cable requires COOP/COEP browser isolation.');
+  }
+  const shared = new SharedArrayBuffer(16 + CABLE_RESPONSE_CAPACITY);
+  const control = new Int32Array(shared, 0, 4);
+  const timeout = Math.max(1000, Math.min(Number(timeoutMs) || 300000, 300000));
+  notify('cable-query', { shared, capacity: CABLE_RESPONSE_CAPACITY, bytes: requestBase64, timeoutMs: timeout });
+  const result = Atomics.wait(control, 0, 0, timeout);
+  const status = Atomics.load(control, 0);
+  if (status !== 1) {
+    const length = Math.max(0, Math.min(Atomics.load(control, 1), CABLE_RESPONSE_CAPACITY));
+    const message = new TextDecoder().decode(new Uint8Array(shared, 16, length));
+    throw new Error(message || (result === 'timed-out' ? 'Specter DIY USB response timed out.' : 'The virtual USB cable failed.'));
+  }
+  const length = Atomics.load(control, 1);
+  return encodeBase64(new Uint8Array(shared, 16, length));
+};
 
 function syncFilesystem(populate) {
   return new Promise((resolve, reject) => {
@@ -158,13 +181,26 @@ __response_json = json.dumps({
   if (typeof resultValue.destroy === 'function') resultValue.destroy();
   await syncFilesystem(false);
   const response = JSON.parse(result);
-  const bytes = decodeBase64(response.body);
+  let bytes = decodeBase64(response.body);
+  const contentType = (response.headers || []).find(([name]) => name.toLowerCase() === 'content-type')?.[1] || '';
+  if (/text\/html/i.test(contentType)) {
+    const html = new TextDecoder().decode(bytes);
+    if (!html.includes('/specter-desktop/desktop-bridge.js')) {
+      const script = '<script src="/specter-desktop/desktop-bridge.js" defer></script>';
+      const updated = /<\/body\s*>/i.test(html) ? html.replace(/<\/body\s*>/i, `${script}</body>`) : `${html}${script}`;
+      bytes = new TextEncoder().encode(updated);
+    }
+  }
   response.body = bytes.buffer;
   return response;
 }
 
 self.addEventListener('message', async event => {
   const { data, ports } = event;
+  if (data?.type === 'cable-state') {
+    cableConnectionAvailable = Boolean(data.connected);
+    return;
+  }
   if (data?.type === 'init') {
     try {
       await initialize(data);

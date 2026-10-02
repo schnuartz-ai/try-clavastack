@@ -70,7 +70,7 @@ let forceCanvasBridge = false;
 let recoveryTimer;
 let startupPhase = 'manifest';
 let displayMode = 'unselected';
-const workerRevision = '2026-10-02.1';
+const workerRevision = '2026-10-02.2';
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;
@@ -675,9 +675,11 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     }
   } else if (data.type === 'usb-output') {
     if (virtualHostSocket?.readyState === WebSocket.OPEN) virtualHostSocket.send(data.bytes);
+    if (gallery && variant === 'diy') notifyParent({ type: 'simulator-usb-output', variant, bytes: data.bytes });
   } else if (data.type === 'usb-state') {
     virtualUsbEnabled = data.enabled;
     updateVirtualHostStatus();
+    if (gallery && variant === 'diy') notifyParent({ type: 'simulator-usb-state', variant, enabled: virtualUsbEnabled });
   }
 }
 async function start() {
@@ -789,7 +791,10 @@ addEventListener('message', async event => {
     if (status.textContent === 'Running locally') notifyParent({ type: 'simulator-running', variant });
   } else if (event.data?.type === 'peripherals-provide' && restoreResolve) {
     clearInterval(peripheralRetryTimer);
-    restoreResolve(event.data.files || []);
+    const files = event.data.files || [];
+    files.sdInserted = Boolean(event.data.sdInserted);
+    files.cardSlot = event.data.cardSlot || null;
+    restoreResolve(files);
     restoreResolve = undefined;
   } else if (event.data?.type === 'peripherals-export') {
     notifyParent({ type: 'peripherals-snapshot', variant,
@@ -824,7 +829,7 @@ addEventListener('message', async event => {
     notifyParent({ type: 'simulator-qr-source-state', source: qrBridgeSource });
   } else if (gallery && event.data?.type === 'peripheral-command') {
     const command = event.data.command;
-    if (['sd-insert', 'sd-eject', 'sd-import', 'sd-clear', 'sd-delete', 'card-insert',
+    if (['sd-insert', 'sd-eject', 'sd-import', 'sd-clear', 'sd-delete', 'usb-data', 'usb-disconnect', 'card-insert',
       'card-remove', 'card-reset', 'state-import', 'state-remove-prefix'].includes(command?.type)) {
       send(command);
     }
@@ -1090,6 +1095,8 @@ function updateBuildMetadata(manifest) {
 
 try {
   stateFiles = await awaitPeripherals();
+  inserted = Boolean(stateFiles.sdInserted);
+  activeCard = stateFiles.cardSlot || null;
   const requestedManifest = params.get('manifest');
   if (requestedManifest && !/^(?:\/(?:browser|ab-builds)\/[A-Za-z0-9._/-]+\.json|\/api\/ab\/pointer\/[A-Za-z0-9]+)$/.test(requestedManifest)) {
     throw new Error('Invalid dynamic build manifest');

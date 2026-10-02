@@ -7,7 +7,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cdn.jsdelivr.net https://pypi.org https://files.pythonhosted.org; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
   <title>Specter Desktop + DIY — ClavaStack</title>
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/specter-desktop/style.css">
+  <link rel="stylesheet" href="/specter-desktop/style.css?v=2026-10-02.2">
 </head>
 <body>
   <header class="topbar">
@@ -61,9 +61,47 @@
           </div>
           <small id="diy-scan-status">No QR source selected.</small>
         </section>
-        <div class="pane-foot diy-foot"><span id="diy-build-label">Loading exact firmware source…</span><a id="diy-source-link" target="_blank" rel="noopener noreferrer">Source</a></div>
+        <div class="pane-foot diy-foot"><span id="diy-build-label">Loading exact firmware source…</span><div class="diy-actions"><button type="button" id="diy-restart">Restart DIY</button><a id="diy-source-link" target="_blank" rel="noopener noreferrer">Source</a></div></div>
       </section>
     </div>
+
+    <section class="cable-panel" aria-labelledby="cable-heading">
+      <div class="cable-copy"><p class="eyebrow">SIMULATED USB SERIAL</p><h2 id="cable-heading">Cable connection</h2><p>Enable <strong>Device settings → Communication → USB communication</strong> on Specter DIY, then connect the cable here. Specter Desktop will query the running firmware through its USB command protocol.</p></div>
+      <label class="cable-toggle"><input type="checkbox" id="cable-toggle"><span>Connect Specter Desktop to Specter DIY</span></label>
+      <p id="cable-status" role="status" aria-live="polite">USB communication is disabled on Specter DIY.</p>
+    </section>
+
+    <section class="removable-media" aria-labelledby="media-heading">
+      <div class="media-heading"><div><p class="eyebrow">SHARED VIRTUAL STORAGE</p><h2 id="media-heading">Removable media</h2></div><p>Insert the same card into either application to move files between them.</p></div>
+      <div class="media-grid">
+        <section class="media-group" id="sd-drop" aria-labelledby="sd-heading">
+          <h3 id="sd-heading">Virtual SD card · 8 GB</h3>
+          <button class="media-token sd-token" id="sd-token" type="button" data-media="sd" aria-pressed="false" aria-label="Select the virtual SD card">
+            <img src="/assets/sd-card-8gb.png" alt="8 GB microSD card">
+            <small id="sd-location">Not inserted</small>
+          </button>
+          <div class="media-actions"><button type="button" id="sd-add">Add files</button><button type="button" id="sd-refresh">Refresh files</button><button type="button" id="sd-clear">Clear</button><input id="sd-picker" type="file" multiple hidden></div>
+          <p class="drop-help">Select, drop, or paste files. Desktop’s “Open SD card” uses these files.</p>
+          <ul id="sd-files" class="sd-files"><li>No files on card</li></ul>
+        </section>
+        <section class="media-group memory-group" aria-labelledby="memory-heading">
+          <h3 id="memory-heading">Virtual MemoryCards</h3>
+          <div class="memory-tray">
+            <button class="media-token memory-token" type="button" data-media="card" data-slot="1" aria-pressed="false"><span class="card-art"><img src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 1</strong></span><small>Not inserted</small></button>
+            <button class="media-token memory-token" type="button" data-media="card" data-slot="2" aria-pressed="false"><span class="card-art"><img src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 2</strong></span><small>Not inserted</small></button>
+            <button class="media-token memory-token" type="button" data-media="card" data-slot="3" aria-pressed="false"><span class="card-art"><img src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 3</strong></span><small>Not inserted</small></button>
+          </div>
+          <p class="drop-help">MemoryCards are available in Specter DIY.</p>
+        </section>
+      </div>
+      <div class="media-insertion" role="group" aria-label="Insert selected card">
+        <span id="media-selection">Select a card to insert or eject it.</span>
+        <button type="button" data-media-target="desktop" disabled>Insert in Specter Desktop</button>
+        <button type="button" data-media-target="diy" disabled>Insert in Specter DIY</button>
+        <button type="button" id="media-eject" disabled>Eject selected card</button>
+      </div>
+      <p id="media-status" role="status" aria-live="polite">Cards are ejected.</p>
+    </section>
 
     <details class="source-details" id="source-details">
       <summary>Build and source information</summary>

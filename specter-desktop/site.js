@@ -16,6 +16,21 @@ let lastDesktopFrameAt = 0;
 let lastDiyFrameAt = 0;
 let sourceBuildInfo;
 let ready = false;
+let diyRunning = false;
+let diyUsbEnabled = false;
+let cableConnected = false;
+let pendingCableQuery;
+let mediaDb;
+const mediaFiles = new Map();
+const cardOwners = new Map([[1, null], [2, null], [3, null]]);
+let sdOwner = null;
+let selectedMedia = null;
+let mediaBusy = false;
+let mediaRequestId = 0;
+const mediaRequests = new Map();
+const SD_CAPACITY_BYTES = 8_000_000_000;
+const MEDIA_DB_NAME = 'clavastack-specter-removable-media-v1';
+const desktopRuntimeRevision = '2026-10-02.2';
 
 function setStatus(element, message, state = 'loading') {
   element.textContent = message;
@@ -80,7 +95,7 @@ async function loadSourceInfo() {
 }
 
 function startRuntime() {
-  desktopWorker = new Worker('/specter-desktop/runtime-worker.js', { name: 'Specter Desktop · CPython WASM' });
+  desktopWorker = new Worker(`/specter-desktop/runtime-worker.js?v=${desktopRuntimeRevision}`, { name: 'Specter Desktop · CPython WASM' });
   desktopWorker.addEventListener('message', event => {
     const data = event.data;
     if (data.type === 'progress') {
@@ -96,6 +111,8 @@ function startRuntime() {
       desktopFrame.hidden = false;
       desktopFrame.src = '/specter-desktop/app/spc/welcome/';
       setStatus(desktopStatus, 'Running locally', 'ready');
+      renderMedia();
+      updateCableState();
       setTimeout(() => desktopFrame.contentWindow?.focus(), 1500);
     } else if (data.type === 'reset-complete') {
       setStatus(desktopStatus, 'Desktop data reset', 'ready');
@@ -105,6 +122,11 @@ function startRuntime() {
       $('#loader-detail').textContent = data.error;
       $('#loader-detail').classList.add('error-text');
       setStatus(desktopStatus, 'Startup failed', 'error');
+      ready = false;
+      renderMedia();
+      updateCableState();
+    } else if (data.type === 'cable-query') {
+      queueCableQuery(data);
     }
   });
   desktopWorker.addEventListener('error', event => {
@@ -146,6 +168,422 @@ async function startBridge() {
 
 function sendDiyMessage(message) {
   diyFrame.contentWindow?.postMessage(message, origin);
+}
+
+function openMediaDatabase() {
+  if (mediaDb) return Promise.resolve(mediaDb);
+  return new Promise((resolve, reject) => {
+    const opening = indexedDB.open(MEDIA_DB_NAME, 1);
+    opening.onupgradeneeded = () => opening.result.createObjectStore('files', { keyPath: 'path' });
+    opening.onerror = () => reject(opening.error || new Error('Could not open virtual SD storage'));
+    opening.onsuccess = () => { mediaDb = opening.result; resolve(mediaDb); };
+  });
+}
+
+function idbDone(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error('Virtual SD storage failed'));
+    transaction.onabort = () => reject(transaction.error || new Error('Virtual SD storage was interrupted'));
+  });
+}
+
+async function loadSharedMedia() {
+  const database = await openMediaDatabase();
+  const transaction = database.transaction('files', 'readonly');
+  const records = await new Promise((resolve, reject) => {
+    const request = transaction.objectStore('files').getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('Could not read virtual SD storage'));
+  });
+  for (const record of records) mediaFiles.set(record.path, new Uint8Array(record.bytes));
+  try {
+    const state = JSON.parse(localStorage.getItem('specter-desktop-media-state-v1') || '{}');
+    sdOwner = ['desktop', 'diy'].includes(state.sdOwner) ? state.sdOwner : null;
+    for (const slot of [1, 2, 3]) cardOwners.set(slot, state.cardOwners?.[slot] === 'diy' ? 'diy' : null);
+  } catch {
+    sdOwner = null;
+  }
+  renderMedia();
+}
+
+async function persistMedia() {
+  const database = await openMediaDatabase();
+  const transaction = database.transaction('files', 'readwrite');
+  const store = transaction.objectStore('files');
+  store.clear();
+  for (const [path, bytes] of mediaFiles) {
+    store.put({ path, bytes: bytes.slice().buffer });
+  }
+  await idbDone(transaction);
+}
+
+function persistMediaOwners() {
+  localStorage.setItem('specter-desktop-media-state-v1', JSON.stringify({
+    sdOwner,
+    cardOwners: Object.fromEntries(cardOwners),
+  }));
+  notifyDesktopMediaState();
+}
+
+function notifyDesktopMediaState() {
+  desktopFrame.contentWindow?.postMessage({ type: 'specter-media-state', sdOwner }, origin);
+}
+
+function reportMedia(message) {
+  $('#media-status').textContent = message;
+}
+
+function mediaPrefix(kind, slot) { return kind === 'sd' ? 'sd/' : `cards/${slot}/`; }
+
+function mediaFor(prefix) {
+  return [...mediaFiles].filter(([path]) => path.startsWith(prefix))
+    .map(([path, bytes]) => ({ path, bytes }));
+}
+
+function ownerFor(kind, slot) { return kind === 'sd' ? sdOwner : cardOwners.get(slot); }
+
+function renderMedia() {
+  const selectedOwner = selectedMedia ? ownerFor(selectedMedia.kind, selectedMedia.slot) : null;
+  $('#sd-location').textContent = sdOwner ? `Inserted in ${sdOwner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}` : 'Not inserted';
+  $('#sd-token').setAttribute('aria-pressed', String(selectedMedia?.kind === 'sd'));
+  for (const token of document.querySelectorAll('.memory-token')) {
+    const slot = Number(token.dataset.slot);
+    const owner = cardOwners.get(slot);
+    token.querySelector('small').textContent = owner ? 'Inserted in Specter DIY' : 'Not inserted';
+    token.setAttribute('aria-pressed', String(selectedMedia?.kind === 'card' && selectedMedia.slot === slot));
+    token.setAttribute('aria-label', `MemoryCard ${slot}. ${owner ? 'Inserted in Specter DIY' : 'Not inserted'}.`);
+  }
+  const list = $('#sd-files');
+  list.replaceChildren();
+  const files = mediaFor('sd/');
+  const used = files.reduce((total, file) => total + file.bytes.byteLength, 0);
+  if (!files.length) {
+    const empty = document.createElement('li');
+    empty.textContent = 'No files on card';
+    list.append(empty);
+  }
+  for (const file of files) {
+    const row = document.createElement('li');
+    const name = file.path.slice(3);
+    const label = document.createElement('span');
+    label.textContent = `${name} · ${file.bytes.byteLength.toLocaleString()} bytes`;
+    const actions = document.createElement('span');
+    const download = document.createElement('button');
+    download.type = 'button';
+    download.textContent = 'Download';
+    download.addEventListener('click', () => {
+      const url = URL.createObjectURL(new Blob([file.bytes]));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = name;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Delete';
+    remove.disabled = mediaBusy;
+    remove.addEventListener('click', () => runMediaOperation(async () => {
+      if (sdOwner === 'diy') {
+        sendDiyMessage({ type: 'peripheral-command', command: { type: 'sd-delete', name } });
+        await getDiySnapshot();
+        syncDiyMedia('sd/');
+      } else mediaFiles.delete(file.path);
+      await persistMedia();
+      reportMedia(`Deleted ${name} from the virtual SD card.`);
+    }));
+    actions.append(download, remove);
+    row.append(label, actions);
+    list.append(row);
+  }
+  $('#sd-clear').disabled = mediaBusy || files.length === 0;
+  $('#sd-refresh').disabled = mediaBusy || sdOwner !== 'diy';
+  $('#sd-add').disabled = mediaBusy;
+  const selection = selectedMedia
+    ? `${selectedMedia.kind === 'sd' ? 'Virtual SD card' : `MemoryCard ${selectedMedia.slot}`} selected${selectedOwner ? ` · inserted in ${selectedOwner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}` : ''}`
+    : 'Select a card to insert or eject it.';
+  $('#media-selection').textContent = selection;
+  document.querySelectorAll('[data-media-target="desktop"]').forEach(button => {
+    button.disabled = mediaBusy || !ready || !selectedMedia || selectedMedia.kind !== 'sd' || selectedOwner === 'desktop';
+  });
+  document.querySelectorAll('[data-media-target="diy"]').forEach(button => {
+    button.disabled = mediaBusy || !diyRunning || !selectedMedia || selectedOwner === 'diy';
+  });
+  $('#media-eject').disabled = mediaBusy || !selectedOwner;
+  $('#media-eject').textContent = selectedOwner ? 'Eject selected card' : 'Eject selected card';
+  const sdDrop = $('#sd-drop');
+  sdDrop.dataset.used = `${used}`;
+  notifyDesktopMediaState();
+}
+
+function requestDiySnapshot() {
+  if (!diyRunning) return Promise.reject(new Error('Specter DIY is not running yet.'));
+  return new Promise((resolve, reject) => {
+    const requestId = ++mediaRequestId;
+    const timer = setTimeout(() => {
+      mediaRequests.delete(requestId);
+      reject(new Error('Specter DIY did not return the virtual card contents.'));
+    }, 15000);
+    mediaRequests.set(requestId, { resolve, reject, timer });
+    sendDiyMessage({ type: 'peripherals-export', requestId });
+  });
+}
+
+async function getDiySnapshot(prefix) {
+  const files = await requestDiySnapshot();
+  for (const path of [...mediaFiles.keys()]) if (path.startsWith(prefix)) mediaFiles.delete(path);
+  for (const file of files) {
+    if (!file.path.startsWith(prefix)) continue;
+    mediaFiles.set(file.path, file.bytes instanceof Uint8Array ? file.bytes : new Uint8Array(file.bytes));
+  }
+  return files;
+}
+
+async function runMediaOperation(action) {
+  if (mediaBusy) return;
+  mediaBusy = true;
+  renderMedia();
+  try { await action(); }
+  catch (error) { reportMedia(`Media error: ${error.message}`); }
+  finally { mediaBusy = false; renderMedia(); }
+}
+
+async function detachMedia(kind, slot) {
+  const owner = ownerFor(kind, slot);
+  if (!owner) return;
+  const prefix = mediaPrefix(kind, slot);
+  if (owner === 'diy') {
+    await getDiySnapshot(prefix);
+    sendDiyMessage({ type: 'peripheral-command', command: kind === 'sd' ? { type: 'sd-eject' } : { type: 'card-remove' } });
+    sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-remove-prefix', prefix } });
+    await requestDiySnapshot(); // Wait for the ordered commands without replacing the card's saved files.
+  }
+  if (kind === 'sd') sdOwner = null;
+  else cardOwners.set(slot, null);
+  await persistMedia();
+  persistMediaOwners();
+}
+
+async function insertMedia(kind, slot, target) {
+  if (kind === 'card' && target !== 'diy') throw new Error('MemoryCards can only be inserted in Specter DIY.');
+  if (target === 'desktop' && !ready) throw new Error('Specter Desktop is still starting.');
+  if (target === 'diy' && !diyRunning) throw new Error('Specter DIY is still starting.');
+  const currentOwner = ownerFor(kind, slot);
+  if (currentOwner === target) return;
+  if (kind === 'card') {
+    const other = [...cardOwners].find(([otherSlot, owner]) => otherSlot !== slot && owner === 'diy');
+    if (other) await detachMedia('card', other[0]);
+  }
+  await detachMedia(kind, slot);
+  if (target === 'diy') {
+    const prefix = mediaPrefix(kind, slot);
+    const files = mediaFor(prefix);
+    sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files } });
+    sendDiyMessage({ type: 'peripheral-command', command: kind === 'sd'
+      ? { type: 'sd-insert' } : { type: 'card-insert', slot } });
+    await getDiySnapshot(prefix);
+  }
+  if (kind === 'sd') sdOwner = target;
+  else cardOwners.set(slot, target);
+  await persistMedia();
+  persistMediaOwners();
+  reportMedia(`${kind === 'sd' ? 'Virtual SD card' : `MemoryCard ${slot}`} inserted in ${target === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}.`);
+}
+
+function mediaSelected(kind, slot) {
+  selectedMedia = { kind, slot };
+  renderMedia();
+  reportMedia(ownerFor(kind, slot)
+    ? 'Card selected. Eject it here or insert it into the other application.'
+    : 'Card selected. Choose Specter Desktop or Specter DIY to insert it.');
+}
+
+$('#sd-token').addEventListener('click', () => mediaSelected('sd', null));
+for (const token of document.querySelectorAll('.memory-token')) {
+  token.addEventListener('click', () => mediaSelected('card', Number(token.dataset.slot)));
+}
+document.querySelectorAll('[data-media-target]').forEach(button => button.addEventListener('click', () => {
+  if (!selectedMedia) return;
+  runMediaOperation(() => insertMedia(selectedMedia.kind, selectedMedia.slot, button.dataset.mediaTarget));
+}));
+$('#media-eject').addEventListener('click', () => {
+  if (!selectedMedia) return;
+  runMediaOperation(async () => {
+    await detachMedia(selectedMedia.kind, selectedMedia.slot);
+    reportMedia(`${selectedMedia.kind === 'sd' ? 'Virtual SD card' : `MemoryCard ${selectedMedia.slot}`} ejected.`);
+  });
+});
+
+const sdPicker = $('#sd-picker');
+$('#sd-add').addEventListener('click', () => sdPicker.click());
+sdPicker.addEventListener('change', () => {
+  const files = [...sdPicker.files];
+  sdPicker.value = '';
+  if (!files.length) return;
+  runMediaOperation(async () => {
+    const sizes = new Map(mediaFor('sd/').map(file => [file.path, file.bytes.byteLength]));
+    let projected = [...sizes.values()].reduce((total, size) => total + size, 0);
+    for (const file of files) {
+      const path = `sd/${file.name}`;
+      projected += file.size - (sizes.get(path) || 0);
+      sizes.set(path, file.size);
+    }
+    if (projected > SD_CAPACITY_BYTES) throw new Error('The virtual SD card is full (8 GB).');
+    const imported = await Promise.all(files.map(async file => ({
+      path: `sd/${file.name}`, bytes: new Uint8Array(await file.arrayBuffer()),
+    })));
+    for (const file of imported) mediaFiles.set(file.path, file.bytes);
+    if (sdOwner === 'diy') {
+      sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files: imported } });
+      await getDiySnapshot('sd/');
+    }
+    await persistMedia();
+    reportMedia(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
+  });
+});
+const sdDrop = $('#sd-drop');
+sdDrop.addEventListener('dragover', event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); });
+sdDrop.addEventListener('drop', event => {
+  if (!event.dataTransfer.files.length) return;
+  event.preventDefault();
+  const files = [...event.dataTransfer.files];
+  runMediaOperation(async () => {
+    for (const file of files) mediaFiles.set(`sd/${file.name}`, new Uint8Array(await file.arrayBuffer()));
+    if (sdOwner === 'diy') {
+      sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files: mediaFor('sd/') } });
+      await getDiySnapshot('sd/');
+    }
+    await persistMedia();
+    reportMedia(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
+  });
+});
+addEventListener('paste', event => {
+  const files = [...(event.clipboardData?.files || [])];
+  if (!files.length) return;
+  event.preventDefault();
+  runMediaOperation(async () => {
+    for (const file of files) mediaFiles.set(`sd/${file.name}`, new Uint8Array(await file.arrayBuffer()));
+    if (sdOwner === 'diy') {
+      sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files: mediaFor('sd/') } });
+      await getDiySnapshot('sd/');
+    }
+    await persistMedia();
+    reportMedia(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
+  });
+});
+$('#sd-clear').addEventListener('click', () => runMediaOperation(async () => {
+  if (sdOwner === 'diy') {
+    sendDiyMessage({ type: 'peripheral-command', command: { type: 'sd-clear' } });
+    await getDiySnapshot('sd/');
+  } else {
+    for (const path of [...mediaFiles.keys()]) if (path.startsWith('sd/')) mediaFiles.delete(path);
+  }
+  await persistMedia();
+  reportMedia('Virtual SD card cleared.');
+}));
+$('#sd-refresh').addEventListener('click', () => runMediaOperation(async () => {
+  await getDiySnapshot('sd/');
+  await persistMedia();
+  reportMedia('Virtual SD card refreshed from Specter DIY.');
+}));
+
+function updateCableState() {
+  const toggle = $('#cable-toggle');
+  const panel = document.querySelector('.cable-panel');
+  const status = $('#cable-status');
+  const supported = crossOriginIsolated && typeof SharedArrayBuffer === 'function';
+  const connected = Boolean(toggle.checked && diyUsbEnabled && diyRunning && ready && supported);
+  panel.classList.toggle('connected', connected);
+  if (!supported) status.textContent = 'Cable mode needs cross-origin isolation (COOP/COEP response headers).';
+  else if (!diyUsbEnabled) status.textContent = 'USB communication is disabled on Specter DIY. Open Device settings → Communication → USB communication.';
+  else if (!toggle.checked) status.textContent = 'USB communication is enabled. Connect the cable here when you are ready.';
+  else if (!ready || !diyRunning) status.textContent = 'Waiting for both Specter applications to finish starting…';
+  else status.textContent = 'Cable connected. Specter Desktop is communicating with the Specter DIY firmware.';
+  if (connected !== cableConnected) {
+    cableConnected = connected;
+    desktopWorker?.postMessage({ type: 'cable-state', connected });
+    if (!connected) finishCableQuery(null, new Error('The virtual USB cable was disconnected.'));
+  }
+}
+
+$('#cable-toggle').addEventListener('change', updateCableState);
+
+function findCrLf(bytes, start = 0) {
+  for (let index = start; index + 1 < bytes.length; index++) {
+    if (bytes[index] === 13 && bytes[index + 1] === 10) return index;
+  }
+  return -1;
+}
+
+function finishCableQuery(response, error) {
+  const pending = pendingCableQuery;
+  if (!pending) return;
+  if (!error && response.length > pending.capacity) error = new Error('USB response exceeded the browser cable buffer.');
+  pendingCableQuery = null;
+  clearTimeout(pending.timer);
+  const control = new Int32Array(pending.shared, 0, 4);
+  if (error) {
+    const message = new TextEncoder().encode(String(error.message || error));
+    new Uint8Array(pending.shared, 16, message.length).set(message);
+    Atomics.store(control, 1, message.length);
+    Atomics.store(control, 0, -1);
+  } else {
+    new Uint8Array(pending.shared, 16, response.length).set(response);
+    Atomics.store(control, 1, response.length);
+    Atomics.store(control, 0, 1);
+  }
+  Atomics.notify(control, 0);
+}
+
+function queueCableQuery(data) {
+  if (pendingCableQuery) {
+    finishCableQuery(null, new Error('Another USB command is already in progress.'));
+  }
+  if (!cableConnected || !diyUsbEnabled || !diyRunning) {
+    const shared = data.shared;
+    const control = new Int32Array(shared, 0, 4);
+    const message = new TextEncoder().encode('The virtual USB cable is not connected.');
+    new Uint8Array(shared, 16, message.length).set(message);
+    Atomics.store(control, 1, message.length);
+    Atomics.store(control, 0, -1);
+    Atomics.notify(control, 0);
+    return;
+  }
+  const pending = {
+    shared: data.shared,
+    capacity: data.capacity,
+    chunks: [],
+    timer: setTimeout(() => finishCableQuery(null, new Error('Specter DIY did not answer the USB command in time.')), data.timeoutMs || 300000),
+  };
+  pendingCableQuery = pending;
+  const bytes = base64ToBytes(data.bytes);
+  sendDiyMessage({ type: 'peripheral-command', command: { type: 'usb-data', bytes: bytes.buffer } });
+}
+
+function receiveCableBytes(value) {
+  const pending = pendingCableQuery;
+  if (!pending) return;
+  const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+  pending.chunks.push(chunk.slice());
+  const size = pending.chunks.reduce((total, part) => total + part.length, 0);
+  if (size > pending.capacity) {
+    finishCableQuery(null, new Error('USB response exceeded the browser cable buffer.'));
+    return;
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const part of pending.chunks) { bytes.set(part, offset); offset += part.length; }
+  const ackEnd = findCrLf(bytes);
+  if (ackEnd < 0) return;
+  const ack = new TextDecoder().decode(bytes.subarray(0, ackEnd));
+  if (ack !== 'ACK') {
+    finishCableQuery(null, new Error(`Specter DIY did not acknowledge USB input: ${ack || 'empty response'}`));
+    return;
+  }
+  const responseEnd = findCrLf(bytes, ackEnd + 2);
+  if (responseEnd < 0) return;
+  finishCableQuery(bytes.slice(0, responseEnd + 2));
 }
 
 function decodeCanvas(canvas) {
@@ -235,13 +673,47 @@ window.addEventListener('message', event => {
   if (event.source === diyFrame.contentWindow) {
     const data = event.data;
     if (data.type === 'child-awaiting-peripherals') {
-      sendDiyMessage({ type: 'peripherals-provide', files: [] });
+      const files = [];
+      if (sdOwner === 'diy') files.push(...mediaFor('sd/'));
+      for (const slot of [1, 2, 3]) if (cardOwners.get(slot) === 'diy') files.push(...mediaFor(`cards/${slot}/`));
+      const cardSlot = [...cardOwners].find(([, owner]) => owner === 'diy')?.[0] || null;
+      sendDiyMessage({ type: 'peripherals-provide', files, sdInserted: sdOwner === 'diy', cardSlot });
       sendDiyMessage({ type: 'gallery-parent-ready' });
       setStatus(diyStatus, 'Starting real firmware…');
     } else if (data.type === 'simulator-running') {
+      diyRunning = true;
       setStatus(diyStatus, 'Running locally', 'ready');
+      renderMedia();
+      updateCableState();
     } else if (data.type === 'simulator-error') {
+      diyRunning = false;
+      diyUsbEnabled = false;
       setStatus(diyStatus, 'Firmware error', 'error');
+      renderMedia();
+      updateCableState();
+    } else if (data.type === 'peripherals-snapshot') {
+      const pending = mediaRequests.get(data.requestId);
+      if (pending) {
+        mediaRequests.delete(data.requestId);
+        clearTimeout(pending.timer);
+        pending.resolve(data.files || []);
+      }
+    } else if (data.type === 'peripheral-state') {
+      if (data.sdInserted) sdOwner = 'diy';
+      else if (sdOwner === 'diy') sdOwner = null;
+      if (data.cardSlot) {
+        for (const [slot, owner] of cardOwners) if (owner === 'diy') cardOwners.set(slot, null);
+        cardOwners.set(data.cardSlot, 'diy');
+      } else {
+        for (const [slot, owner] of cardOwners) if (owner === 'diy') cardOwners.set(slot, null);
+      }
+      persistMediaOwners();
+      renderMedia();
+    } else if (data.type === 'simulator-usb-state') {
+      diyUsbEnabled = Boolean(data.enabled);
+      updateCableState();
+    } else if (data.type === 'simulator-usb-output') {
+      receiveCableBytes(data.bytes);
     } else if (data.type === 'simulator-scanner-state') {
       diyScannerActive = Boolean(data.active);
       diyScannerControls.hidden = !diyScannerActive;
@@ -258,8 +730,35 @@ window.addEventListener('message', event => {
     }
     return;
   }
-  if (event.source === desktopFrame.contentWindow && event.data.type === 'simulator-diy-scan') {
-    desktopFrame.dataset.qrSource = 'diy';
+  if (event.source === desktopFrame.contentWindow) {
+    const data = event.data;
+    if (data.type === 'simulator-diy-scan') {
+      desktopFrame.dataset.qrSource = 'diy';
+    } else if (data.type === 'specter-media-state-request' || data.type === 'specter-media-bridge-ready') {
+      notifyDesktopMediaState();
+    } else if (data.type === 'specter-media-list') {
+      const files = sdOwner === 'desktop'
+        ? mediaFor('sd/').map(file => ({ name: file.path.slice(3), bytes: file.bytes, type: 'application/octet-stream' }))
+        : null;
+      desktopFrame.contentWindow.postMessage({ type: 'specter-media-files', id: data.id,
+        error: files ? undefined : 'Insert the virtual SD card in Specter Desktop first.', files: files || [] }, origin);
+    } else if (data.type === 'specter-media-write') {
+      const saveToCard = async () => {
+        if (sdOwner !== 'desktop') throw new Error('Insert the virtual SD card in Specter Desktop first.');
+        const name = String(data.name || '').replaceAll('\\', '/').split('/').pop();
+        if (!name || name === '.' || name === '..') throw new Error('The SD card filename is invalid.');
+        const bytes = data.bytes instanceof Uint8Array ? data.bytes : new Uint8Array(data.bytes);
+        const previous = mediaFiles.get(`sd/${name}`)?.byteLength || 0;
+        const used = mediaFor('sd/').reduce((total, file) => total + file.bytes.byteLength, 0);
+        if (used - previous + bytes.byteLength > SD_CAPACITY_BYTES) throw new Error('The virtual SD card is full (8 GB).');
+        mediaFiles.set(`sd/${name}`, bytes.slice());
+        await persistMedia();
+        renderMedia();
+        reportMedia(`Specter Desktop saved ${name} to the virtual SD card.`);
+      };
+      saveToCard().then(() => desktopFrame.contentWindow.postMessage({ type: 'specter-media-written', id: data.id }, origin))
+        .catch(error => desktopFrame.contentWindow.postMessage({ type: 'specter-media-written', id: data.id, error: error.message }, origin));
+    }
   }
 });
 
@@ -288,9 +787,20 @@ $('#desktop-reset').addEventListener('click', () => {
   desktopWorker.postMessage({ type: 'reset', secret });
 });
 
+$('#diy-restart').addEventListener('click', () => {
+  if (!diyRunning) return;
+  diyRunning = false;
+  diyUsbEnabled = false;
+  setStatus(diyStatus, 'Restarting firmware…');
+  updateCableState();
+  renderMedia();
+  sendDiyMessage({ type: 'runtime-restart' });
+});
+
 async function boot() {
   try {
     const diyInfo = await loadSourceInfo();
+    await loadSharedMedia();
     diyFrame.addEventListener('load', () => {
       sendDiyMessage({ type: 'gallery-parent-ready' });
     });
