@@ -43,6 +43,9 @@ try {
   const workbench = page.frameLocator('#specter-workbench');
   try {
     await workbench.getByRole('heading', { name: 'Cable Connection' }).waitFor({ timeout: 12000 });
+    // The old production Specter panel already has this heading before the Sparrow
+    // adapter moves it into the compact third media-group slot.
+    await workbench.locator('.media-grid > .media-group.cable-panel').waitFor({ timeout: 30000 });
   } catch (error) {
     const frameUrls = page.frames().map(frame => frame.url());
     const frameState = await page.frameLocator('#specter-workbench').locator('body').innerText().catch(innerError => String(innerError));
