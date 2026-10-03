@@ -41,7 +41,7 @@ module.exports = {
       if (args.src.split(original).length !== 2) {
         throw new Error('Keeper TextStyleResolver web patch no longer matches; review the upstream plugin.');
       }
-      args = { ...args, src: args.src.replace(original, 'Object.assign({}, componentProps, { style: style, ref: ref })') };
+      args = { ...args, src: args.src.replace(original, 'Object.assign({}, componentProps, { style: react_native_1.StyleSheet.flatten(style), ref: ref })') };
     }
     if (filename === signerPickerPath) {
       const normalizedSource = args.src.replace(/\r\n/g, '\n');
