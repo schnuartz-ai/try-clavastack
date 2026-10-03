@@ -22,9 +22,12 @@ async function unlockFirstSchnuartzLogin(page, canvas, tap) {
 }
 
 for (const variant of [
-  { id: 'play', repo: 'k9ert/specter-playground', pointer: '/browser/variants/specter-playground.json', x: .24, y: .38 },
-  { id: 'play-fast', url: '/?variant=play&buildVariant=fast', repo: 'schnuartz-ai/specter-playground', pointer: '/browser/variants/specter-playground-fast.json', x: .24, y: .38 },
-  { id: 'schnuartz', repo: 'Schnuartz/specter-playground', pointer: '/browser/variants/specter-playground-schnuartz.json', x: .94, y: .96 },
+  { id: 'play', repo: 'k9ert/specter-playground', pointer: '/browser/variants/specter-playground.json',
+    targets: [[.24, .38], [.50, .38], [.75, .38], [.24, .55]] },
+  { id: 'play-fast', url: '/?variant=play&buildVariant=fast', repo: 'schnuartz-ai/specter-playground', pointer: '/browser/variants/specter-playground-fast.json',
+    targets: [[.24, .38], [.50, .38], [.75, .38], [.24, .55]] },
+  { id: 'schnuartz', repo: 'Schnuartz/specter-playground', pointer: '/browser/variants/specter-playground-schnuartz.json',
+    targets: [[.94, .03], [.50, .48], [.50, .85]] },
 ]) {
   const page = await browser.newPage({ viewport: { width: 850, height: 1000 } });
   const errors = [];
@@ -68,10 +71,11 @@ for (const variant of [
   images.set(variant.id, before);
   const box = await canvas.boundingBox();
   let changed = false;
-  for (let attempt = 0; attempt < 3 && !changed; attempt++) {
-    await page.mouse.click(box.x + box.width * variant.x, box.y + box.height * variant.y);
-    await page.waitForTimeout(1000);
+  for (const [x, y] of variant.targets) {
+    await canvas.click({ position: { x: box.width * x, y: box.height * y } });
+    await page.waitForTimeout(1600);
     changed = !before.equals(await canvas.screenshot());
+    if (changed) break;
   }
   if (!changed) throw new Error(`${variant.id}: pointer did not reach LVGL`);
   if (errors.length) throw new Error(`${variant.id}: ${errors.join('; ')}`);
@@ -84,8 +88,8 @@ if (images.get('play').equals(images.get('schnuartz'))) throw new Error('Both Pl
 const mobile = await browser.newContext({ ...devices['Pixel 5'],
   viewport: { width: 360, height: 740 }, deviceScaleFactor: 3 });
 for (const variant of [
-  { id: 'play', x: .24, y: .38 },
-  { id: 'schnuartz', x: .94, y: .96 },
+  { id: 'play', targets: [[.24, .38], [.50, .38], [.75, .38], [.24, .55]] },
+  { id: 'schnuartz', targets: [[.94, .03], [.50, .48], [.50, .85]] },
 ]) {
   const page = await mobile.newPage();
   await page.goto(`${base}/?variant=${variant.id}`);
@@ -97,10 +101,11 @@ for (const variant of [
   const before = await canvas.screenshot();
   const box = await canvas.boundingBox();
   let changed = false;
-  for (let attempt = 0; attempt < 3 && !changed; attempt++) {
-    await page.touchscreen.tap(box.x + box.width * variant.x, box.y + box.height * variant.y);
-    await page.waitForTimeout(1000);
+  for (const [x, y] of variant.targets) {
+    await page.touchscreen.tap(box.x + box.width * x, box.y + box.height * y);
+    await page.waitForTimeout(1600);
     changed = !before.equals(await canvas.screenshot());
+    if (changed) break;
   }
   if (!changed) {
     throw new Error(`${variant.id}: Android-scaled touch did not reach LVGL`);
