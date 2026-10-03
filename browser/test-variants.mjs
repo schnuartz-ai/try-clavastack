@@ -21,12 +21,15 @@ async function unlockFirstSchnuartzLogin(page, canvas, tap) {
   }
 }
 
-async function dismissSpecterWelcomeTour(page, canvas) {
+async function dismissSpecterWelcomeTour(page, canvas, touch = false) {
   const box = await canvas.boundingBox();
   // Fresh CI storage starts on the real Specter welcome tour. Its Skip Tour
-  // button sits here; when the tour has already been dismissed this point is
-  // between the welcome choices and does not change the screen.
-  await canvas.click({ position: { x: box.width * .50, y: box.height * .58 } });
+  // button sits here. Use the same input class as the variant test itself.
+  if (touch) {
+    await page.touchscreen.tap(box.x + box.width * .50, box.y + box.height * .58);
+  } else {
+    await canvas.click({ position: { x: box.width * .50, y: box.height * .58 } });
+  }
   await page.waitForTimeout(500);
 }
 
@@ -113,6 +116,7 @@ for (const variant of [
   if (variant.id === 'schnuartz') {
     await unlockFirstSchnuartzLogin(page, canvas, (x, y) => page.touchscreen.tap(x, y));
   }
+  await dismissSpecterWelcomeTour(page, canvas, true);
   const before = await canvas.screenshot();
   const box = await canvas.boundingBox();
   let changed = false;
@@ -123,6 +127,9 @@ for (const variant of [
     if (changed) break;
   }
   if (!changed) {
+    const after = await canvas.screenshot({ path: `test-results/${variant.id}-mockui-mobile-after-touch.png` });
+    console.error(JSON.stringify({ variant: variant.id, canvas: box, beforeBytes: before.length,
+      afterBytes: after.length, targets: variant.targets }));
     throw new Error(`${variant.id}: Android-scaled touch did not reach LVGL`);
   }
   console.log(JSON.stringify({ variant: variant.id, android: 'Pixel 5 / DPR 3',
