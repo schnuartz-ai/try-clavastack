@@ -16,7 +16,7 @@
   <div id="keeper-native-root"></div>
   <script>
     globalThis.__keeperBootMarkers = ['runtime-html-loaded'];
-    globalThis.__keeperDOMConstructors = { Element: window.Element };
+    globalThis.__keeperDOMConstructors = { Element: window.Element, File: window.File, Blob: window.Blob, URL: window.URL };
     globalThis.__keeperNativeFetch = window.fetch.bind(window);
     globalThis.__keeperNativeAbortController = window.AbortController;
     globalThis.process ||= {
@@ -28,7 +28,7 @@
   </script>
   <script src="/bitcoin-keeper/runtime-native-modules.js"></script>
   <script src="/assets/jsQR-1.4.0.js"></script>
-  <script src="/bitcoin-keeper/runtime-bridge.js"></script>
-  <script src="/builds/keeper-web/keeper-app.js" defer></script>
+  <script type="module" src="/bitcoin-keeper/runtime-bridge.js"></script>
+  <script src="/builds/keeper-web/keeper-app.js?v=20261003-keeper-media" defer></script>
 </body>
 </html>

@@ -208,6 +208,7 @@ jobs:
         run: |
           node browser/test-demo-import-policy.mjs
           node browser/test-companion-media.mjs
+          npm run test:keeper-media
       - name: Verify public derivation WASM bridge against Python and BIP32
         env:
           CI: 'true'

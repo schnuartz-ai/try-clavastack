@@ -62,6 +62,7 @@ let appMountedNotified = false;
 const announceAppMounted = () => {
   if (appMountedNotified || !rootTag.childElementCount) return;
   appMountedNotified = true;
+  (globalThis as any).__keeperAppMounted = true;
   mountObserver.disconnect();
   window.parent.postMessage({ type: 'keeper-app-mounted' }, window.location.origin);
 };

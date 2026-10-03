@@ -6,6 +6,7 @@
   <meta name="description" content="Use the real Bitcoin Keeper app with the Specter DIY browser simulator. Testnet only; never enter a real seed.">
   <meta name="theme-color" content="#070a0e">
   <title>Bitcoin Keeper + Specter DIY — ClavaStack</title>
+  <link rel="stylesheet" href="/browser/companion-media.css">
   <style>
     :root{color-scheme:dark;--bg:#070a0e;--panel:#101923;--line:#283443;--muted:#a9b7c7;--blue:#48a8df;--green:#b2d17d;--red:#ff8b8b}
     *{box-sizing:border-box}
@@ -29,6 +30,7 @@
     .pill{white-space:nowrap;padding:5px 8px;border:1px solid #344456;border-radius:99px;color:#aab9c7;font-size:10px}
     .pill.online{border-color:#49744c;color:#b8e5ad}
     .specter-screen{position:relative;width:min(100%,450px);margin:auto;aspect-ratio:479/905}
+    .phone.desktop-runtime{flex:none;min-height:0}
     .specter-screen iframe{position:absolute;left:calc(12.5% + 2px);top:calc(17.9% + 2px);z-index:1;display:block;width:76%;height:66%;border:0;border-radius:4px;background:#000}
     .specter-shell{position:relative;z-index:2;display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
     .specter-footer{display:grid;justify-items:center;gap:9px;margin-top:10px}
@@ -72,7 +74,7 @@
     <section class="workspace" aria-label="Bitcoin Keeper and Specter DIY simulators">
       <article class="device-card" aria-labelledby="specter-heading">
         <div class="device-head"><div><h2 id="specter-heading">Specter DIY</h2><p>Real Specter DIY firmware in the existing WebAssembly simulator.</p></div><span class="pill" id="specter-badge">Starting</span></div>
-        <div class="specter-screen"><img class="specter-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe id="specter-simulator" title="Specter DIY hardware wallet simulator" src="/?embedded=1&amp;gallery=1&amp;variant=diy&amp;qr-bridge=1&amp;assetVersion=20261002-keeper-web" allow="camera"></iframe></div>
+        <div class="specter-screen device-frame"><img class="specter-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe id="specter-simulator" title="Specter DIY hardware wallet simulator" src="/?embedded=1&amp;gallery=1&amp;variant=diy&amp;qr-bridge=1&amp;assetVersion=20261003-keeper-media" allow="camera"></iframe><button class="device-hitbox" type="button" data-media-target="diy" aria-label="Insert a virtual card into Specter DIY"></button></div>
         <div class="specter-footer">
           <div class="status" id="specter-status" role="status" aria-live="polite">Loading the Specter DIY firmware…</div>
           <div class="controls"><button class="button" id="specter-restart" type="button">Restart Specter</button><button class="button danger" id="specter-reset" type="button">Reset Specter state</button></div>
@@ -82,15 +84,17 @@
       </article>
       <article class="device-card keeper-card" aria-labelledby="keeper-heading">
         <div class="device-head"><div><h2 id="keeper-heading">Bitcoin Keeper</h2><p>Upstream app screens, navigation, Redux, wallet logic and QR/UR parser.</p></div><span class="pill online">Browser</span></div>
-        <div class="phone" aria-label="Bitcoin Keeper phone simulator frame">
+        <div class="phone desktop-runtime" aria-label="Bitcoin Keeper phone simulator frame">
           <div class="phone-screen">
             <div class="phone-status"><span id="clock">9:41</span><span class="network">TESTNET&nbsp; ▴ ▣</span></div>
-            <iframe id="keeper-runtime" title="Bitcoin Keeper browser app" src="/bitcoin-keeper/runtime.html" allow="camera"></iframe>
+            <iframe id="keeper-runtime" title="Bitcoin Keeper browser app" src="/bitcoin-keeper/runtime.html?v=20261003-keeper-media" allow="camera"></iframe>
           </div>
+          <button class="device-hitbox" type="button" data-media-target="desktop" aria-label="Insert the virtual SD card into Bitcoin Keeper"></button>
         </div>
         <div id="keeper-controls"><div id="keeper-status" role="status" aria-live="polite">Starting the Bitcoin Keeper app…</div><button class="button danger" id="keeper-reset" type="button">Reset Keeper session</button></div>
       </article>
     </section>
+    <div id="companion-media"></div>
     <details class="details">
       <summary>Browser compatibility and source</summary>
       <p>The embedded app uses Bitcoin Keeper upstream commit <a href="https://github.com/KeeperCommunity/bitcoin-keeper/commit/1adf4f66399a2bfac4572d9da94440323bff02f2" target="_blank" rel="noopener noreferrer">1adf4f66399a2bfac4572d9da94440323bff02f2</a> from its canonical <code>sprint</code> branch. Its React Native app, original screens, Navigator, Redux store, and wallet/QR code run through React Native Web. Browser adapters provide session-only storage, a Realm-compatible session database, camera access, and the direct QR transport. Physical-device features are unavailable in the browser. <a href="/bitcoin-keeper/LICENSE.txt">MIT license</a> · <a href="/bitcoin-keeper/THIRD-PARTY-NOTICES.txt">third-party notices</a>.</p>
@@ -98,6 +102,6 @@
     </details>
   </main>
   <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="https://github.com/KeeperCommunity/bitcoin-keeper" target="_blank" rel="noopener noreferrer">Bitcoin Keeper source</a> · A browser simulator does not provide hardware-wallet security.</footer>
-  <script src="/bitcoin-keeper/bridge.js" defer></script>
+  <script type="module" src="/bitcoin-keeper/bridge.js"></script>
 </body>
 </html>

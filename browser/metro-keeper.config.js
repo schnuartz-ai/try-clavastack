@@ -37,6 +37,7 @@ function mappedFile(request) {
     ['src/components/KeeperQRCode', path.join(webAdapters, 'adapters', 'KeeperQRCode.web.tsx')],
     ['src/services/sentry', path.join(webAdapters, 'adapters', 'browser-sentry.web.tsx')],
     ['src/services/backend/Relay', path.join(webAdapters, 'adapters', 'browser-relay.web.ts')],
+    ['src/services/fs', path.join(webAdapters, 'adapters', 'browser-file-service.web.ts')],
     ['src/services/electrum/predefinedNodes', path.join(webAdapters, 'adapters', 'browser-predefined-nodes.web.ts')],
   ]);
   if (aliases.has(request)) return aliases.get(request);
@@ -46,6 +47,7 @@ function mappedFile(request) {
 }
 
 const browserModules = new Map([
+  ['@react-native-documents/picker', path.join(webAdapters, 'adapters', 'browser-document-picker.web.ts')],
   ['electrum-client', path.join(webAdapters, 'adapters', 'browser-electrum-transport.web.ts')],
   ['@realm/react', path.join(webAdapters, 'adapters', 'browser-realm.web.ts')],
   ['realm', path.join(webAdapters, 'adapters', 'realm-module.web.ts')],
