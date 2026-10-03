@@ -31,7 +31,7 @@ let mediaRequestId = 0;
 const mediaRequests = new Map();
 const SD_CAPACITY_BYTES = 8_000_000_000;
 const MEDIA_DB_NAME = 'clavastack-specter-removable-media-v1';
-const desktopRuntimeRevision = '2026-10-03.3';
+const desktopRuntimeRevision = '2026-10-03.4';
 
 function setStatus(element, message, state = 'loading') {
   element.textContent = message;

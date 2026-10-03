@@ -60,6 +60,10 @@ port is opened. This installation is separate from the static site release.
   16,120 KiB before; these are idle measurements, not a peak-load guarantee.
 - SD capacity, atomic file import, shared SD snapshots and gallery SD/MemoryCard
   drag/drop, restart and reset checks passed.
+- Manual normal-firmware SD signing: a PSBT with a fictional input was read,
+  signed and saved back to SD. Its single signature was independently verified
+  with bitcoinjs-lib and tiny-secp256k1; input/output/fee amounts matched.
+  No transaction was broadcast.
 
 The history cache adapter fixes the upstream category cache-key mismatch and
 preserves cached zero amounts and False ownership values. Calculations for new

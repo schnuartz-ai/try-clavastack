@@ -82,8 +82,16 @@ try {
   const expectedNext = payments.p2wpkh({ pubkey: testRoot.derivePath("m/84'/0'/0'/0/1").publicKey }).address;
   assert.equal(await app.locator('#address_qr').getAttribute('value'), `bitcoin:${expectedNext}`);
   await pass('New address advances to the independently derived BIP84 address');
+  const feeResponsePending = page.waitForResponse(response => /\/fees(?:\?|$)/.test(response.url()), { timeout: 60000 });
   await app.getByRole('link', { name: 'Send', exact: true }).click();
   await app.locator('body').getByText('Send', { exact: true }).first().waitFor();
+  const feeResponse = await feeResponsePending;
+  assert(feeResponse.ok());
+  const feeEstimate = await feeResponse.json();
+  assert(Number.isFinite(feeEstimate.result.fastestFee) && feeEstimate.result.fastestFee > 0);
+  assert(Array.isArray(feeEstimate.error_messages));
+  assert(!await app.locator('body').innerText().then(text => text.includes('Failed to fetch fees: SyntaxError')));
+  await pass('The native fee API returns parseable JSON without injected HTML');
   await pass('Send page opens for the test wallet');
   await app.locator('#btn_settings').click();
   await app.getByRole('button', { name: 'Export', exact: true }).click();
