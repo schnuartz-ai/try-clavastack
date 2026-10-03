@@ -54,6 +54,7 @@ done
 mkdir -p "$SITE_DIR/browser/variants"
 cp "$ROOT/browser/site.js" "$ROOT/browser/runtime-worker.js" \
   "$ROOT/browser/current.json" "$ROOT/browser/demo-data.js" \
+  "$ROOT/browser/virtual-host-downloads.js" \
   "$SITE_DIR/browser/"
 cp "$ROOT/browser/specter-desktop-current.json" "$SITE_DIR/browser/"
 cp "$ROOT/browser/variants/"*.json "$SITE_DIR/browser/variants/"

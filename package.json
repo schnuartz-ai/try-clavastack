@@ -3,7 +3,7 @@
   "scripts": {
     "test:pointer-gc": "node browser/test-pointer-gc.mjs",
     "build:keeper": "node browser/build-keeper-native-web.mjs",
-    "test:browser": "node browser/test-sd-capacity.mjs && node browser/test-demo-data.mjs && node browser/test-site.mjs && node browser/test-source-link.mjs && node browser/test-qr.mjs && node browser/test-camera.mjs && node browser/test-card.mjs && node browser/test-variants.mjs && node browser/test-simulators.mjs && node browser/test-ab.mjs && node browser/test-demo-import.mjs && node browser/test-keeper-upstream-flow.mjs",
+    "test:browser": "node browser/test-sd-capacity.mjs && node browser/test-demo-data.mjs && node browser/test-site.mjs && node browser/test-virtual-host-downloads.mjs && node browser/test-source-link.mjs && node browser/test-qr.mjs && node browser/test-camera.mjs && node browser/test-card.mjs && node browser/test-variants.mjs && node browser/test-simulators.mjs && node browser/test-ab.mjs && node browser/test-demo-import.mjs && node browser/test-keeper-upstream-flow.mjs",
     "test:specter-desktop": "node browser/test-specter-desktop.mjs",
     "test:compat": "node browser/test-compat.mjs && node browser/test-gallery-compat.mjs",
     "test:virtual-host": "node browser/test-virtual-host.mjs",

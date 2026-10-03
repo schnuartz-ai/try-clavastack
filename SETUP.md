@@ -72,14 +72,16 @@ systemctl start try-browser-auto-deploy.service
 Rollback is an atomic symlink change to a retained release followed by the same
 HTTPS smoke check. Do not edit files below `releases/` in place.
 
-The normal browser page fetches only `/browser/current.json`, its versioned build manifest/assets, the Worker, local logos/mockup, and the bundled QR decoder. `/api/*`, `/novnc/*`, VNC WebSockets and legacy server pages are not part of the production package. [The previous VNC deployment instructions](legacy/SETUP-VNC.md) remain in Git history as documentation only.
+The normal browser page fetches `/browser/current.json`, its versioned build manifest/assets, the Worker, local logos/mockup, and the bundled QR decoder. Opening the Virtual USB Connection panel or clicking its downloads also queries GitHub's public latest-release API. `/api/*`, `/novnc/*`, VNC WebSockets and legacy server pages are not part of the production package. [The previous VNC deployment instructions](legacy/SETUP-VNC.md) remain in Git history as documentation only.
 
 The standalone [`cryptoadvance/specter-virtual-host`](https://github.com/cryptoadvance/specter-virtual-host)
 repository owns the Virtual Host source and its tagged release workflow. It
 cross-compiles Windows, Linux x64, macOS Intel and macOS Apple Silicon assets,
-publishes checksums, and the browser page links to the pinned release assets.
-Keep the website release and Virtual Host release versions aligned when
-updating the download links. The program binds only to `127.0.0.1`: port 8788
+publishes checksums, and the browser pages resolve the latest release assets
+through GitHub's public API. Download links fall back to the latest release page
+if that API is unavailable.
+Virtual Host releases do not require a website update. The program binds only
+to `127.0.0.1`: port 8788
 hosts the connected simulator view and browser bridge, while port 8789 is
 Specter DIY's standard simulator USB endpoint for Specter Desktop.
 

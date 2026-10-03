@@ -50,13 +50,16 @@ The CI workflow at [`.github/workflows/browser.yml`](.github/workflows/browser.y
 - **Camera and QR:** Specter's scanner trigger pin activates the camera view inside the device screen and requests `getUserMedia()` access. A separate lower preview can be enabled or hidden and its camera selected. Bundled jsQR 1.4.0 decodes frames only while Specter scans; its `binaryData` bytes enter the same `pyb.UART('YA')` decoded-scanner seam that Specter's `QRHost` uses. Specter itself parses text, wallet payloads and animated formats. QR output remains LVGL-generated. Camera frames and QR payloads are never sent to the server.
 - **Smartcards:** The browser implements this fork's MemoryCard APDU transport at `uscard.Reader`, following the [upstream Specter-JavaCard protocol](https://github.com/cryptoadvance/specter-javacard). It provides three isolated, session-only slots; one card can be inserted at a time. Card identity, PIN hash, attempt count and secret data belong to the slot and survive a normal firmware restart. Reset card creates a new identity and wipes that slot. The real Specter `MemoryCardApplet` opens its secure channel, sets and checks PINs, and reads/writes secrets in CI. This is a software simulation with none of a physical smartcard's protection. Other JavaCard applets such as BlindOracle are not emulated or advertised.
 
-The MicroPython build disables sockets, SSL, and threads for the wallet runtime. The browser shell fetches only static build files; it makes no telemetry or data-upload requests. HTTPS is required for camera access. [`vps-config/Caddyfile`](vps-config/Caddyfile) sets COOP, COEP and CORP headers, compresses static responses, caches immutable versioned WASM assets, and keeps build manifests fresh.
+The MicroPython build disables sockets, SSL, and threads for the wallet runtime. The browser shell fetches static build files and queries GitHub's public release API when the Virtual USB Connection panel is opened or a download is clicked; it makes no telemetry or data-upload requests. HTTPS is required for camera access. [`vps-config/Caddyfile`](vps-config/Caddyfile) sets COOP, COEP and CORP headers, compresses static responses, caches immutable versioned WASM assets, and keeps build manifests fresh.
 
 The expandable **Virtual USB Connection** section offers **Specter Virtual
 Host** downloads for Windows, Linux x64, macOS Intel and macOS Apple Silicon.
-The buttons point to the pinned, checksummed `v1.0.4` release assets in the
-standalone [`cryptoadvance/specter-virtual-host`](https://github.com/cryptoadvance/specter-virtual-host/releases/tag/v1.0.4)
-repository, so the website does not have to host executable files itself. This
+The buttons resolve the latest published release assets in the standalone
+[`cryptoadvance/specter-virtual-host`](https://github.com/cryptoadvance/specter-virtual-host/releases/latest)
+repository when the panel opens and again on download. This includes versioned
+Linux .deb filenames and the universal macOS .zip. If the release API is
+unavailable or a platform asset is missing, the button opens the latest release
+page instead. The website does not host executable files itself. This
 small local program reverse-proxies the simulator onto
 `127.0.0.1:8788` and exposes Specter DIY's established simulator transport on
 `127.0.0.1:8789`, which Specter Desktop detects as a Specter DIY device. Browser

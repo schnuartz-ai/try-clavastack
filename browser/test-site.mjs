@@ -17,10 +17,10 @@ if (await virtualHost.locator('summary').textContent().then(text => !text.includ
   throw new Error('Virtual Host download panel is missing');
 }
 const virtualHostDownloads = {
-  '#virtual-host-download': 'https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Windows-x64.exe',
-  '#virtual-host-download-linux': 'https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Linux-x64',
-  '#virtual-host-download-macos-arm64': 'https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-arm64',
-  '#virtual-host-download-macos-amd64': 'https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-x64',
+  '#virtual-host-download': 'https://github.com/cryptoadvance/specter-virtual-host/releases/latest',
+  '#virtual-host-download-linux': 'https://github.com/cryptoadvance/specter-virtual-host/releases/latest',
+  '#virtual-host-download-macos-arm64': 'https://github.com/cryptoadvance/specter-virtual-host/releases/latest',
+  '#virtual-host-download-macos-amd64': 'https://github.com/cryptoadvance/specter-virtual-host/releases/latest',
 };
 for (const [selector, href] of Object.entries(virtualHostDownloads)) {
   if (await page.locator(selector).getAttribute('href') !== href) {
@@ -41,15 +41,6 @@ if (!await page.locator('.virtual-host-repository a').evaluate(anchor =>
   anchor.href === 'https://github.com/cryptoadvance/specter-virtual-host')) {
   throw new Error('Virtual Host GitHub repository link is missing');
 }
-for (const href of Object.values(virtualHostDownloads)) {
-  const releaseUrl = new URL(href);
-  const filename = releaseUrl.pathname.split('/').pop();
-  if (releaseUrl.hostname !== 'github.com' ||
-      releaseUrl.pathname !== `/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/${filename}` ||
-      !/^Specter-Virtual-Host-(Windows-x64\.exe|Linux-x64|macOS-(arm64|x64))$/.test(filename)) {
-    throw new Error(`Virtual Host release URL is malformed: ${href}`);
-  }
-}
 for (const route of ['/ab/', '/simulators/']) {
   const response = await page.request.get(`${base}${route}`);
   if (!response.ok()) throw new Error(`Companion App page is not reachable: ${route}`);
@@ -58,6 +49,11 @@ for (const route of ['/ab/', '/simulators/']) {
       !html.includes('Virtual USB Connection') ||
       !html.includes('https://github.com/cryptoadvance/specter-virtual-host"')) {
     throw new Error(`Companion App panel is missing from ${route}`);
+  }
+  for (const platform of ['windows', 'linux-x64', 'macos-arm64', 'macos-x64']) {
+    if (!html.includes(`data-virtual-host-platform="${platform}" href="https://github.com/cryptoadvance/specter-virtual-host/releases/latest"`)) {
+      throw new Error(`Latest Virtual Host release fallback is missing for ${platform} on ${route}`);
+    }
   }
   if ((html.match(/class="virtual-host-download"/g) || []).length !== 4) {
     throw new Error(`Companion App downloads are incomplete on ${route}`);

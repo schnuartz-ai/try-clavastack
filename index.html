@@ -482,10 +482,10 @@
       <span id="virtual-host-status-text">Virtual Host not detected</span>
     </div>
     <div class="virtual-host-actions">
-      <a id="virtual-host-download" class="virtual-host-download" href="https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Windows-x64.exe">Download for Windows (.exe)</a>
-      <a id="virtual-host-download-linux" class="virtual-host-download" href="https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-Linux-x64">Download for Linux (x64)</a>
-      <a id="virtual-host-download-macos-arm64" class="virtual-host-download" href="https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-arm64">Download for macOS (Apple Silicon)</a>
-      <a id="virtual-host-download-macos-amd64" class="virtual-host-download" href="https://github.com/cryptoadvance/specter-virtual-host/releases/download/v1.0.4/Specter-Virtual-Host-macOS-x64">Download for macOS (Intel)</a>
+      <a id="virtual-host-download" class="virtual-host-download" data-virtual-host-platform="windows" href="https://github.com/cryptoadvance/specter-virtual-host/releases/latest">Download for Windows (.exe)</a>
+      <a id="virtual-host-download-linux" class="virtual-host-download" data-virtual-host-platform="linux-x64" href="https://github.com/cryptoadvance/specter-virtual-host/releases/latest">Download for Linux (x64)</a>
+      <a id="virtual-host-download-macos-arm64" class="virtual-host-download" data-virtual-host-platform="macos-arm64" href="https://github.com/cryptoadvance/specter-virtual-host/releases/latest">Download for macOS (Apple Silicon)</a>
+      <a id="virtual-host-download-macos-amd64" class="virtual-host-download" data-virtual-host-platform="macos-x64" href="https://github.com/cryptoadvance/specter-virtual-host/releases/latest">Download for macOS (Intel)</a>
     </div>
     <p class="virtual-host-repository">Source code, releases and checksums: <a href="https://github.com/cryptoadvance/specter-virtual-host" target="_blank" rel="noopener noreferrer">github.com/cryptoadvance/specter-virtual-host</a></p>
     <ol class="virtual-host-steps">
@@ -494,7 +494,7 @@
       <li>Open <strong>Device settings → Communication → USB communication</strong>, enable USB, and confirm the restart.</li>
       <li>In your compatible companion app (for example, Specter Desktop), add or rescan hardware devices. The simulator appears as <strong>Specter DIY</strong>.</li>
     </ol>
-    <p class="virtual-host-note">The unsigned preview builds may trigger a Windows SmartScreen or macOS Gatekeeper notice. On Linux/macOS, make the downloaded file executable before running it. The bridge listens only on this computer; closing its window ends the connection.</p>
+    <p class="virtual-host-note">The unsigned preview builds may trigger a Windows SmartScreen or macOS Gatekeeper notice. On Linux, install the .deb package; on macOS, extract the .zip and open the app. The bridge listens only on this computer; closing its window ends the connection.</p>
   </div>
 </details>
 
@@ -543,5 +543,6 @@
 
 <script src="/assets/jsQR-1.4.0.js"></script>
 <script type="module" src="/browser/site.js?v=20261002-inspector-v1"></script>
+<script type="module" src="/browser/virtual-host-downloads.js?v=20261003"></script>
 </body>
 </html>
