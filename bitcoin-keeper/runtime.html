@@ -18,6 +18,7 @@
     globalThis.__keeperBootMarkers = ['runtime-html-loaded'];
     globalThis.__keeperDOMConstructors = { Element: window.Element };
     globalThis.__keeperNativeFetch = window.fetch.bind(window);
+    globalThis.__keeperNativeAbortController = window.AbortController;
     globalThis.process ||= {
       browser: true, version: 'web', env: { NODE_ENV: 'production' },
       nextTick: (callback, ...args) => queueMicrotask(() => callback(...args)),

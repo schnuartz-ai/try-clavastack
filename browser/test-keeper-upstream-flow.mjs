@@ -12,6 +12,7 @@ page.on('console', (message) => { if (message.type() === 'error') consoleErrors.
 page.on('requestfailed', (request) => failedRequests.push({ url: request.url(), error: request.failure()?.errorText }));
 
 await page.addInitScript(() => {
+  window.__KEEPER_SIMULATOR_DEBUG__ = true;
   window.__testKeeperFrames = [];
   window.addEventListener('message', (event) => {
     if (event.data?.type === 'keeper-qr-output-frame') window.__testKeeperFrames.push(event.data.frame);
@@ -97,6 +98,8 @@ try {
   if (decodedQr !== address) throw new Error(`Keeper's rendered QR decoded to ${decodedQr}, expected ${address}`);
   await page.waitForFunction((value) => window.__testKeeperFrames?.some((frame) => frame.includes(value)), address, { timeout: 15_000 });
   const bridgeFrames = await page.evaluate(() => window.__testKeeperFrames || []);
+  const keeperFrame = page.frames().find((frame) => frame.url().includes('/bitcoin-keeper/runtime.html'));
+  await keeperFrame.waitForFunction(() => window.__keeperStore?.getState().login.electrumClientConnectionStatus.success, undefined, { timeout: 30_000 });
 
   const runtime = await page.frames().find((frame) => frame.url().includes('/bitcoin-keeper/runtime.html'))
     ?.evaluate(() => {
@@ -112,6 +115,7 @@ try {
         reactErrors: (globalThis.__keeperReactErrors || []).map((entry) => entry.message),
         gestureRefDebug: globalThis.__keeperGestureRefDebug || null,
         sessionKeys: Object.keys(sessionStorage),
+        bitcoinBackend: globalThis.__keeperStore.getState().login.electrumClientConnectionStatus,
         app: app ? { networkType: app.networkType, enableAnalytics: app.enableAnalytics } : null,
         wallet: wallet ? {
           networkType: wallet.networkType,
@@ -152,6 +156,7 @@ try {
     reactErrors: runtime?.reactErrors,
     app: runtime?.app,
     wallet: runtime?.wallet,
+    bitcoinBackend: runtime?.bitcoinBackend,
     gestureRefDebug: runtime?.gestureRefDebug,
     sessionKeys: runtime?.sessionKeys,
     pageErrors,
@@ -165,6 +170,8 @@ try {
     return {
       bodyText: document.body.innerText.slice(0, 4000),
       walletCount: realm.Wallet?.length || 0,
+      bitcoinBackend: globalThis.__keeperStore?.getState().login.electrumClientConnectionStatus,
+      nodes: realm.NodeConnect,
       app: realm.KeeperApp?.[0] ? {
         networkType: realm.KeeperApp[0].networkType,
         enableAnalytics: realm.KeeperApp[0].enableAnalytics,

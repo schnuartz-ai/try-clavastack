@@ -18,6 +18,12 @@ const dateFields: Record<string, string[]> = {
 
 function restoreRealmDates(schema: string, row: any) {
   if (!row || typeof row !== 'object') return row;
+  // Upgrade the original simulator's disposable default TCP node in place.
+  // Retain custom nodes so unsupported transports get an explicit error.
+  if (['NodeConnect', 'DefaultNodeConnect'].includes(schema) && row.id === 336 && row.host === 'blackie.c3-soft.com') {
+    row.host = 'mempool.space/testnet4/api';
+    row.port = '443';
+  }
   for (const field of dateFields[schema] || []) {
     const value = row[field];
     if (value !== null && value !== undefined && !(value instanceof Date)) {

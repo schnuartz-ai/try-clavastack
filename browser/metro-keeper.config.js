@@ -36,6 +36,7 @@ function mappedFile(request) {
     ['src/components/KeeperQRCode', path.join(webAdapters, 'adapters', 'KeeperQRCode.web.tsx')],
     ['src/services/sentry', path.join(webAdapters, 'adapters', 'browser-sentry.web.tsx')],
     ['src/services/backend/Relay', path.join(webAdapters, 'adapters', 'browser-relay.web.ts')],
+    ['src/services/electrum/predefinedNodes', path.join(webAdapters, 'adapters', 'browser-predefined-nodes.web.ts')],
   ]);
   if (aliases.has(request)) return aliases.get(request);
   if (request === 'src') return path.join(upstream, 'src');
@@ -44,6 +45,7 @@ function mappedFile(request) {
 }
 
 const browserModules = new Map([
+  ['electrum-client', path.join(webAdapters, 'adapters', 'browser-electrum-transport.web.ts')],
   ['@realm/react', path.join(webAdapters, 'adapters', 'browser-realm.web.ts')],
   ['realm', path.join(webAdapters, 'adapters', 'realm-module.web.ts')],
   ['react-native-mmkv', path.join(webAdapters, 'adapters', 'browser-mmkv.web.ts')],
@@ -102,6 +104,13 @@ module.exports = mergeConfig(config, {
     resolveRequest(context, moduleName, platform) {
       const origin = context.originModulePath?.replaceAll('\\', '/');
       const normalizedRequest = moduleName.replaceAll('\\', '/');
+      if (
+        platform === 'web' &&
+        normalizedRequest === './predefinedNodes' &&
+        origin?.includes('/upstream/bitcoin-keeper/src/services/electrum/')
+      ) {
+        return context.resolveRequest(context, path.join(webAdapters, 'adapters', 'browser-predefined-nodes.web.ts'), platform);
+      }
       // React Native's generic RCTNetworking.js imports itself on web (there is
       // no .web implementation). The resulting undefined emitter crashes real
       // XHR users such as Keeper's QR screen. Route only that upstream boundary

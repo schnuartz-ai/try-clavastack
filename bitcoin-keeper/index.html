@@ -93,7 +93,7 @@
     <details class="details">
       <summary>Browser compatibility and source</summary>
       <p>The embedded app uses Bitcoin Keeper upstream commit <a href="https://github.com/KeeperCommunity/bitcoin-keeper/commit/1adf4f66399a2bfac4572d9da94440323bff02f2" target="_blank" rel="noopener noreferrer">1adf4f66399a2bfac4572d9da94440323bff02f2</a> from its canonical <code>sprint</code> branch. Its React Native app, original screens, Navigator, Redux store, and wallet/QR code run through React Native Web. Browser adapters provide session-only storage, a Realm-compatible session database, camera access, and the direct QR transport. Physical-device features are unavailable in the browser. <a href="/bitcoin-keeper/LICENSE.txt">MIT license</a> · <a href="/bitcoin-keeper/THIRD-PARTY-NOTICES.txt">third-party notices</a>.</p>
-      <p>QR transfer passes encoded frames into each app’s normal camera scanner/parser path. Specter DIY remains its own firmware Worker and storage. Reset each device separately; no wallet data or QR frames are sent to the server.</p>
+      <p>QR transfer passes encoded frames into each app’s normal camera scanner/parser path. Specter DIY remains its own firmware Worker and storage. Reset each device separately. Bitcoin balances, history, fees and broadcasting use mempool.space’s Testnet4 HTTPS API; queried script hashes and transactions are shared with that service. Private keys and simulator QR exchanges stay in your browser.</p>
     </details>
   </main>
   <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="https://github.com/KeeperCommunity/bitcoin-keeper" target="_blank" rel="noopener noreferrer">Bitcoin Keeper source</a> · A browser simulator does not provide hardware-wallet security.</footer>

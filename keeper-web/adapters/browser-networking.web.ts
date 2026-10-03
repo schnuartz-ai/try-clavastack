@@ -75,7 +75,10 @@ const RCTNetworking = {
     withCredentials: boolean,
   ) {
     const requestId = nextRequestId++;
-    const controller = new AbortController();
+    // React Native installs its own AbortSignal polyfill. Browser fetch only
+    // accepts a signal created by the browser's original AbortController.
+    const NativeAbortController = (globalThis as any).__keeperNativeAbortController || globalThis.AbortController;
+    const controller: AbortController = new NativeAbortController();
     pending.set(requestId, controller);
     let timedOut = false;
     const timeoutId = timeout > 0 ? setTimeout(() => {
@@ -85,11 +88,19 @@ const RCTNetworking = {
     callback(requestId);
 
     const browserFetch = (globalThis as any).__keeperNativeFetch || globalThis.fetch;
+    const publicApi = ['mempool.space', 'api.coingecko.com'].includes(new URL(url, location.href).hostname);
+    // These public APIs do not use Keeper's mobile authentication metadata or
+    // cookies. Sending native defaults triggers an invalid browser CORS request.
+    const publicMetadata = new Set(['hexa-id', 'hexa_id', 'appversion', 'buildnumber', 'os']);
+    const browserHeaders = publicApi ? Object.fromEntries(Object.entries(headers).filter(([name]) =>
+      !publicMetadata.has(name.toLowerCase()) &&
+      !(['GET', 'HEAD'].includes(method.toUpperCase()) && name.toLowerCase() === 'content-type')
+    )) : headers;
     Promise.resolve().then(() => browserFetch(url, {
       method,
-      headers,
+      headers: browserHeaders,
       body: requestBody(body),
-      credentials: withCredentials ? 'include' : 'same-origin',
+      credentials: publicApi ? 'omit' : withCredentials ? 'include' : 'same-origin',
       signal: controller.signal,
     })).then(async (response: Response) => {
       emitter.emit('didReceiveNetworkResponse', requestId, response.status, responseHeaders(response), response.url || url);
