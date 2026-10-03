@@ -33,6 +33,17 @@ module.exports = {
   ...upstreamTransformer,
   async transform(args) {
     const filename = path.resolve(args.filename);
+    // NativeBase inherits text props by deep-merging objects. A React Native
+    // style array otherwise becomes an object with numeric keys, which React
+    // DOM cannot assign to CSSStyleDeclaration on nested text nodes.
+    if (filename.endsWith(path.join('@gluestack-ui', 'themed-native-base', 'build', 'components', 'Text', 'index.js'))) {
+      const original = 'let finalPropsToApply = props;';
+      if (args.src.split(original).length !== 2) {
+        throw new Error('Keeper nested Text style patch no longer matches; review the upstream component.');
+      }
+      args = { ...args, src: args.src.replace(original,
+        "props = Object.assign({}, props, { style: require('react-native').StyleSheet.flatten(props.style) });\n    let finalPropsToApply = props;") };
+    }
     // NativeBase's text plugin destructures `style`, then drops it in its web
     // branch. Preserve the original Keeper typography without editing vendor
     // files or replacing the upstream Text component.
