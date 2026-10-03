@@ -34,7 +34,10 @@ for pointer_file, repository in (
 desktop_pointer = json.loads((root / 'browser' / 'specter-desktop-current.json').read_text())
 assert desktop_pointer['repository'] == 'cryptoadvance/specter-desktop'
 assert re.fullmatch(r'[a-f0-9]{40}', desktop_pointer['commit'])
-assert desktop_pointer['build'].endswith(f"/{desktop_pointer['commit']}/")
+assert re.fullmatch(r'[a-f0-9]{16}', desktop_pointer['version'])
+assert desktop_pointer['build'] == (
+    f"/builds/{desktop_pointer['repository']}/{desktop_pointer['commit']}/{desktop_pointer['version']}/"
+)
 desktop_root = root / desktop_pointer['build'].lstrip('/')
 desktop_manifest = json.loads((desktop_root / 'build-info.json').read_text())
 assert desktop_manifest['repository'] == desktop_pointer['repository']
@@ -44,7 +47,17 @@ assert desktop_manifest['web_simulator_repository'] == 'cryptoadvance/specter-di
 archive_record = desktop_manifest['source_archive']
 archive_path = desktop_root / archive_record['path']
 assert archive_path.is_file() and archive_path.stat().st_size == archive_record['bytes']
-assert sha256(archive_path.read_bytes()).hexdigest() == archive_record['sha256']
+archive_bytes = archive_path.read_bytes()
+assert sha256(archive_bytes).hexdigest() == archive_record['sha256']
+public_derivation = desktop_manifest['public_derivation']
+assert public_derivation['package'] == 'tiny-secp256k1' and public_derivation['version'] == '2.2.4'
+assert set(public_derivation['files']) == {'secp256k1.js', 'secp256k1.wasm'}
+for name, record in public_derivation['files'].items():
+    payload = (desktop_root / name).read_bytes()
+    assert len(payload) == record['bytes'] and sha256(payload).hexdigest() == record['sha256'], name
+assert (desktop_root / 'secp256k1.LICENSE.txt').is_file()
+assert sha256(archive_bytes + (desktop_root / 'secp256k1.js').read_bytes()
+              + (desktop_root / 'secp256k1.wasm').read_bytes()).hexdigest()[:16] == desktop_pointer['version']
 with __import__('zipfile').ZipFile(archive_path) as source_archive:
     names = set(source_archive.namelist())
     assert 'cryptoadvance/specter/server.py' in names
