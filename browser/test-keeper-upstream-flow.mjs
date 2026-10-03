@@ -25,6 +25,15 @@ try {
 
   await keeper.getByTestId('key_1').waitFor({ timeout: 90_000 });
   await keeper.getByText('Welcome', { exact: true }).waitFor();
+  const fontsLoaded = await keeper.locator('body').evaluate(async () => {
+    const families = ['Inter', 'Inter-Regular', 'Lora-Medium'];
+    return Promise.all(families.map(async (family) => ({
+      family, loaded: (await document.fonts.load(`14px "${family}"`)).length > 0,
+    })));
+  });
+  if (fontsLoaded.some(({ loaded }) => !loaded)) {
+    throw new Error(`Keeper's original fonts did not load: ${JSON.stringify(fontsLoaded)}`);
+  }
   for (const digit of '12341234') {
     await keeper.getByTestId(`key_${digit}`).click();
     await page.waitForTimeout(325);
@@ -133,6 +142,7 @@ try {
   await page.screenshot({ path: 'test-results/keeper-upstream-onboarding.png', fullPage: true });
   console.log(JSON.stringify({
     result: 'testnet-receive-screen-reached',
+    fontsLoaded,
     receiveAddress: address,
     renderedQrSvg: true,
     decodedQr,

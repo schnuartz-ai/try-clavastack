@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -26,6 +26,34 @@ const bundle = await metro.runBuild(config, {
 });
 
 const assetRoot = join(root, 'builds', 'keeper-web', 'assets');
+// React Native selects Keeper's bundled fonts by family name. Browsers need
+// those same families registered explicitly; merely copying Metro assets
+// leaves the real screens rendered with the browser's fallback font.
+const fontSource = join(upstream, 'src', 'assets', 'fonts');
+const fontTarget = join(root, 'builds', 'keeper-web', 'fonts');
+await mkdir(fontTarget, { recursive: true });
+const fontFiles = (await readdir(fontSource)).filter((name) => /^[A-Za-z0-9-]+\.ttf$/.test(name)).sort();
+await Promise.all(fontFiles.map((name) => copyFile(join(fontSource, name), join(fontTarget, name))));
+const fontFace = (name, family, weight = 400, style = 'normal') =>
+  `@font-face{font-family:"${family}";src:url("./fonts/${name}.ttf") format("truetype");font-style:${style};font-weight:${weight};font-display:swap}`;
+const fontRules = fontFiles.map((name) => fontFace(name.slice(0, -4), name.slice(0, -4)));
+// Gluestack keeps the theme's "Inter" family plus its weight on the web.
+// Derive its native fontConfig from upstream so Lora headings and italic/bold
+// variants continue to follow Keeper's own typography when it is updated.
+const fontConstants = await readFile(join(upstream, 'src', 'constants', 'Fonts.js'), 'utf8');
+const fontNames = new Map([...fontConstants.matchAll(/(\w+):\s*'([^']+)'/g)].map((match) => [match[1], match[2]]));
+const themeSource = await readFile(join(upstream, 'src', 'navigation', 'themes.js'), 'utf8');
+const themeFontConfig = themeSource.split('fontConfig:')[1]?.split('fonts:')[0] || '';
+const themeFontWeights = [...themeFontConfig.matchAll(/(\d+):\s*\{\s*normal:\s*Fonts\.(\w+),\s*italic:\s*Fonts\.(\w+)/g)];
+if (!themeFontWeights.length) throw new Error('Keeper theme fontConfig could not be read.');
+for (const [, weight, normal, italic] of themeFontWeights) {
+  for (const [key, style] of [[normal, 'normal'], [italic, 'italic']]) {
+    const name = fontNames.get(key);
+    if (!name || !fontFiles.includes(`${name}.ttf`)) throw new Error(`Keeper theme references an unavailable font: ${key}`);
+    fontRules.push(fontFace(name, 'Inter', weight, style));
+  }
+}
+await writeFile(join(root, 'builds', 'keeper-web', 'fonts.css'), fontRules.join('\n') + '\n');
 for (const asset of bundle.assets ?? []) {
   const relativeDirectory = relative(root, asset.fileSystemLocation);
   const directory = relativeDirectory.startsWith(`..${sep}`)
