@@ -21,6 +21,15 @@ async function unlockFirstSchnuartzLogin(page, canvas, tap) {
   }
 }
 
+async function dismissSpecterWelcomeTour(page, canvas) {
+  const box = await canvas.boundingBox();
+  // Fresh CI storage starts on the real Specter welcome tour. Its Skip Tour
+  // button sits here; when the tour has already been dismissed this point is
+  // between the welcome choices and does not change the screen.
+  await canvas.click({ position: { x: box.width * .50, y: box.height * .58 } });
+  await page.waitForTimeout(500);
+}
+
 for (const variant of [
   { id: 'play', repo: 'k9ert/specter-playground', pointer: '/browser/variants/specter-playground.json',
     targets: [[.24, .38], [.50, .38], [.75, .38], [.24, .55]] },
@@ -63,6 +72,7 @@ for (const variant of [
   if (variant.id === 'schnuartz') {
     await unlockFirstSchnuartzLogin(page, canvas, (x, y) => page.mouse.click(x, y));
   }
+  await dismissSpecterWelcomeTour(page, canvas);
   const before = await canvas.screenshot({ path: `test-results/${variant.id}-mockui-screen.png` });
   const png = PNG.sync.read(before);
   const colors = new Set();
@@ -77,7 +87,12 @@ for (const variant of [
     changed = !before.equals(await canvas.screenshot());
     if (changed) break;
   }
-  if (!changed) throw new Error(`${variant.id}: pointer did not reach LVGL`);
+  if (!changed) {
+    const after = await canvas.screenshot({ path: `test-results/${variant.id}-mockui-after-pointer.png` });
+    console.error(JSON.stringify({ variant: variant.id, canvas: box, beforeBytes: before.length,
+      afterBytes: after.length, targets: variant.targets }));
+    throw new Error(`${variant.id}: pointer did not reach LVGL`);
+  }
   if (errors.length) throw new Error(`${variant.id}: ${errors.join('; ')}`);
   console.log(JSON.stringify({ variant: variant.id, application: 'original LVGL 9 MockUI scenario',
     boot: 'pass', colors: colors.size, pointer: 'pass' }));
