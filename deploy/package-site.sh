@@ -56,10 +56,19 @@ mkdir -p "$SITE_DIR/browser/runtime"
 cp "$ROOT/browser/runtime/usb-wallet-probe.py" "$SITE_DIR/browser/runtime/"
 cp "$ROOT/browser/site.js" "$ROOT/browser/runtime-worker.js" \
   "$ROOT/browser/current.json" "$ROOT/browser/demo-data.js" \
+  "$ROOT/browser/demo-import.js" "$ROOT/browser/companion-media.js" \
+  "$ROOT/browser/companion-media.css" \
   "$ROOT/browser/virtual-host-downloads.js" \
   "$SITE_DIR/browser/"
 cp "$ROOT/browser/specter-desktop-current.json" "$SITE_DIR/browser/"
 cp "$ROOT/browser/variants/"*.json "$SITE_DIR/browser/variants/"
+
+# The shared modules are imported by the root page and every companion. Check
+# the staged package itself, so source-tree browser tests cannot mask omissions.
+for shared_file in demo-import.js companion-media.js companion-media.css; do
+  test -s "$SITE_DIR/browser/$shared_file"
+  cmp "$ROOT/browser/$shared_file" "$SITE_DIR/browser/$shared_file"
+done
 
 if [[ $(find "$SITE_DIR/builds" -type f -name 'micropython.wasm' | wc -l) -lt 4 ]]; then
   echo "Expected all four tested firmware builds in the production package" >&2
