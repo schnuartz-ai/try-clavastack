@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 import { strict as assert } from 'node:assert';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { createDemoFiles } from './demo-data.js';
 import { BIP32Factory } from 'bip32';
 import * as ecc from 'tiny-secp256k1';
@@ -83,6 +83,21 @@ try {
   for (const token of await page.locator('.memory-token').all()) assert((await token.innerText()).includes('Not inserted'));
   await page.locator('#sd-picker').setInputFiles({ name: 'keep.bin', mimeType: 'application/octet-stream', buffer: Buffer.from([0, 255, 42]) });
   await page.locator('#sd-files').getByText('keep.bin', { exact: false }).waitFor();
+  for (const mode of ['drop', 'paste']) {
+    await page.evaluate(mode => {
+      const data = new DataTransfer();
+      data.items.add(new File([new Uint8Array([0, 128, 255])], `${mode}.bin`));
+      const event = mode === 'drop' ? new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true })
+        : new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true });
+      document.querySelector('#sd-drop').dispatchEvent(event);
+    }, mode);
+    await page.locator('#sd-files').getByText(`${mode}.bin`, { exact: false }).waitFor();
+  }
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#sd-files li').filter({ hasText: 'keep.bin' }).getByRole('button', { name: 'Download' }).click();
+  const downloaded = await downloadPromise;
+  assert.deepEqual([...await readFile(await downloaded.path())], [0, 255, 42]);
+  pass('Binary file picker, native drop/paste events and actual SD download preserve exact bytes');
   await importDemo('testnet');
   const demo = createDemoFiles('testnet');
   let files = await readMedia();
@@ -120,6 +135,13 @@ try {
   files = await readMedia();
   for (const file of demo.files) assert.deepEqual(files[`sd/${file.name}`], [...file.bytes]);
   pass('Same virtual SD card round-trips between Desktop and running DIY firmware');
+  for (const mode of ['drop', 'paste']) {
+    await page.locator('#sd-files li').filter({ hasText: `${mode}.bin` }).getByRole('button', { name: 'Delete' }).click();
+    await page.locator('#sd-token:not(:disabled)').waitFor();
+    assert(!(await readMedia())[`sd/${mode}.bin`]);
+    assert(!/error/i.test(await page.locator('#media-status').innerText()));
+  }
+  pass('Delete updates the running DIY filesystem and persistent virtual SD storage');
 
   await importDemo('');
   files = await readMedia();
@@ -132,6 +154,15 @@ try {
   pass('None removes imported demo data and retains unrelated binary files');
 
   await importDemo('testnet');
+  const cardBeforeReset = (await readMedia())['cards/2/private.key'];
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('.memory-token[data-slot="2"]').click({ button: 'right' });
+  await page.locator('.memory-token[data-slot="2"]:not(:disabled)').waitFor();
+  assert(!(await readMedia())['cards/2/private.key']);
+  await importDemo('mainnet');
+  assert.notDeepEqual((await readMedia())['cards/2/private.key'], cardBeforeReset);
+  await importDemo('testnet');
+  pass('Shared right-click reset clears the card and the next import creates a new firmware identity');
   await page.locator('#cable-toggle').check(); assert(await page.locator('#cable-toggle').isChecked());
   await page.locator('#cable-toggle').uncheck();
   for (const width of [1512, 800, 390]) {
@@ -161,6 +192,11 @@ try {
   assert.equal(await offline.frameLocator('#desktop-app').locator('#server-list').inputValue(), 'Blockstream Bitcoin Testnet');
   await offline.close();
   pass('Fresh offline startup remains usable with its Testnet node');
+  await page.locator('#sd-clear').click();
+  await page.locator('#sd-token:not(:disabled)').waitFor();
+  assert(!(Object.keys(await readMedia()).some(path => path.startsWith('sd/'))));
+  assert((await readMedia())['cards/1/secret.bin']?.length);
+  pass('Clear empties the actual SD card while preserving MemoryCard data');
   assert.deepEqual(errors, []);
   assert(!calls.some(call => call.method === 'blockchain.transaction.broadcast'));
   await writeFile('test-results/companion-media.json', JSON.stringify({ checks, errors, ports: [...new Set(calls.map(call => call.port))] }, null, 2));

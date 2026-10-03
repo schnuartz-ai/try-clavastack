@@ -170,8 +170,7 @@ function renderMedia() {
     remove.addEventListener('click', () => runMediaOperation(async () => {
       if (sdOwner === 'diy') {
         sendDiyMessage({ type: 'peripheral-command', command: { type: 'sd-delete', name } });
-        await getDiySnapshot();
-        syncDiyMedia('sd/');
+        await getDiySnapshot('sd/');
       } else mediaFiles.delete(file.path);
       await persistMedia();
       reportMedia(`Deleted ${name} from the virtual SD card.`);
