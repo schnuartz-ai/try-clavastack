@@ -14,7 +14,7 @@
     header{min-height:55px;padding:10px max(18px,calc((100vw - 1480px)/2));display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid #243140;background:#07101abf}
     header a{color:#c5d3e2;font-size:13px;text-decoration:none}
     .brand{display:flex;align-items:center;gap:10px;font-weight:700}
-    .brand img{max-height:25px;max-width:120px}
+    .brand img{width:25px;height:25px;object-fit:contain}
     .brand .separator{color:#65758a;font-size:18px}
     main{max-width:1480px;margin:auto;padding:23px 18px 35px}
     h1{margin:0 0 5px;font-size:clamp(27px,4vw,38px);letter-spacing:-.03em}
@@ -61,7 +61,7 @@
 </head>
 <body>
   <header>
-    <a class="brand" href="/"><img src="/assets/clavastack-logo.png" alt="ClavaStack"><span class="separator">×</span><img src="/builds/keeper-web/keeper-logo.svg" alt="Bitcoin Keeper"></a>
+    <a class="brand" href="/" aria-label="ClavaStack × Specter DIY × Bitcoin Keeper"><img src="/assets/clavastack-logo.png" alt="ClavaStack"><span class="separator" aria-hidden="true">×</span><img src="/assets/specter-logo.png" alt="Specter DIY"><span class="separator" aria-hidden="true">×</span><img src="/assets/bitcoin-keeper-logo.png" alt="Bitcoin Keeper"></a>
     <a href="/simulators/">← All simulators</a>
   </header>
   <main>
