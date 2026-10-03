@@ -31,7 +31,7 @@ let mediaRequestId = 0;
 const mediaRequests = new Map();
 const SD_CAPACITY_BYTES = 8_000_000_000;
 const MEDIA_DB_NAME = 'clavastack-specter-removable-media-v1';
-const desktopRuntimeRevision = '2026-10-02.3';
+const desktopRuntimeRevision = '2026-10-03.3';
 
 function setStatus(element, message, state = 'loading') {
   element.textContent = message;
@@ -480,32 +480,33 @@ document.querySelectorAll('.device-hitbox').forEach(hitbox => hitbox.addEventLis
 }));
 addEventListener('keydown', event => { if (event.key === 'Escape') { selectedMedia = null; cleanupMediaDrag(); renderMedia(); } });
 
+async function importSdFiles(files) {
+  const sizes = new Map(mediaFor('sd/').map(file => [file.path, file.bytes.byteLength]));
+  let projected = [...sizes.values()].reduce((total, size) => total + size, 0);
+  for (const file of files) {
+    const path = `sd/${file.name}`;
+    projected += file.size - (sizes.get(path) || 0);
+    sizes.set(path, file.size);
+  }
+  if (projected > SD_CAPACITY_BYTES) throw new Error('The virtual SD card is full (8 GB).');
+  const imported = await Promise.all(files.map(async file => ({
+    path: `sd/${file.name}`, bytes: new Uint8Array(await file.arrayBuffer()),
+  })));
+  for (const file of imported) mediaFiles.set(file.path, file.bytes);
+  if (sdOwner === 'diy') {
+    sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files: imported } });
+    await getDiySnapshot('sd/');
+  }
+  await persistMedia();
+  reportMedia(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
+}
+
 const sdPicker = $('#sd-picker');
 $('#sd-add').addEventListener('click', () => sdPicker.click());
 sdPicker.addEventListener('change', () => {
   const files = [...sdPicker.files];
   sdPicker.value = '';
-  if (!files.length) return;
-  runMediaOperation(async () => {
-    const sizes = new Map(mediaFor('sd/').map(file => [file.path, file.bytes.byteLength]));
-    let projected = [...sizes.values()].reduce((total, size) => total + size, 0);
-    for (const file of files) {
-      const path = `sd/${file.name}`;
-      projected += file.size - (sizes.get(path) || 0);
-      sizes.set(path, file.size);
-    }
-    if (projected > SD_CAPACITY_BYTES) throw new Error('The virtual SD card is full (8 GB).');
-    const imported = await Promise.all(files.map(async file => ({
-      path: `sd/${file.name}`, bytes: new Uint8Array(await file.arrayBuffer()),
-    })));
-    for (const file of imported) mediaFiles.set(file.path, file.bytes);
-    if (sdOwner === 'diy') {
-      sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files: imported } });
-      await getDiySnapshot('sd/');
-    }
-    await persistMedia();
-    reportMedia(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
-  });
+  if (files.length) runMediaOperation(() => importSdFiles(files));
 });
 const sdDrop = $('#sd-drop');
 sdDrop.addEventListener('dragover', event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); });
@@ -513,29 +514,13 @@ sdDrop.addEventListener('drop', event => {
   if (!event.dataTransfer.files.length) return;
   event.preventDefault();
   const files = [...event.dataTransfer.files];
-  runMediaOperation(async () => {
-    for (const file of files) mediaFiles.set(`sd/${file.name}`, new Uint8Array(await file.arrayBuffer()));
-    if (sdOwner === 'diy') {
-      sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files: mediaFor('sd/') } });
-      await getDiySnapshot('sd/');
-    }
-    await persistMedia();
-    reportMedia(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
-  });
+  runMediaOperation(() => importSdFiles(files));
 });
 addEventListener('paste', event => {
   const files = [...(event.clipboardData?.files || [])];
   if (!files.length) return;
   event.preventDefault();
-  runMediaOperation(async () => {
-    for (const file of files) mediaFiles.set(`sd/${file.name}`, new Uint8Array(await file.arrayBuffer()));
-    if (sdOwner === 'diy') {
-      sendDiyMessage({ type: 'peripheral-command', command: { type: 'state-import', files: mediaFor('sd/') } });
-      await getDiySnapshot('sd/');
-    }
-    await persistMedia();
-    reportMedia(`${files.length} file${files.length === 1 ? '' : 's'} added to the virtual SD card.`);
-  });
+  runMediaOperation(() => importSdFiles(files));
 });
 $('#sd-clear').addEventListener('click', () => runMediaOperation(async () => {
   if (sdOwner === 'diy') {
@@ -756,6 +741,11 @@ window.addEventListener('message', event => {
       sendDiyMessage({ type: 'peripherals-provide', files, sdInserted: sdOwner === 'diy', cardSlot });
       sendDiyMessage({ type: 'gallery-parent-ready' });
       setStatus(diyStatus, 'Starting real firmware…');
+    } else if (data.type === 'simulator-restarting') {
+      diyRunning = false;
+      diyUsbEnabled = false;
+      setStatus(diyStatus, 'Restarting locally…');
+      updateCableState();
     } else if (data.type === 'simulator-running') {
       diyRunning = true;
       setStatus(diyStatus, 'Running locally', 'ready');
@@ -891,6 +881,7 @@ async function boot() {
       sourceCommit: sourceBuildInfo.commit,
       sourceSha256: sourceBuildInfo.source_archive.sha256,
       sourceUrl: sourceBuildInfo.sourceUrl,
+      publicDerivation: sourceBuildInfo.public_derivation,
     });
     $('#diy-build-label').classList.remove('diy-build-loading');
   } catch (error) {

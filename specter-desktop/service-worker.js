@@ -16,6 +16,7 @@ function needsWsgi(pathname) {
     pathname.startsWith(`${SCOPE_PREFIX}static/`) ||
     pathname.startsWith(`${SCOPE_PREFIX}spc/`) ||
     pathname.startsWith(`${SCOPE_PREFIX}hwi/`) ||
+    pathname.startsWith(`${SCOPE_PREFIX}svc/`) ||
     pathname.startsWith(`${SCOPE_PREFIX}ext/`);
 }
 
@@ -49,6 +50,9 @@ async function routeThroughWsgi(request, url) {
   const body = request.method === 'GET' || request.method === 'HEAD'
     ? new ArrayBuffer(0) : await request.arrayBuffer();
   const headers = Object.fromEntries(request.headers.entries());
+  // Host is a browser-managed header and may be absent from Request.headers.
+  // Flask needs the actual origin for HTTPS CSRF checks and absolute URLs.
+  headers.Host = url.host;
   // Fetch exposes Referer on Request.referrer rather than Request.headers.
   // Flask-WTF requires it for HTTPS POSTs, so preserve the browser's actual
   // same-origin referrer when adapting the request to the in-browser WSGI app.
@@ -58,7 +62,7 @@ async function routeThroughWsgi(request, url) {
   }
   const channel = new MessageChannel();
   const responsePromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Specter WSGI request timed out')), 120000);
+    const timeout = setTimeout(() => reject(new Error('Specter WSGI request timed out')), 300000);
     channel.port1.onmessage = event => {
       clearTimeout(timeout);
       resolve(event.data);
@@ -76,6 +80,8 @@ async function routeThroughWsgi(request, url) {
       path: wsgiPath(url.pathname),
       query: url.search.slice(1),
       scheme: url.protocol.slice(0, -1),
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? '443' : '80'),
       content_type: request.headers.get('Content-Type') || '',
       headers,
       body: body,
@@ -100,7 +106,8 @@ self.addEventListener('fetch', event => {
   event.respondWith(routeThroughWsgi(event.request, url).catch(error =>
     new Response(`Specter browser request failed: ${error.message}`, {
       status: 502,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store',
+        'Cross-Origin-Embedder-Policy': 'require-corp', 'Cross-Origin-Resource-Policy': 'same-origin' },
     })
   ));
 });

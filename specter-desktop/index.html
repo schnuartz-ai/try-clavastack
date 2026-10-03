@@ -112,11 +112,11 @@
         <section><h3>Specter Desktop</h3><p>Repository: <a id="desktop-repository" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Commit: <a id="desktop-commit" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Browser runtime: Pyodide / CPython 3.12</p><p id="desktop-built-at"></p></section>
         <section><h3>Specter DIY</h3><p>Repository: <a id="diy-repository" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Commit: <a id="diy-commit" target="_blank" rel="noopener noreferrer">Loading…</a></p><p>Runtime: MicroPython + Emscripten / WebAssembly</p><p id="diy-built-at"></p></section>
       </div>
-      <p class="adapter-note">Browser adapters disable OS processes, TCP/RPC services, Tor and physical USB access. Specter’s Flask routes, templates, wallet and device logic remain sourced from upstream. Browser data is stored locally and can be cleared with Reset Desktop data.</p>
+      <p class="adapter-note">Specter’s Flask routes, templates, wallet and device logic run locally. The upstream Spectrum extension connects to supported Electrum servers through a TLS relay. Wallet files stay in this browser; the selected server and relay receive the public blockchain queries. OS processes, Tor, Bitcoin Core TCP access and physical USB are unavailable.</p>
     </details>
   </main>
   <footer>ClavaStack · <a href="/simulators/">Simulator drafts</a> · Browser simulation only; never use real funds or real seeds.</footer>
   <script src="/assets/jsQR-1.4.0.js"></script>
-  <script type="module" src="/specter-desktop/site.js"></script>
+  <script type="module" src="/specter-desktop/site.js?v=2026-10-03.3"></script>
 </body>
 </html>

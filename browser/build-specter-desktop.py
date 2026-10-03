@@ -27,6 +27,9 @@ PYODIDE_VERSION = "0.27.7"
 PYODIDE_PYTHON = "3.12.7"
 EMBIT_VERSION = "0.6.1"
 HWI_VERSION = "3.1.0"
+SPECTRUM_REPO = "cryptoadvance/spectrum"
+SPECTRUM_COMMIT = "a057c55084fcd46e47a73ad0794a524e92ab7354"
+SQLALCHEMY_VERSION = "1.4.54"
 
 
 def run(args: list[str], *, cwd: Path | None = None) -> str:
@@ -132,6 +135,29 @@ def sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def download_sqlalchemy():
+    """Bundle the upstream Python fallback, without desktop C extensions."""
+    with urllib.request.urlopen(f"https://pypi.org/pypi/SQLAlchemy/{SQLALCHEMY_VERSION}/json", timeout=30) as response:
+        metadata = json.load(response)
+    source = next(item for item in metadata["urls"] if item["packagetype"] == "sdist")
+    with urllib.request.urlopen(source["url"], timeout=60) as response:
+        payload = response.read()
+    digest = sha256(payload)
+    if digest != source["digests"]["sha256"]:
+        raise SystemExit("SQLAlchemy source archive failed its published SHA-256 check")
+    files = {}
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as archive:
+        for member in archive.getmembers():
+            path = PurePosixPath(member.name)
+            if not member.isfile() or "sqlalchemy" not in path.parts or path.suffix != ".py":
+                continue
+            relative = PurePosixPath(*path.parts[path.parts.index("sqlalchemy"):])
+            files[str(relative)] = archive.extractfile(member).read()
+    if "sqlalchemy/__init__.py" not in files:
+        raise SystemExit("SQLAlchemy package missing from source archive")
+    return digest, files
+
+
 def main() -> None:
     desktop_commit = resolve_head(DESKTOP_REPO, os.getenv("SPECTER_DESKTOP_SOURCE_SHA"))
     web_simulator_commit = resolve_head(
@@ -145,20 +171,23 @@ def main() -> None:
         raise SystemExit("Current DIY build provenance did not match the expected upstream repository")
 
     source = checkout(DESKTOP_REPO, WORK / "source", desktop_commit)
+    spectrum_source = checkout(SPECTRUM_REPO, WORK / "spectrum", SPECTRUM_COMMIT)
     package_root = source / "src" / "cryptoadvance" / "specter"
     if not (package_root / "server.py").is_file() or not (package_root / "templates").is_dir():
         raise SystemExit("The pinned Specter Desktop tree does not contain its real Flask application")
     namespace_init = source / "src" / "cryptoadvance" / "__init__.py"
     embit_payload, embit_sdist_sha, embit_files = download_embit()
     hwi_wheel_sha, hwi_files = download_hwi()
+    sqlalchemy_sha, sqlalchemy_files = download_sqlalchemy()
 
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
-    destination = OUT_ROOT / desktop_commit
+    destination = WORK / "package"
+    run(["node", str(ROOT / "browser" / "build-desktop-secp.mjs"), str(destination)], cwd=ROOT)
     destination.mkdir(parents=True, exist_ok=True)
     bundle_path = destination / "source.zip"
     source_records: dict[str, dict[str, object]] = {}
     with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as bundle:
-        candidates = [package_root, namespace_init]
+        candidates = [package_root, namespace_init, source / "src" / "cryptoadvance" / "specterext" / "spectrum"]
         for candidate in candidates:
             if not candidate.exists():
                 continue
@@ -177,14 +206,35 @@ def main() -> None:
                 payload = file_path.read_bytes()
                 bundle.writestr(relative, payload)
                 source_records[relative] = {"sha256": sha256(payload), "bytes": len(payload)}
+        for file_path in sorted((spectrum_source / "src" / "cryptoadvance" / "spectrum").rglob("*")):
+            if not file_path.is_file() or "__pycache__" in file_path.parts or file_path.suffix == ".pyc":
+                continue
+            relative = file_path.relative_to(spectrum_source / "src").as_posix()
+            payload = file_path.read_bytes()
+            bundle.writestr(relative, payload)
+            source_records[relative] = {"sha256": sha256(payload), "bytes": len(payload)}
         for relative, payload in sorted(embit_files.items()):
             bundle.writestr(relative, payload)
             source_records[relative] = {"sha256": sha256(payload), "bytes": len(payload)}
         for relative, payload in sorted(hwi_files.items()):
             bundle.writestr(relative, payload)
             source_records[relative] = {"sha256": sha256(payload), "bytes": len(payload)}
+        for relative, payload in sorted(sqlalchemy_files.items()):
+            bundle.writestr(relative, payload)
+            source_records[relative] = {"sha256": sha256(payload), "bytes": len(payload)}
 
     archive_bytes = bundle_path.read_bytes()
+    # The same upstream commit can have a different dependency bundle. Give
+    # the whole bundle a content-addressed URL so old cached archives cannot
+    # be paired with a new manifest or WASM checksum.
+    version = sha256(archive_bytes + (destination / "secp256k1.js").read_bytes()
+                     + (destination / "secp256k1.wasm").read_bytes())[:16]
+    published = OUT_ROOT / desktop_commit / version
+    published.mkdir(parents=True, exist_ok=True)
+    for name in ("source.zip", "secp256k1.js", "secp256k1.wasm", "secp256k1.LICENSE.txt"):
+        shutil.copyfile(destination / name, published / name)
+    destination = published
+    bundle_path = destination / "source.zip"
     build_info = {
         "schema_version": 1,
         "repository": DESKTOP_REPO,
@@ -194,6 +244,8 @@ def main() -> None:
         "diy_commit": diy_commit,
         "web_simulator_repository": WEB_SIMULATOR_REPO,
         "web_simulator_commit": web_simulator_commit,
+        "spectrum_repository": SPECTRUM_REPO,
+        "spectrum_commit": SPECTRUM_COMMIT,
         "built_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
         "runtime": {
             "pyodide": PYODIDE_VERSION,
@@ -205,6 +257,17 @@ def main() -> None:
             "embit_sdist_sha256": embit_sdist_sha,
             "hwi": HWI_VERSION,
             "hwi_wheel_sha256": hwi_wheel_sha,
+            "sqlalchemy": SQLALCHEMY_VERSION,
+            "sqlalchemy_sdist_sha256": sqlalchemy_sha,
+        },
+        "public_derivation": {
+            "package": "tiny-secp256k1",
+            "version": "2.2.4",
+            "files": {
+                name: {"sha256": sha256((destination / name).read_bytes()),
+                       "bytes": (destination / name).stat().st_size}
+                for name in ("secp256k1.js", "secp256k1.wasm")
+            },
         },
         "source_archive": {
             "path": "source.zip",
@@ -229,8 +292,8 @@ def main() -> None:
         json.dumps(build_info, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     pointer = {
-        "build": f"/builds/{DESKTOP_REPO}/{desktop_commit}/",
-        "version": sha256(archive_bytes)[:16],
+        "build": f"/builds/{DESKTOP_REPO}/{desktop_commit}/{version}/",
+        "version": version,
         "repository": DESKTOP_REPO,
         "commit": desktop_commit,
         "diy_repository": DIY_REPO,

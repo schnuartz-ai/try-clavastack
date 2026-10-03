@@ -8,7 +8,21 @@ let usbEnabled = false;
 let program = 'wallet';
 self.screen = { width: 480, height: 800 };
 const send = (type, details = {}) => postMessage({ type, ...details });
-const workerRevision = '2026-10-02.inspector2';
+const workerRevision = '2026-10-03.reboot1';
+// Unix firmware normally exits its process. A browser reboot must preserve
+// MEMFS and ask the page to replace this Worker instead.
+const rebootPython = `import platform
+def reboot():
+    with open('/bridge/reboot-requested', 'wb') as f:
+        f.write(b'1')
+platform.reboot = reboot
+`;
+function pollReboot() {
+  const fs = Module.FS;
+  if (!fs.analyzePath('/bridge/reboot-requested').exists) return;
+  fs.unlink('/bridge/reboot-requested');
+  send('reboot');
+}
 let inspectorEnabled = false;
 // Runs on the firmware's own asyncio loop; never re-enter the WASM VM from JS.
 const inspectorPython = `import os, gc, json, asyncio
@@ -519,6 +533,8 @@ onmessage = async ({ data }) => {
     const canvas = data.canvas;
     program = data.program === 'mockui' ? 'mockui' : 'wallet';
     const headlessDisplay = Boolean(data.headlessDisplay);
+    const usbWalletProbe = data.usbWalletProbe
+      ? await (await fetch('/browser/runtime/usb-wallet-probe.py', { cache: 'no-store' })).text() : null;
     const assetSuffix = data.version ? `?v=${encodeURIComponent(data.version)}` : '';
     send('diagnostic', { event: 'start-received', workerRevision, build: data.build, version: data.version,
       display: headlessDisplay ? 'Canvas-Pixelbridge' : 'OffscreenCanvas', canvasGetContext: typeof canvas?.getContext });
@@ -541,7 +557,7 @@ onmessage = async ({ data }) => {
       headlessDisplay,
       // Browser MicroPython heap is independent of hardware RAM. The full
       // wallet import needs the previously proven 64M; MockUI stays lean.
-      arguments: ['-X', `heapsize=${program === 'mockui' ? '16M' : '64M'}`, data.usbProbe ? '/browser/usb-probe.py' : data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.qrOutputProbe ? '/browser/qr-output-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state', ...(data.qrOutputProbe ? [data.qrOutputAnimated ? 'animated' : 'static'] : [])],
+      arguments: ['-X', `heapsize=${program === 'mockui' ? '16M' : '64M'}`, data.usbWalletProbe ? '/browser/usb-wallet-probe.py' : data.usbProbe ? '/browser/usb-probe.py' : data.sdProbe ? '/browser/sd-probe.py' : data.qrProbe ? '/browser/qr-probe.py' : data.qrOutputProbe ? '/browser/qr-output-probe.py' : data.cardProbe ? '/browser/card-probe.py' : data.diag ? '/browser/diagnose.py' : data.program === 'mockui' ? '/browser/mockui-boot.py' : '/browser/boot.py', '/state', ...(data.qrOutputProbe ? [data.qrOutputAnimated ? 'animated' : 'static'] : [])],
       monitorRunDependencies: remaining => send('loading-progress', { remaining }),
       locateFile: path => data.build + path + assetSuffix,
       preRun: [() => {
@@ -550,11 +566,13 @@ onmessage = async ({ data }) => {
         mkdirs(fs, '/state/sd');
         mkdirs(fs, '/state/cards');
         mkdirs(fs, '/bridge');
+        if (usbWalletProbe) fs.writeFile('/browser/usb-wallet-probe.py', usbWalletProbe);
         installSdQuota(fs);
         if (program === 'wallet' && !data.sdProbe && !data.qrProbe && !data.usbProbe && !data.cardProbe && !data.qrOutputProbe && !data.diag) {
           fs.writeFile('/browser/browser_inspector.py', inspectorPython);
+          fs.writeFile('/browser/browser_reboot.py', rebootPython);
           const boot = fs.readFile('/browser/boot.py', { encoding: 'utf8' });
-          fs.writeFile('/browser/boot.py', boot.replace('import main\n', 'import main\nimport browser_inspector\nbrowser_inspector.install(main)\n'));
+          fs.writeFile('/browser/boot.py', boot.replace('import main\n', 'import browser_reboot\nimport main\nimport browser_inspector\nbrowser_inspector.install(main)\n'));
         }
         for (const file of data.stateFiles || []) {
           if (!file.path || file.path.startsWith('ramdisk/')) continue;
@@ -578,12 +596,13 @@ onmessage = async ({ data }) => {
         } else {
           send('log', { message });
         }
-        if (message === 'SPECTER_MAIN_IMPORTED' || message === 'MOCKUI_READY' || message === 'DIAG_SPECTER_CREATED' || message === 'QR_PROBE_READY' || message === 'DIY_QR_OUTPUT_READY' || message === 'USB_PROBE_READY' || message === 'SD_PROBE_WRITTEN' || message === 'CARD_PROBE_READY') {
+        if (message === 'SPECTER_MAIN_IMPORTED' || message === 'MOCKUI_READY' || message === 'DIAG_SPECTER_CREATED' || message === 'QR_PROBE_READY' || message === 'DIY_QR_OUTPUT_READY' || message === 'USB_PROBE_READY' || message === 'USB_WALLET_PROBE_READY' || message === 'SD_PROBE_WRITTEN' || message === 'CARD_PROBE_READY') {
           runtimeReady = true;
           for (const item of pending.splice(0)) handle(item);
           setInterval(flushQr, 50);
           setInterval(pollScanner, 80);
           setInterval(pollUsb, 20);
+          setInterval(pollReboot, 50);
           pollScanner();
           pollUsb();
           setTimeout(() => send('running'), 500);

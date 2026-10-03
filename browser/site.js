@@ -70,7 +70,7 @@ let forceCanvasBridge = false;
 let recoveryTimer;
 let startupPhase = 'manifest';
 let displayMode = 'unselected';
-const workerRevision = '2026-10-02.inspector1';
+const workerRevision = '2026-10-03.reboot1';
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;
@@ -742,6 +742,9 @@ function onWorkerMessage({ data }, generation = runGeneration) {
     send({ type: 'sd-list' });
     send({ type: 'card-list' });
     notifyParent({ type: 'simulator-running', variant, build, version });
+  } else if (data.type === 'reboot') {
+    log('Firmware requested a reboot');
+    restart().catch(error => failure(error.message || String(error)));
   } else if (data.type === 'log') {
     if (/^(SPECTER_|MOCKUI_)/.test(data.message)) startupPhase = data.message;
     if (data.message === 'SPECTER_IMPORTS_DONE' || data.message === 'SPECTER_MAIN_IMPORTED') {
@@ -914,7 +917,7 @@ async function start() {
     send({ type: 'start', build, version, program, canvas: offscreen, headlessDisplay: !transferable,
       stateFiles, sdInserted: inserted, cardSlot: activeCard, qrProbe: diagnosticQrProbe,
       qrOutputProbe: diagnosticQrOutputProbe, qrOutputAnimated: params.get('probe') === 'qr-output-animated',
-      usbProbe: diagnosticUsbProbe }, offscreen ? [offscreen] : []);
+      usbProbe: diagnosticUsbProbe, usbWalletProbe: params.get('probe') === 'usb-wallet' }, offscreen ? [offscreen] : []);
     startupPhase = 'runtime-assets';
   } catch (error) {
     crashRecover(`${error.name}: ${error.message}\n${error.stack || ''}`, generation);
@@ -935,6 +938,10 @@ function snapshot(generation = runGeneration) {
 async function restart(factory = false) {
   if (restartPromise) return restartPromise;
   restartPromise = (async () => {
+    virtualUsbEnabled = false;
+    updateVirtualHostStatus();
+    notifyParent({ type: 'simulator-restarting', variant });
+    if (gallery && variant === 'diy') notifyParent({ type: 'simulator-usb-state', variant, enabled: false });
     stopCamera();
     clearTimeout(scannerStopTimer);
     scannerActive = false;

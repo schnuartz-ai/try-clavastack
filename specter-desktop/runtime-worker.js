@@ -55,12 +55,41 @@ function syncFilesystem(populate) {
 }
 
 async function initialize(message) {
+  const sourceBase = new URL('.', new URL(message.sourceUrl, self.location.href));
+  const verifiedAssets = {};
+  for (const name of ['secp256k1.js', 'secp256k1.wasm']) {
+    const expected = message.publicDerivation?.files?.[name]?.sha256;
+    if (!expected) throw new Error(`Missing public derivation checksum for ${name}`);
+    const response = await fetch(new URL(name, sourceBase), { cache: 'no-store' });
+    if (!response.ok) throw new Error(`${name} returned HTTP ${response.status}`);
+    const bytes = await response.arrayBuffer();
+    const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+      .map(value => value.toString(16).padStart(2, '0')).join('');
+    if (hash !== expected) throw new Error(`${name} SHA-256 mismatch`);
+    verifiedAssets[name] = bytes;
+  }
+  self.specterVerifiedSecpWasm = verifiedAssets['secp256k1.wasm'];
+  const moduleUrl = URL.createObjectURL(new Blob([verifiedAssets['secp256k1.js']], { type: 'text/javascript' }));
+  let publicSecp;
+  try { publicSecp = await import(moduleUrl); }
+  finally { URL.revokeObjectURL(moduleUrl); delete self.specterVerifiedSecpWasm; }
+  self.specterPublicPointCompress = (hex, compressed) => {
+    const input = Uint8Array.from(hex.match(/../g) || [], value => parseInt(value, 16));
+    if (!publicSecp.isPoint(input)) throw new Error('Invalid public key');
+    return [...publicSecp.pointCompress(input, compressed)].map(value => value.toString(16).padStart(2, '0')).join('');
+  };
+  self.specterPublicPointAdd = (hex, tweakHex) => {
+    const input = Uint8Array.from(hex.match(/../g) || [], value => parseInt(value, 16));
+    const tweak = Uint8Array.from(tweakHex.match(/../g) || [], value => parseInt(value, 16));
+    const result = publicSecp.pointAddScalar(input, tweak, false);
+    return result ? [...result].map(value => value.toString(16).padStart(2, '0')).join('') : null;
+  };
   notify('progress', { label: 'Loading CPython 3.12 WebAssembly…', progress: 4 });
   importScripts(`${PYODIDE_INDEX}pyodide.js`);
   pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX });
   notify('progress', { label: 'Loading Python cryptography and protocol runtime…', progress: 16 });
   await pyodide.loadPackage([
-    'micropip', 'cryptography', 'requests', 'ssl', 'typing-extensions', 'protobuf'
+    'micropip', 'cryptography', 'requests', 'ssl', 'typing-extensions', 'protobuf', 'sqlite3'
   ]);
   const micropip = pyodide.pyimport('micropip');
   await micropip.install([
@@ -80,7 +109,9 @@ async function initialize(message) {
     'semver==3.0.4',
     'ecdsa==0.19.1',
     'noiseprotocol==0.3.1',
+    'PySocks==1.7.1',
   ]);
+  await micropip.install('Flask-SQLAlchemy==2.5.1', { deps: false });
   micropip.destroy();
 
   notify('progress', { label: 'Verifying pinned Specter Desktop upstream source…', progress: 48 });
@@ -141,8 +172,8 @@ _environ = {
     'SCRIPT_NAME': '/specter-desktop',
     'PATH_INFO': _request['path'],
     'QUERY_STRING': _request['query'],
-    'SERVER_NAME': 'try.clavastack.com',
-    'SERVER_PORT': '443',
+    'SERVER_NAME': _request.get('hostname', 'try.clavastack.com'),
+    'SERVER_PORT': _request.get('port', '443'),
     'SERVER_PROTOCOL': 'HTTP/1.1',
     'wsgi.version': (1, 0),
     'wsgi.url_scheme': _request.get('scheme', 'https'),

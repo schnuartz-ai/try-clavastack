@@ -174,6 +174,10 @@ jobs:
         run: python3 run_native_tests.py
       - name: Install browser test tools
         run: npx playwright install --with-deps chromium
+      - name: Test Electrum relay validation and transport
+        run: |
+          python3 -m unittest discover -s pool -p test_electrum_relay.py
+          node browser/test-desktop-sd-capacity.mjs
       - name: Start static server
         run: python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/specter-static.log 2>&1 &
       - name: Start isolated static server for the Specter Desktop cable test
@@ -197,6 +201,23 @@ jobs:
           CI: 'true'
           TEST_BASE_URL: http://127.0.0.1:8766
         run: npm run test:specter-desktop
+      - name: Verify public derivation WASM bridge against Python and BIP32
+        env:
+          CI: 'true'
+          TEST_BASE_URL: http://127.0.0.1:8766
+        run: node browser/test-desktop-public-secp.mjs
+      - name: Start HTTPS server for Specter wallet regression tests
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: |
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/specter-test.key -out /tmp/specter-test.crt \
+            -days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1
+          python3 browser/test-isolated-server.py --port 8767 --cert /tmp/specter-test.crt --key /tmp/specter-test.key > /tmp/specter-https.log 2>&1 &
+      - name: Test HTTPS device creation, real USB keys and Blockstream wallet
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        env:
+          CI: 'true'
+          TEST_BASE_URL: https://127.0.0.1:8767
+        run: npm run test:specter-workflows
       - name: Package the complete tested production site
         if: github.event_name != 'pull_request'
         run: bash deploy/package-site.sh dist
@@ -216,6 +237,7 @@ jobs:
           name: browser-smoke
           path: |
             test-results/*.png
+            test-results/*.json
             builds/**/build-info.json
       - name: Upload tested browser builds
         # Keep failed-run builds available for startup diagnostics. They are

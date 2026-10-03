@@ -52,6 +52,8 @@ for path in "${paths[@]}"; do
 done
 
 mkdir -p "$SITE_DIR/browser/variants"
+mkdir -p "$SITE_DIR/browser/runtime"
+cp "$ROOT/browser/runtime/usb-wallet-probe.py" "$SITE_DIR/browser/runtime/"
 cp "$ROOT/browser/site.js" "$ROOT/browser/runtime-worker.js" \
   "$ROOT/browser/current.json" "$ROOT/browser/demo-data.js" \
   "$ROOT/browser/virtual-host-downloads.js" \

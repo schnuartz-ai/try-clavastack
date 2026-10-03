@@ -171,9 +171,13 @@
     const name = (link.download || '').trim();
     if (!name || !sdInserted) return false;
     try {
-      const bytes = link.href.startsWith('data:')
-        ? decodeDataUrl(link.href)
-        : new Uint8Array(await (await fetch(link.href)).arrayBuffer());
+      let bytes;
+      if (link.href.startsWith('data:')) bytes = decodeDataUrl(link.href);
+      else {
+        const response = await fetch(link.href);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        bytes = new Uint8Array(await response.arrayBuffer());
+      }
       const result = await request('specter-media-write', { name, bytes });
       if (result.error) throw new Error(result.error);
       showToast(`Saved ${name} to the virtual SD card.`);

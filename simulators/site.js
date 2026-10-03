@@ -178,6 +178,9 @@ addEventListener('message', event => {
     if (sdOwner === name) files.push(...filesFor('sd/'));
     for (const slot of [1, 2, 3]) if (cardOwners.get(slot) === name) files.push(...filesFor(`cards/${slot}/`));
     message(name, { type: 'peripherals-provide', files });
+  } else if (data.type === 'simulator-restarting' && data.variant === name) {
+    ready.delete(name);
+    devices[name].querySelector('.device-status').textContent = 'Restarting locally';
   } else if (data.type === 'simulator-running' && data.variant === name) {
     childVersions.set(name, { build: data.build, version: data.version });
     if (feedbackVersions[name] &&

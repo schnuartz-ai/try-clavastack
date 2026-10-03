@@ -182,6 +182,264 @@ def install_kdf_adapter():
     hashlib.pbkdf2_hmac = browser_pbkdf2_hmac
 
 
+def install_public_derivation_adapter():
+    """Use pinned libsecp256k1 WASM for public point operations only."""
+    from js import specterPublicPointCompress, specterPublicPointAdd
+    from embit.util import secp256k1 as secp
+
+    def internal(sec):
+        return sec[1:33][::-1] + sec[33:65][::-1]
+
+    def serialized(pub):
+        if len(pub) != 64:
+            raise ValueError("Public key should be 64 bytes long")
+        return b"\x04" + pub[:32][::-1] + pub[32:][::-1]
+
+    def parse(sec, context=None):
+        if len(sec) not in (33, 65):
+            raise ValueError("Serialized public key should be 33 or 65 bytes long")
+        try:
+            return internal(bytes.fromhex(str(specterPublicPointCompress(bytes(sec).hex(), False))))
+        except Exception as error:
+            raise ValueError("Invalid public key") from error
+
+    def serialize(pub, flag=secp.EC_COMPRESSED, context=None):
+        if flag not in (secp.EC_COMPRESSED, secp.EC_UNCOMPRESSED):
+            raise ValueError("Invalid public key serialization flag")
+        return bytes.fromhex(str(specterPublicPointCompress(serialized(pub).hex(), flag == secp.EC_COMPRESSED)))
+
+    def add(pub, tweak, context=None):
+        if len(tweak) != 32:
+            raise ValueError("Tweak should be 32 bytes long")
+        try:
+            result = specterPublicPointAdd(serialized(pub).hex(), bytes(tweak).hex())
+            return internal(bytes.fromhex(str(result))) if result is not None else None
+        except Exception as error:
+            raise ValueError("Invalid public key tweak") from error
+
+    def tweak_add(pub, tweak, context=None):
+        result = add(pub, tweak, context)
+        if result is None:
+            raise ValueError("Public key tweak resulted in infinity")
+        pub[:] = result
+
+    secp.ec_pubkey_parse = parse
+    secp.ec_pubkey_serialize = serialize
+    secp.ec_pubkey_add = add
+    secp.ec_pubkey_tweak_add = tweak_add
+
+
+def install_electrum_adapter():
+    """Keep upstream Spectrum; adapt its socket and thread seams for WASM."""
+    import json
+    import time
+    from js import XMLHttpRequest
+    from cryptoadvance.spectrum.spectrum_error import RPCError
+
+    class BrowserElectrumSocket:
+        def __init__(self, host, port, use_ssl=True, **_kwargs):
+            self.host, self.port, self.ssl = host, int(port), bool(use_ssl)
+            self.status = "disconnected"
+            self.uses_tor = False
+            self._next_retry = 0
+            self._script_statuses = {}
+            self._read_cache = {}
+            try:
+                self.call("server.version", ["ClavaStack Spectrum", "1.4"])
+            except Exception:
+                # Opening saved wallets offline must not prevent Desktop boot.
+                self.status = "disconnected"
+
+        def call(self, method, params=None):
+            if method == "blockchain.scripthash.subscribe" and params and params[0] in self._script_statuses:
+                return self._script_statuses.pop(params[0])
+            key = (method, json.dumps(params or []))
+            if key in self._read_cache:
+                return self._read_cache[key]
+            return self._request({"method": method, "params": params or []})
+
+        def prime_scripts(self, scripts):
+            self._script_statuses.clear()
+            self._read_cache.clear()
+            states = {script.scripthash: script.state for script in scripts if script.index is not None}
+            hashes = list(states)
+            transactions, heights, changed_scripts = set(), set(), []
+            for start in range(0, len(hashes), 100):
+                batch = hashes[start:start + 100]
+                records = self._request({"method": "blockchain.scripthash.subscribe", "scripthashes": batch, "include_history": True})
+                for value, record in zip(batch, records):
+                    self._script_statuses[value] = record["status"]
+                    self._read_cache[("blockchain.scripthash.get_history", json.dumps([value]))] = record["history"]
+                    if states[value] != record["status"]:
+                        changed_scripts.append([value])
+                        for tx in record["history"]:
+                            transactions.add(tx["tx_hash"])
+                            if tx["height"] > 0:
+                                heights.add(tx["height"])
+            for method, values in (("blockchain.scripthash.listunspent", changed_scripts),
+                                   ("blockchain.scripthash.get_balance", changed_scripts),
+                                   ("blockchain.transaction.get", [[value, False] for value in transactions]),
+                                   ("blockchain.block.header", [[value] for value in heights])):
+                for start in range(0, len(values), 100):
+                    batch = values[start:start + 100]
+                    results = self._request({"method": method, "parameter_batch": batch})
+                    for params, result in zip(batch, results):
+                        self._read_cache[(method, json.dumps(params))] = result
+
+        def _request(self, payload):
+            request = XMLHttpRequest.new()
+            request.open("POST", "/api/ab/electrum", False)
+            request.setRequestHeader("Content-Type", "application/json")
+            try:
+                request.send(json.dumps({"host": self.host, "port": self.port,
+                                         "ssl": self.ssl, **payload}))
+                response = json.loads(str(request.responseText))
+                if int(request.status) != 200:
+                    raise RuntimeError(response.get("error", "Electrum relay could not be reached"))
+                self.status = "ok"
+                if response.get("error"):
+                    error = response["error"]
+                    raise RPCError(error.get("message", str(error)), error.get("code", -1))
+                self.status = "ok"
+                return response["result"]
+            except RPCError:
+                raise
+            except Exception:
+                self.status = "disconnected"
+                raise
+
+        def ping(self):
+            started = time.monotonic()
+            self.call("server.ping")
+            return time.monotonic() - started
+
+        def ensure_connected(self, force=False):
+            if self.status == "ok":
+                return True
+            if not force and time.monotonic() < self._next_retry:
+                return False
+            self._next_retry = time.monotonic() + 15
+            try:
+                self.call("server.version", ["ClavaStack Spectrum", "1.4"])
+                return True
+            except Exception:
+                return False
+
+        def shutdown(self):
+            self.status = "disconnected"
+
+    # Spectrum uses threads only to schedule wallet synchronisation. Requests
+    # already run serially in a dedicated Worker, so execute those jobs there.
+    class BrowserFlaskThread:
+        def __init__(self, target, args=(), kwargs=None, **_options):
+            self.target, self.args, self.kwargs = target, args, kwargs or {}
+
+        def start(self):
+            self.target(*self.args, **self.kwargs)
+
+    import cryptoadvance.spectrum.elsock as elsock
+    import cryptoadvance.spectrum.util as spectrum_util
+    elsock.ElectrumSocket = BrowserElectrumSocket
+    spectrum_util.FlaskThread = BrowserFlaskThread
+    from cryptoadvance.specter.managers import wallet_manager
+    wallet_manager.FlaskThread = BrowserFlaskThread
+    from cryptoadvance.spectrum.spectrum import Spectrum
+    # Both supported relay servers are Bitcoin mainnet, including offline boot.
+    Spectrum.chain = "main"
+    from cryptoadvance.spectrum.db import Script
+    import inspect
+    import textwrap
+    from cryptoadvance.specter.wallet.txlist import WalletAwareTxItem
+    # Upstream stores these immutable transaction properties in its CSV but
+    # checks a different category key, and treats cached zero/False as absent.
+    # Copies used by the history page otherwise rebuild every transaction PSBT.
+    for name in ("category", "flow_amount", "utxo_amount", "ismine"):
+        prop = getattr(WalletAwareTxItem, name)
+        property_source = textwrap.dedent(inspect.getsource(prop.fget))
+        if name == "category":
+            if property_source.count('self.get("_category")') != 1 or property_source.count('self["_category"]') != 1:
+                raise RuntimeError("Specter transaction category cache seam changed")
+            property_source = property_source.replace('self.get("_category")', 'self.get("category")')
+            property_source = property_source.replace('self["_category"]', 'self["category"]')
+        else:
+            seam = f'if self.get("{name}"):'
+            if property_source.count(seam) != 1:
+                raise RuntimeError("Specter transaction property cache seam changed")
+            property_source = property_source.replace(seam, f'if self.get("{name}") is not None:', 1)
+        namespace = {}
+        exec(compile(property_source, "<browser-transaction-cache>", "exec"), prop.fget.__globals__, namespace)
+        setattr(WalletAwareTxItem, name, namespace[name])
+    original_info = Spectrum.getblockchaininfo
+    original_rpc = Spectrum.jsonrpc
+    original_sync = Spectrum._sync
+    # Upstream rounds elapsed seconds down; a batched empty wallet can finish
+    # its first hundred scripts in <1 second. Keep its progress division valid.
+    sync_source = textwrap.dedent(inspect.getsource(original_sync))
+    denominator = "int(\n                    (datetime.now() - ts).total_seconds()\n                )"
+    if sync_source.count(denominator) != 1:
+        raise RuntimeError("Spectrum sync progress seam changed")
+    sync_source = sync_source.replace(denominator, "max(1, (datetime.now() - ts).total_seconds())", 1)
+    sync_namespace = {}
+    exec(compile(sync_source, "<browser-spectrum-sync>", "exec"), original_sync.__globals__, sync_namespace)
+    original_sync = sync_namespace["_sync"]
+    original_subscribe = Spectrum._subcribe_scripts
+    original_script_sync = Spectrum.sync_script
+    script_source = textwrap.dedent(inspect.getsource(original_script_sync))
+    header_seam = '''blockheader = self.sock.call("blockchain.block.header", [tx.get("height")])
+        blockheader = parse_blockheader(blockheader)'''
+    if script_source.count(header_seam) != 1 or script_source.count('[tx["tx_hash"], tx_in_db]') != 1:
+        raise RuntimeError("Spectrum transaction sync seam changed")
+    script_source = script_source.replace(header_seam, '''blockheader = parse_blockheader(self.sock.call("blockchain.block.header", [tx["height"]])) if tx["height"] > 0 else {}''', 1)
+    # Only raw bytes are used for new transactions; existing rows need height
+    # updates. Electrs does not support Bitcoin Core's verbose response mode.
+    script_source = script_source.replace('[tx["tx_hash"], tx_in_db]', '[tx["tx_hash"], False]', 1)
+    script_namespace = {}
+    exec(compile(script_source, "<browser-spectrum-script-sync>", "exec"), original_script_sync.__globals__, script_namespace)
+    Spectrum.sync_script = script_namespace["sync_script"]
+
+    def sync_scripts(self):
+        if self.sock.status != "ok":
+            return original_sync(self)
+        self.sock.prime_scripts(Script.query.all())
+        try:
+            return original_sync(self)
+        finally:
+            self.sock._script_statuses.clear()
+            self.sock._read_cache.clear()
+            self._browser_wallet_checked = time.monotonic()
+
+    def subscribe_scripts(self, descriptor_id):
+        self.sock.prime_scripts(Script.query.filter_by(descriptor_id=descriptor_id).all())
+        try:
+            return original_subscribe(self, descriptor_id)
+        finally:
+            self.sock._script_statuses.clear()
+            self.sock._read_cache.clear()
+
+    def refreshed_info(self):
+        now = time.monotonic()
+        if self.sock.ensure_connected() and now - getattr(self, "_browser_tip_checked", 0) > 15:
+            header = self.sock.call("blockchain.headers.subscribe")
+            self.process_notification({"method": "blockchain.headers.subscribe", "params": [header]})
+            self._browser_tip_checked = now
+        return original_info(self)
+
+    def refreshed_rpc(self, obj, wallet_name=None, catch_exceptions=True):
+        # Browser Workers cannot run Spectrum's socket notification threads.
+        # Poll before balance/history reads to keep its original database fresh.
+        if wallet_name and obj.get("method") in {"getbalances", "getwalletinfo", "listtransactions", "listunspent"} and self.sock.ensure_connected():
+            now = time.monotonic()
+            if now - getattr(self, "_browser_wallet_checked", 0) > 30:
+                self.sync(asyncc=False)
+                self._browser_wallet_checked = now
+        return original_rpc(self, obj, wallet_name, catch_exceptions)
+
+    Spectrum.getblockchaininfo = refreshed_info
+    Spectrum.jsonrpc = refreshed_rpc
+    Spectrum._sync = sync_scripts
+    Spectrum._subcribe_scripts = subscribe_scripts
+
+
 def patch_qr_scanner_template(app):
     """Expose upstream's own QR/UR parser callback as a camera or frame source."""
     import jinja2
@@ -296,6 +554,16 @@ def patch_qr_scanner_template(app):
                 if source.count(old_hwi_url) != 1:
                     raise RuntimeError("Specter Desktop HWI template no longer exposes its expected API URL")
                 source = source.replace(old_hwi_url, new_hwi_url, 1)
+            if template.replace("\\", "/").endswith("wallet/settings/wallet_settings.jinja"):
+                qr_button = '''<button onclick="showPageOverlay('{{ device.alias }}_export_qr_code')" type="button" class="button mt-3 mb-8">Show {{ device.name }} QR Code</button>'''
+                sd_export = '''
+                                {% if device.device_type == 'specter' %}
+                                <a download="{{ wallet.name | ascii20 }}.txt" href="data:text/plain;charset=utf-8,{{ device.export_wallet(wallet) | urlencode }}" class="button mt-3 mb-8">Save {{ device.name }} file</a>
+                                {% endif %}'''
+                if source.count(qr_button) != 1:
+                    raise RuntimeError("Specter Desktop DIY wallet export seam changed")
+                # Use the same native device export for QR and removable media.
+                source = source.replace(qr_button, qr_button + sd_export, 1)
 
             def refreshed():
                 return uptodate()
@@ -309,6 +577,8 @@ def initialize(secret_key):
     install_import_adapters()
     install_process_and_network_guards()
     install_kdf_adapter()
+    install_public_derivation_adapter()
+    install_electrum_adapter()
 
     from cryptoadvance.specter import server
     from cryptoadvance.specter.config import BaseConfig
@@ -331,12 +601,14 @@ def initialize(secret_key):
         SESSION_COOKIE_SAMESITE = "Lax"
         SESSION_PROTECTION = None
         INTERNAL_BITCOIND_VERSION = ""
-        EXTENSION_LIST = []
+        EXTENSION_LIST = ["cryptoadvance.specterext.spectrum.service"]
+        SQLALCHEMY_TRACK_MODIFICATIONS = False
         SERVICES_LOAD_FROM_CWD = False
         ENABLE_OWN_REQUEST_LOGGING = False
         ENABLE_WERKZEUG_REQUEST_LOGGING = False
         RASPIBLITZ_SPECTER_RPC_LOGIN_BITCOIN_CONF_LOCATION = "/disabled/bitcoin.conf"
 
+    globals()["BrowserConfig"] = BrowserConfig  # ExtensionManager resolves the configured class by module.
     app = server.create_app(BrowserConfig)
     patch_qr_scanner_template(app)
     specter = Specter(
@@ -346,6 +618,34 @@ def initialize(secret_key):
     )
     with app.app_context():
         server.init_app(app, specter=specter)
+        # Spectrum starts in the extension callback, after Specter's initial
+        # wallet check. With background checkers disabled, run that check once
+        # now so persisted wallets are loaded against the restored node.
+        specter.check(check_all=True)
+    app.config["ELECTRUM_DEFAULT_OPTION"] = "electrum.blockstream.info"
+    options = app.config["ELECTRUM_OPTIONS"]
+    app.config["ELECTRUM_OPTIONS"] = {key: options[key] for key in ("electrum.blockstream.info", "electrum.emzy.de")}
+    @app.before_request
+    def reconnect_spectrum():
+        from flask import request
+        from cryptoadvance.spectrum.util import get_blockhash
+        if request.path.startswith('/static/'):
+            return
+        node = specter.node
+        backend = getattr(node, 'spectrum', None)
+        if backend is None or backend.is_connected():
+            return
+        navigation = request.method == 'GET' and 'text/html' in request.headers.get('Accept', '')
+        if not backend.sock.ensure_connected(force=navigation):
+            return
+        try:
+            backend.roothash = get_blockhash(backend.sock.call('blockchain.block.header', [0]))
+            header = backend.sock.call('blockchain.headers.subscribe')
+            backend.process_notification({'method': 'blockchain.headers.subscribe', 'params': [header]})
+            backend.sync(asyncc=False)
+            specter.check(check_all=True)
+        except Exception:
+            backend.sock.status = 'disconnected'
     os.makedirs(BrowserConfig.SPECTER_DATA_FOLDER, exist_ok=True)
     return app
 
