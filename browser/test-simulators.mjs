@@ -134,6 +134,13 @@ for (const [name, targets] of [
   ['schnuartz', [[.94, .03], [.50, .48], [.50, .85]]],
 ]) {
   const canvas = page.frameLocator(`[data-device="${name}"] iframe`).locator('#screen');
+  // A fresh firmware instance starts on the upstream welcome tour. Dismiss it
+  // before testing the menu coordinates, as on the standalone variant pages.
+  if (name === 'play') {
+    const tourBox = await canvas.boundingBox();
+    await canvas.click({ position: { x: tourBox.width * .50, y: tourBox.height * .58 } });
+    await page.waitForTimeout(500);
+  }
   const before = await canvas.screenshot();
   const box = await canvas.boundingBox();
   let changed = false;
