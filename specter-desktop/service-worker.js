@@ -48,6 +48,14 @@ async function routeThroughWsgi(request, url) {
   if (!client) return new Response('Specter Desktop browser worker is unavailable.', { status: 503 });
   const body = request.method === 'GET' || request.method === 'HEAD'
     ? new ArrayBuffer(0) : await request.arrayBuffer();
+  const headers = Object.fromEntries(request.headers.entries());
+  // Fetch exposes Referer on Request.referrer rather than Request.headers.
+  // Flask-WTF requires it for HTTPS POSTs, so preserve the browser's actual
+  // same-origin referrer when adapting the request to the in-browser WSGI app.
+  if (!Object.keys(headers).some(name => name.toLowerCase() === 'referer') &&
+      request.referrer && request.referrer !== 'about:client' && !request.referrer.startsWith('about:')) {
+    headers.Referer = request.referrer;
+  }
   const channel = new MessageChannel();
   const responsePromise = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Specter WSGI request timed out')), 120000);
@@ -69,7 +77,7 @@ async function routeThroughWsgi(request, url) {
       query: url.search.slice(1),
       scheme: url.protocol.slice(0, -1),
       content_type: request.headers.get('Content-Type') || '',
-      headers: Object.fromEntries(request.headers.entries()),
+      headers,
       body: body,
     },
   }, [channel.port2, body]);
