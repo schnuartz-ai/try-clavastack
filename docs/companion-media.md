@@ -1,6 +1,6 @@
 # Shared companion media
 
-`browser/companion-media.js` owns the existing compact UI, drag/drop and tap insertion, SD file import/export, capacity checks, persistence, media ownership, and demo import. Its stylesheet is `browser/companion-media.css`. Specter Desktop mounts it directly; the Sparrow workbench embeds Specter Desktop and consequently uses the same module. Future companion pages, including Bitcoin Keeper, should mount this component instead of copying its HTML or event handlers.
+`browser/companion-media.js` owns the existing compact UI, drag/drop and tap insertion, SD file import/export, capacity checks, persistence, media ownership, and demo import. Its stylesheet is `browser/companion-media.css`. Specter Desktop and Bitcoin Keeper mount it directly; the Sparrow workbench embeds Specter Desktop and consequently uses the same module. Future companion pages should mount this component instead of copying its HTML or event handlers.
 
 The original standalone DIY layout remains in `index.html`. Both it and companion workbenches call the same `createDemoImporter` in `browser/demo-import.js`, which lazily loads `browser/demo-data.js`. Testnet/Mainnet selections create the identical SD file set and prepare empty Ghost/Zoo MemoryCards with their existing public PINs. No MemoryCard is automatically inserted. None removes only the demo file names and cards prepared by that importer session. Occupied cards are preserved.
 
@@ -29,6 +29,12 @@ Forward same-origin messages only after checking `event.source === diyFrame.cont
 
 The Cable Connection UI is shared. The app connects `#cable-toggle` to its supported real transport. For Specter this is upstream HWI serial commands and the running DIY USB host. Keep the checkbox clickable while the firmware's USB setting is disabled; distinguish an armed cable from an operational connection through status and accessible labels. Do not claim a working cable without the app-specific transport tests.
 
+## Bitcoin Keeper adapter
+
+Keeper uses `clavastack-keeper-removable-media-v1`, independently of Desktop's media store. Its original document picker and sharing boundaries use `browser/companion-file-dialog.js` for computer upload/download or the currently inserted SD card. Temporary RNFS handles only hold files while an upstream operation reads or exports them; the shared component remains the sole SD filesystem. `src/services/fs` maps to a web adapter because the upstream OS service handles only Android and iOS. The upstream screens and PSBT validation remain unchanged.
+
+The pinned Keeper Specter integration supports QR signing. The cable box therefore reports unavailable USB transport and never shows an operational connection. QR frames still enter each application's normal scanner/parser boundary. The None importer removes only cards prepared during its current session; after reloading, existing occupied cards are preserved.
+
 ## Verification
 
 - `node browser/test-demo-data.mjs`: public fixtures and binary card payloads.
@@ -36,5 +42,6 @@ The Cable Connection UI is shared. The app connects `#cable-toggle` to its suppo
 - `node browser/test-desktop-sd-capacity.mjs`: shared 8 GB checks, atomic reads, picker/drop/paste paths.
 - `node browser/test-companion-media.mjs`: actual Spectrum Testnet startup/reset, SD/card byte parity, identity protection, switching/None, round trip, compact desktop/mobile layout and cable toggle.
 - `node browser/test-specter-workflows.mjs`: native upstream wallet, USB, SD, QR and signing workflows.
+- `node browser/test-keeper-media.mjs`: actual Keeper onboarding, shared media parity, persistence, firmware SD deletion, original Keeper file screen import/export, browser picker/download and responsive layout.
 
 Change shared behavior once, then run these checks and each affected companion's existing workflow suite. Shared changes ship with the same static release, so root DIY, embedded DIY and companion UIs receive them together.

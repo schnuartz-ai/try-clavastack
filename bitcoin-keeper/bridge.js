@@ -1,3 +1,5 @@
+import { createCompanionMedia } from '/browser/companion-media.js';
+
 (() => {
   const specter = document.querySelector('#specter-simulator');
   const keeper = document.querySelector('#keeper-runtime');
@@ -7,6 +9,35 @@
   const keeperStatus = document.querySelector('#keeper-status');
   const sendButton = document.querySelector('#send-keeper-qr');
   const keeperReset = document.querySelector('#keeper-reset');
+  let diyRunning = false;
+  let keeperReady = false;
+  const media = createCompanionMedia({
+    container: document.querySelector('#companion-media'), companionLabel: 'Bitcoin Keeper',
+    storageKey: 'clavastack-keeper-removable-media-v1',
+    isDiyRunning: () => diyRunning, isCompanionReady: () => keeperReady,
+    sendDiyMessage: message => specter.contentWindow?.postMessage(message, location.origin),
+    getTargetZone: target => target === 'desktop' ? keeper.closest('.phone') : specter.closest('.device-frame'),
+    onState: state => keeper.contentWindow?.postMessage({ type: 'specter-media-state', ...state }, location.origin),
+  });
+  const mediaReady = media.init();
+  mediaReady.catch(error => { document.querySelector('#media-status').textContent = `Media error: ${error.message}`; });
+  const cableToggle = document.querySelector('#cable-toggle');
+  const cableStatus = document.querySelector('#cable-status');
+  const cableNote = document.createElement('p');
+  cableNote.className = 'drop-help';
+  cableNote.textContent = 'Keeper’s Specter integration uses QR. USB signing is not supported by this upstream integration.';
+  cableStatus.after(cableNote);
+  const updateCableState = () => {
+    const message = cableToggle.checked
+      ? 'Cable is on. Keeper’s Specter integration uses QR; USB transport is unavailable.'
+      : 'Cable is off.';
+    cableStatus.textContent = message;
+    cableToggle.title = message;
+    cableToggle.setAttribute('aria-label', message);
+    document.querySelector('.cable-group').classList.toggle('armed', cableToggle.checked);
+  };
+  cableToggle.addEventListener('change', updateCableState);
+  updateCableState();
   let scannerActive = false;
   let keeperScanning = false;
   let keeperFrames = [];
@@ -137,9 +168,12 @@
     if (event.origin !== location.origin || !event.data || typeof event.data !== 'object') return;
     const data = event.data;
     if (event.source === specter.contentWindow) {
-      if (data.type === 'child-awaiting-peripherals') {
-        specter.contentWindow?.postMessage({ type: 'peripherals-provide', files: [] }, location.origin);
-      } else if (data.type === 'simulator-running') {
+      if (['child-awaiting-peripherals', 'peripherals-snapshot', 'peripheral-state'].includes(data.type)) {
+        mediaReady.then(() => media.handleDiyMessage(data));
+        return;
+      }
+      if (data.type === 'simulator-running') {
+        diyRunning = true; media.render();
         specterBadge.textContent = 'Running'; specterBadge.classList.add('online');
         specterStatus.textContent = 'Real Specter DIY firmware is running in the browser simulator.';
       } else if (data.type === 'simulator-scanner-state') {
@@ -152,14 +186,18 @@
         clearSpecterOutput(data.token || '');
       } else if (data.type === 'simulator-qr-result') {
         qrStatus.textContent = data.ok ? 'QR frame reached Specter DIY’s real scanner input.' : data.message;
-      } else if (data.type === 'peripherals-snapshot') {
-        // The Specter simulator starts with an empty, isolated hardware-storage snapshot.
       }
     } else if (event.source === keeper.contentWindow) {
+      if (data.type.startsWith('specter-media-')) {
+        mediaReady.then(() => media.handleCompanionMessage(data, reply => keeper.contentWindow?.postMessage(reply, location.origin)));
+        return;
+      }
       if (data.type === 'keeper-runtime-ready') {
-        keeperStatus.textContent = 'Keeper’s upstream React Native app is starting.';
+        mediaReady.then(() => media.notify());
+        if (!keeperReady) keeperStatus.textContent = 'Keeper’s upstream React Native app is starting.';
         keeper.contentWindow?.postMessage({ type: 'keeper-runtime-ready-ack' }, location.origin);
       } else if (data.type === 'keeper-app-mounted') {
+        keeperReady = true; media.render();
         keeperStatus.textContent = 'Bitcoin Keeper is running in this browser (TESTNET).';
       } else if (data.type === 'keeper-scan-state') {
         keeperScanning = Boolean(data.active);
@@ -184,25 +222,32 @@
   });
 
   specter.addEventListener('load', () => {
+    diyRunning = false; media.render();
     specter.contentWindow?.postMessage({ type: 'gallery-parent-ready' }, location.origin);
     specterBadge.textContent = 'Starting';
     specterStatus.textContent = 'Loading the Specter DIY firmware…';
   });
   keeper.addEventListener('load', () => {
-    keeperStatus.textContent = 'Loading the Bitcoin Keeper app…';
+    // A cached bundle can mount React before the iframe's load event.
+    // Reset already clears readiness before requesting a new session.
+    if (!keeperReady) keeperStatus.textContent = 'Loading the Bitcoin Keeper app…';
+    media.render();
   });
   sendButton.addEventListener('click', sendKeeperQr);
   document.querySelector('#specter-restart').addEventListener('click', () => {
+    diyRunning = false; media.render();
     specter.contentWindow?.postMessage({ type: 'runtime-restart' }, location.origin);
     clearSpecterOutput();
     specterStatus.textContent = 'Restarting Specter DIY firmware…';
   });
   document.querySelector('#specter-reset').addEventListener('click', () => {
+    diyRunning = false; media.render();
     specter.contentWindow?.postMessage({ type: 'simulator-factory-reset' }, location.origin);
     clearSpecterOutput();
     specterStatus.textContent = 'Specter DIY factory reset requested.';
   });
   keeperReset.addEventListener('click', () => {
+    keeperReady = false; media.render();
     keeper.contentWindow?.postMessage({ type: 'keeper-reset' }, location.origin);
     keeperStatus.textContent = 'Resetting Keeper’s disposable browser-session data…';
   });

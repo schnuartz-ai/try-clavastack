@@ -15,7 +15,13 @@ args = parser.parse_args()
 
 
 IsolatedHandler = runpy.run_path(str(Path(__file__).with_name("serve-local.py")))["IsolatedStaticHandler"]
-server = ThreadingHTTPServer(("127.0.0.1", args.port), partial(IsolatedHandler, directory="."))
+class BrowserTestServer(ThreadingHTTPServer):
+    # Several iframe runtimes fetch their JS, WASM and fonts concurrently.
+    # The default backlog of five can refuse those connections on Windows.
+    request_queue_size = 128
+
+
+server = BrowserTestServer(("127.0.0.1", args.port), partial(IsolatedHandler, directory="."))
 if args.cert:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(args.cert, args.key)
