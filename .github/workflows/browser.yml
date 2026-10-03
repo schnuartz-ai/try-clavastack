@@ -201,6 +201,13 @@ jobs:
           CI: 'true'
           TEST_BASE_URL: http://127.0.0.1:8766
         run: npm run test:specter-desktop
+      - name: Verify shared media and Testnet defaults
+        env:
+          CI: 'true'
+          TEST_BASE_URL: http://127.0.0.1:8766
+        run: |
+          node browser/test-demo-import-policy.mjs
+          node browser/test-companion-media.mjs
       - name: Verify public derivation WASM bridge against Python and BIP32
         env:
           CI: 'true'

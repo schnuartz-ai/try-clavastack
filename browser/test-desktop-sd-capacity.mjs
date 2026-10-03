@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
-const source = await readFile(new URL('../specter-desktop/site.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('./companion-media.js', import.meta.url), 'utf8');
 const start = source.indexOf('async function importSdFiles(files) {');
 const end = source.indexOf('\nconst sdPicker', start);
 assert(start >= 0 && end > start);

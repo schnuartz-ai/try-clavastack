@@ -25,7 +25,7 @@ class RelayTests(unittest.TestCase):
         history = [{"tx_hash": "a" * 64, "height": 42}]
         with patch.object(relay, "_call", return_value={"result": history}) as call:
             result = relay.query(self.body(method="blockchain.scripthash.subscribe", params=["b" * 64]))
-        call.assert_called_once_with("electrum.blockstream.info", "blockchain.scripthash.get_history", ["b" * 64])
+        call.assert_called_once_with(("electrum.blockstream.info", 50002), "blockchain.scripthash.get_history", ["b" * 64])
         self.assertEqual(result["result"], hashlib.sha256(("a" * 64 + ":42:").encode()).hexdigest())
         self.assertIsNone(relay._status([]))
 
@@ -61,7 +61,7 @@ class RelayTests(unittest.TestCase):
                 self.payload = payload
         connection = Socket()
         with patch.object(relay, "_connection", return_value=(connection, stream)):
-            result = relay._call_many("electrum.blockstream.info", "server.ping", [[], []])
+            result = relay._call_many(("electrum.blockstream.info", 50002), "server.ping", [[], []])
         self.assertEqual([item["result"] for item in result], ["one", "two"])
         self.assertEqual(len(connection.payload.splitlines()), 2)
 
@@ -69,6 +69,16 @@ class RelayTests(unittest.TestCase):
         for stream in (io.BytesIO(), io.BytesIO(b"x" * 2_000_001)):
             with self.assertRaises(RuntimeError):
                 relay._read(stream, 1)
+
+    def test_testnet_has_its_own_connection_and_allowlisted_port(self):
+        with patch.object(relay, "_call", return_value={"result": None}) as call:
+            relay.query(self.body(port=60002))
+        call.assert_called_once_with(("electrum.blockstream.info", 60002), "server.ping", [])
+        self.assertIn(("electrum.blockstream.info", 50002), relay._locks)
+        self.assertIn(("electrum.blockstream.info", 60002), relay._locks)
+        self.assertIsNot(relay._locks[("electrum.blockstream.info", 50002)], relay._locks[("electrum.blockstream.info", 60002)])
+        with self.assertRaises(ValueError):
+            relay.query(self.body(host="electrum.emzy.de", port=60002))
 
 
 if __name__ == "__main__":

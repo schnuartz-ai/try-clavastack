@@ -344,8 +344,14 @@ def install_electrum_adapter():
     from cryptoadvance.specter.managers import wallet_manager
     wallet_manager.FlaskThread = BrowserFlaskThread
     from cryptoadvance.spectrum.spectrum import Spectrum
-    # Both supported relay servers are Bitcoin mainnet, including offline boot.
-    Spectrum.chain = "main"
+    # Set the chain per instance before upstream detects the genesis header.
+    # This also keeps offline boots on the saved node's actual network.
+    original_init = Spectrum.__init__
+    def network_init(self, *args, **kwargs):
+        port = kwargs.get("port", args[1] if len(args) > 1 else 50001)
+        self.chain = "test" if int(port) == 60002 else "main"
+        original_init(self, *args, **kwargs)
+    Spectrum.__init__ = network_init
     from cryptoadvance.spectrum.db import Script
     import inspect
     import textwrap
@@ -583,6 +589,14 @@ def initialize(secret_key):
     from cryptoadvance.specter import server
     from cryptoadvance.specter.config import BaseConfig
     from cryptoadvance.specter.specter import Specter
+    from cryptoadvance.specterext.spectrum.config import BaseConfig as SpectrumConfig
+    # Extension configuration is loaded during create_app, before node startup.
+    SpectrumConfig.ELECTRUM_DEFAULT_OPTION = "Blockstream Bitcoin Testnet"
+    SpectrumConfig.ELECTRUM_OPTIONS = {
+        "Blockstream Bitcoin Testnet": {"host": "electrum.blockstream.info", "port": 60002, "ssl": True},
+        "electrum.blockstream.info": {"host": "electrum.blockstream.info", "port": 50002, "ssl": True},
+        "electrum.emzy.de": {"host": "electrum.emzy.de", "port": 50002, "ssl": True},
+    }
 
     class BrowserConfig(BaseConfig):
         DEBUG = False
@@ -622,9 +636,22 @@ def initialize(secret_key):
         # wallet check. With background checkers disabled, run that check once
         # now so persisted wallets are loaded against the restored node.
         specter.check(check_all=True)
-    app.config["ELECTRUM_DEFAULT_OPTION"] = "electrum.blockstream.info"
-    options = app.config["ELECTRUM_OPTIONS"]
-    app.config["ELECTRUM_OPTIONS"] = {key: options[key] for key in ("electrum.blockstream.info", "electrum.emzy.de")}
+    # A fresh/reset session starts the upstream Spectrum Testnet node. Explicit
+    # user selections and saved wallets retain their selected network.
+    with app.app_context():
+        from cryptoadvance.specterext.spectrum.service import SpectrumService
+        service = specter.service_manager.services[SpectrumService.id]
+        if not service.is_spectrum_node_available:
+            from cryptoadvance.specter.specter_error import SpecterError
+            try:
+                service.enable_default_spectrum()
+            except SpecterError:
+                if service.spectrum_node is None or service.spectrum_node.spectrum is None:
+                    raise
+                # The upstream activation guard requires an online node. A
+                # disconnected Testnet node still serves local browser wallets.
+                specter.update_active_node("spectrum_node")
+            specter.check(check_all=True)
     @app.before_request
     def reconnect_spectrum():
         from flask import request

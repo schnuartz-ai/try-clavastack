@@ -7,7 +7,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://cdn.jsdelivr.net https://pypi.org https://files.pythonhosted.org; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'self'; worker-src 'self' blob: https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self'">
   <title>Specter Desktop + DIY — ClavaStack</title>
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/specter-desktop/style.css?v=2026-10-02.3">
+  <link rel="stylesheet" href="/specter-desktop/style.css?v=2026-10-03.6">
 </head>
 <body>
   <header class="topbar">
@@ -69,42 +69,7 @@
       </section>
     </div>
 
-    <section class="removable-media" aria-labelledby="media-heading">
-      <div class="media-heading"><div><p class="eyebrow">SHARED VIRTUAL STORAGE</p><h2 id="media-heading">Removable media</h2></div><p>Insert the same card into either application to move files between them.</p></div>
-      <div class="media-grid">
-        <section class="media-group" id="sd-drop" aria-labelledby="sd-heading">
-          <h3 id="sd-heading">Virtual SD card</h3>
-          <button class="media-token sd-token" id="sd-token" type="button" data-media="sd" aria-pressed="false" aria-label="Drag 8 GB SD card onto a device">
-            <img src="/assets/sd-card-8gb.png" alt="8 GB microSD card">
-            <small id="sd-location">Not inserted</small>
-          </button>
-          <div class="media-actions"><button type="button" id="sd-add">Add files</button><button type="button" id="sd-refresh">Refresh files</button><button type="button" id="sd-clear">Clear</button><input id="sd-picker" type="file" multiple hidden></div>
-          <p class="drop-help">Select, drop, or paste multiple files at once. Drag this card onto a device to insert it.</p>
-          <ul id="sd-files" class="sd-files"><li>No files on card</li></ul>
-        </section>
-        <section class="media-group memory-group" aria-labelledby="memory-heading">
-          <h3 id="memory-heading">Virtual MemoryCards</h3>
-          <div class="memory-tray">
-            <button class="media-token memory-token" type="button" data-media="card" data-slot="1" aria-pressed="false"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 1</strong></span><small>Not inserted</small></button>
-            <button class="media-token memory-token" type="button" data-media="card" data-slot="2" aria-pressed="false"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 2</strong></span><small>Not inserted</small></button>
-            <button class="media-token memory-token" type="button" data-media="card" data-slot="3" aria-pressed="false"><span class="card-art"><img class="card-photo" src="/assets/specter-smartcard-blank.png" alt=""><strong>MemoryCard 3</strong></span><small>Not inserted</small></button>
-          </div>
-          <p class="drop-help">Drag a MemoryCard onto Specter DIY. Right-click a card to reset it.</p>
-        </section>
-        <section class="media-group cable-group cable-panel" aria-labelledby="cable-heading">
-          <h3 id="cable-heading">Cable Connection</h3>
-          <div class="cable-route" role="group" aria-label="Bidirectional cable from Specter DIY to Specter Desktop">
-            <span class="cable-endpoint">Specter DIY</span>
-            <span class="cable-link" aria-hidden="true"></span>
-            <span class="cable-endpoint">Specter Desktop</span>
-            <label class="cable-toggle"><input type="checkbox" id="cable-toggle"><span>On/Off</span></label>
-          </div>
-          <p class="visually-hidden" id="cable-status" role="status" aria-live="polite">Off</p>
-        </section>
-      </div>
-      <p class="media-insertion" id="media-selection">Drag a card onto a device, or select a card and tap the device. Click an inserted card to eject it.</p>
-      <p id="media-status" role="status" aria-live="polite">Cards are ejected.</p>
-    </section>
+    <div id="companion-media"></div>
 
     <details class="source-details" id="source-details">
       <summary>Build and source information</summary>
@@ -117,6 +82,6 @@
   </main>
   <footer>ClavaStack · <a href="/simulators/">Simulator drafts</a> · Browser simulation only; never use real funds or real seeds.</footer>
   <script src="/assets/jsQR-1.4.0.js"></script>
-  <script type="module" src="/specter-desktop/site.js?v=2026-10-03.5"></script>
+  <script type="module" src="/specter-desktop/site.js?v=2026-10-03.6"></script>
 </body>
 </html>

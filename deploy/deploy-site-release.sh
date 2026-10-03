@@ -106,6 +106,9 @@ for required in \
   browser/runtime-worker.js \
   browser/current.json \
   browser/demo-data.js \
+  browser/demo-import.js \
+  browser/companion-media.js \
+  browser/companion-media.css \
   browser/variants/specter-playground-fast.json \
   browser/variants/specter-playground.json \
   browser/variants/specter-playground-schnuartz.json \

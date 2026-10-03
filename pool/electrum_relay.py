@@ -12,8 +12,8 @@ import ssl
 import threading
 
 SERVERS = {
-    "electrum.blockstream.info": 50002,
-    "electrum.emzy.de": 50002,
+    "electrum.blockstream.info": (50002, 60002),
+    "electrum.emzy.de": (50002,),
 }
 METHODS = {
     "server.version", "server.ping", "server.features",
@@ -25,7 +25,7 @@ METHODS = {
 }
 _slots = threading.BoundedSemaphore(8)
 _connections = {}
-_locks = {host: threading.Lock() for host in SERVERS}
+_locks = {(host, port): threading.Lock() for host, ports in SERVERS.items() for port in ports}
 
 
 def query(body):
@@ -34,8 +34,10 @@ def query(body):
     host = body.get("host")
     method = body.get("method")
     params = body.get("params", [])
-    if not isinstance(host, str) or host not in SERVERS or body.get("port") != SERVERS.get(host) or body.get("ssl") is not True:
-        raise ValueError("Choose a supported Electrum TLS server on port 50002")
+    port = body.get("port")
+    if not isinstance(host, str) or host not in SERVERS or type(port) is not int or port not in SERVERS[host] or body.get("ssl") is not True:
+        raise ValueError("Choose a supported Electrum TLS server and port")
+    server = (host, port)
     if not isinstance(method, str) or method not in METHODS or not isinstance(params, list):
         raise ValueError("Unsupported Electrum request")
     hashes = body.get("scripthashes")
@@ -58,28 +60,28 @@ def query(body):
     if not _slots.acquire(blocking=False):
         raise RuntimeError("Electrum relay is busy. Please try again.")
     try:
-        with _locks[host]:
+        with _locks[server]:
             for attempt in range(2):
                 try:
                     if parameter_batch is not None:
-                        responses = _call_many(host, method, parameter_batch)
+                        responses = _call_many(server, method, parameter_batch)
                         if any(response.get("error") for response in responses):
                             raise RuntimeError("Electrum could not read transaction data")
                         return {"result": [response.get("result") for response in responses], "error": None}
                     if hashes is not None:
-                        responses = _call_many(host, method, [[value] for value in hashes])
+                        responses = _call_many(server, method, [[value] for value in hashes])
                         if any(response.get("error") for response in responses):
                             raise RuntimeError("Electrum could not read script history")
                         histories = [response.get("result") or [] for response in responses]
                         results = [{"status": _status(history), "history": history} for history in histories] if body.get("include_history") else [_status(history) for history in histories]
                         return {"result": results, "error": None}
-                    response = _call(host, method, params)
+                    response = _call(server, method, params)
                     if script_status and not response.get("error"):
                         history = response.get("result") or []
                         response["result"] = _status(history)
                     return {"result": response.get("result"), "error": response.get("error")}
                 except Exception:
-                    old = _connections.pop(host, None)
+                    old = _connections.pop(server, None)
                     if old:
                         old[1].close()
                         old[0].close()
@@ -104,9 +106,10 @@ def _status(history):
     return hashlib.sha256(state.encode()).hexdigest() if state else None
 
 
-def _connection(host):
-    if host not in _connections:
-        raw = socket.create_connection((host, SERVERS[host]), timeout=12)
+def _connection(server):
+    host, port = server
+    if server not in _connections:
+        raw = socket.create_connection(server, timeout=12)
         try:
             connection = ssl.create_default_context().wrap_socket(raw, server_hostname=host)
         except Exception:
@@ -114,12 +117,12 @@ def _connection(host):
             raise
         connection.settimeout(20)
         stream = connection.makefile("rb")
-        _connections[host] = (connection, stream)
+        _connections[server] = (connection, stream)
         connection.sendall(b'{"id":0,"method":"server.version","params":["ClavaStack Spectrum","1.4"]}\n')
         handshake = _read(stream, 0)
         if handshake.get("error"):
             raise RuntimeError("Electrum protocol negotiation failed")
-    return _connections[host]
+    return _connections[server]
 
 
 def _call(host, method, params):

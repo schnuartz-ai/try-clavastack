@@ -33,13 +33,14 @@ try {
   await page.goto(`${base}/specter-desktop/`);
   await page.locator('#desktop-status').getByText('Running locally', { exact: true }).waitFor({ timeout: 360000 });
   await page.locator('#diy-status').getByText('Running locally', { exact: true }).waitFor({ timeout: 90000 });
-  await page.frameLocator('#desktop-app').getByRole('link', { name: 'Electrum Connection', exact: true }).waitFor({ timeout: 60000 });
+  await page.frameLocator('#desktop-app').getByRole('link', { name: 'Connect to the Bitcoin network', exact: true }).waitFor({ timeout: 60000 });
   const app = page.frames().find(frame => frame.url().includes('/specter-desktop/spc/'));
   assert(app, 'Specter Flask frame missing');
-  await app.getByRole('link', { name: 'Electrum Connection', exact: true }).click();
+  await app.getByRole('link', { name: 'Connect to the Bitcoin network', exact: true }).click();
   await app.locator('#server-list').selectOption('electrum.blockstream.info');
   await app.getByRole('button', { name: 'Connect', exact: true }).click();
-  await app.getByText('Specter is connected via Spectrum to a public Electrum server!', { exact: true }).waitFor({ timeout: 90000 });
+  await app.locator('tr').filter({ hasText: 'Network' }).getByText('main', { exact: true }).waitFor({ state: 'attached', timeout: 90000 });
+  assert.equal(await app.locator('#server-list').inputValue(), 'electrum.blockstream.info');
   await pass('Blockstream Electrum TLS connection in the real Spectrum extension');
 
   const diy = page.frames().find(frame => frame.url().includes('variant=diy'));
