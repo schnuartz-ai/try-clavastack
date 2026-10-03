@@ -33,6 +33,16 @@ module.exports = {
   ...upstreamTransformer,
   async transform(args) {
     const filename = path.resolve(args.filename);
+    // NativeBase's text plugin destructures `style`, then drops it in its web
+    // branch. Preserve the original Keeper typography without editing vendor
+    // files or replacing the upstream Text component.
+    if (filename.endsWith(path.join('@gluestack-ui', 'themed-native-base', 'build', 'plugins', 'TextChildStyle.js'))) {
+      const original = 'Object.assign({}, componentProps, { ref: ref })';
+      if (args.src.split(original).length !== 2) {
+        throw new Error('Keeper TextStyleResolver web patch no longer matches; review the upstream plugin.');
+      }
+      args = { ...args, src: args.src.replace(original, 'Object.assign({}, componentProps, { style: style, ref: ref })') };
+    }
     if (filename === signerPickerPath) {
       const normalizedSource = args.src.replace(/\r\n/g, '\n');
       const matches = normalizedSource.split(unsafeXpubReads).length - 1;

@@ -27,6 +27,7 @@ const sharedReactModules = new Map([
 
 function mappedFile(request) {
   const aliases = new Map([
+    ['src/constants/responsive', path.join(webAdapters, 'adapters', 'browser-responsive.web.ts')],
     ['src/context/TorContext', path.join(webAdapters, 'web-tor-context.tsx')],
     ['src/storage', path.join(webAdapters, 'adapters', 'browser-storage.web.ts')],
     ['src/storage/secure-store', path.join(webAdapters, 'adapters', 'browser-secure-store.web.ts')],

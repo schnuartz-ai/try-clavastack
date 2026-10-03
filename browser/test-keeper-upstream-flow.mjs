@@ -11,6 +11,31 @@ page.on('pageerror', (error) => pageErrors.push(error.message));
 page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 page.on('requestfailed', (request) => failedRequests.push({ url: request.url(), error: request.failure()?.errorText }));
 
+// Keep the app's phone proportions independent of the desktop viewport and
+// physical screen. Reload each size because upstream initializes StyleSheets
+// once when its modules are imported.
+async function checkPhoneLayout() {
+  const sizes = [{ width: 1500, height: 1050 }, { width: 1100, height: 650 }, { width: 390, height: 844 }];
+  for (const viewport of sizes) {
+    const layoutPage = await browser.newPage({ viewport, screen: { width: 1920, height: 1200 } });
+    try {
+      await layoutPage.goto(`${base}/bitcoin-keeper/`, { waitUntil: 'domcontentloaded' });
+      const frame = layoutPage.frameLocator('#keeper-runtime');
+      await frame.getByText('Welcome', { exact: true }).waitFor({ timeout: 90_000 });
+      const metrics = await frame.getByText('Create', { exact: true }).evaluate((element) => ({
+        width: innerWidth, height: innerHeight,
+        padding: parseFloat(getComputedStyle(element.parentElement).paddingTop),
+        button: element.parentElement.getBoundingClientRect().toJSON(),
+      }));
+      if (Math.abs(metrics.height / metrics.width - 812 / 375) > 0.01
+          || Math.abs(metrics.padding - 15 / 812 * metrics.height) > 0.1
+          || metrics.button.bottom > metrics.height || metrics.button.top < 0) {
+        throw new Error(`Keeper phone layout is distorted or clipped: ${JSON.stringify({ viewport, metrics })}`);
+      }
+    } finally { await layoutPage.close(); }
+  }
+}
+
 await page.addInitScript(() => {
   window.__KEEPER_SIMULATOR_DEBUG__ = true;
   window.__testKeeperFrames = [];
@@ -20,6 +45,7 @@ await page.addInitScript(() => {
 });
 
 try {
+  await checkPhoneLayout();
   await page.goto(`${base}/bitcoin-keeper/`, { waitUntil: 'domcontentloaded' });
   await page.getByText('Bitcoin Keeper is running in this browser (TESTNET).').waitFor({ timeout: 90_000 });
   const keeper = page.frameLocator('#keeper-runtime');
@@ -35,6 +61,27 @@ try {
   if (fontsLoaded.some(({ loaded }) => !loaded)) {
     throw new Error(`Keeper's original fonts did not load: ${JSON.stringify(fontsLoaded)}`);
   }
+  const typography = await keeper.getByText('Welcome', { exact: true }).evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { fontSize: style.fontSize, fontFamily: style.fontFamily, lineHeight: style.lineHeight };
+  });
+  const digitTypography = await keeper.getByText('1', { exact: true }).evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { fontSize: style.fontSize, lineHeight: style.lineHeight };
+  });
+  if (typography.fontSize !== '25px' || !typography.fontFamily.includes('Lora-Medium') || typography.lineHeight !== '27px'
+      || digitTypography.fontSize !== '25px' || digitTypography.lineHeight !== '30px') {
+    throw new Error(`Keeper lost its original text styles: ${JSON.stringify({ typography, digitTypography })}`);
+  }
+  const buttonPadding = await keeper.getByText('Create', { exact: true }).evaluate((element) => ({
+    actual: parseFloat(getComputedStyle(element.parentElement).paddingTop),
+    expected: 15 / 812 * innerHeight,
+  }));
+  if (Math.abs(buttonPadding.actual - buttonPadding.expected) > 0.1) {
+    throw new Error(`Keeper spacing uses the desktop monitor instead of its frame: ${JSON.stringify(buttonPadding)}`);
+  }
+  await mkdir('test-results', { recursive: true });
+  await page.screenshot({ path: 'test-results/keeper-original-typography.png', fullPage: true });
   for (const digit of '12341234') {
     await keeper.getByTestId(`key_${digit}`).click();
     await page.waitForTimeout(325);
@@ -147,6 +194,9 @@ try {
   console.log(JSON.stringify({
     result: 'testnet-receive-screen-reached',
     fontsLoaded,
+    typography,
+    digitTypography,
+    buttonPadding,
     receiveAddress: address,
     renderedQrSvg: true,
     decodedQr,

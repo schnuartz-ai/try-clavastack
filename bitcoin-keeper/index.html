@@ -42,12 +42,12 @@
     .button:disabled{cursor:not-allowed;opacity:.48}
     .keeper-card{display:flex;flex-direction:column;align-items:center}
     .keeper-card .device-head{width:100%}
-    .phone{position:relative;width:min(100%,385px);height:min(790px,calc(100vh - 210px));min-height:570px;margin:0 auto;padding:8px;border:2px solid #51565e;border-radius:43px;background:linear-gradient(145deg,#222832,#030405 38%,#111318);box-shadow:0 20px 40px #0009,inset 0 0 0 2px #08090b}
+    .phone{position:relative;width:min(100%,385px);margin:0 auto;padding:8px;border:2px solid #51565e;border-radius:43px;background:linear-gradient(145deg,#222832,#030405 38%,#111318);box-shadow:0 20px 40px #0009,inset 0 0 0 2px #08090b}
     .phone:before{content:"";position:absolute;z-index:2;top:10px;left:50%;width:30%;height:21px;transform:translateX(-50%);border-radius:16px;background:#030405;pointer-events:none}
-    .phone-screen{height:100%;overflow:hidden;border-radius:35px;background:#f6f4ef}
+    .phone-screen{overflow:hidden;border-radius:35px;background:#f6f4ef}
     .phone-status{height:32px;padding:7px 19px 0;display:flex;justify-content:space-between;color:#21302d;font-size:10px;font-weight:700}
     .phone-status .network{color:#6d742f;font-size:9px;letter-spacing:.04em}
-    #keeper-runtime{display:block;width:100%;height:calc(100% - 32px);border:0;background:#f6f4ef}
+    #keeper-runtime{display:block;width:100%;height:auto;aspect-ratio:375/812;border:0;background:#f6f4ef}
     #keeper-controls{display:grid;justify-items:center;gap:6px;margin-top:10px}
     #keeper-status{max-width:360px;color:#aab7c6;font-size:11px;line-height:1.4;text-align:center}
     .details{margin:15px 0 0;border:1px solid #2c3948;border-radius:11px;background:#0b131d;color:#adbbca}
@@ -55,8 +55,8 @@
     .details p{margin:0;padding:0 13px 12px;font-size:10px;line-height:1.5}
     footer{padding:17px 18px 25px;text-align:center;color:#91a0af;font-size:11px}
     footer a{color:#6ab8e8;text-decoration:none}
-    @media(max-width:900px){.workspace{grid-template-columns:1fr}.specter-screen{width:min(100%,370px)}.phone{width:min(100%,365px);height:min(790px,calc(100vh - 190px))}}
-    @media(max-width:480px){header{padding:9px 12px}main{padding:18px 10px 25px}.device-card{padding:12px 8px;border-radius:13px}.phone{min-height:570px;padding:6px;border-radius:37px}.phone-screen{border-radius:30px}}
+    @media(max-width:900px){.workspace{grid-template-columns:1fr}.specter-screen{width:min(100%,370px)}.phone{width:min(100%,365px)}}
+    @media(max-width:480px){header{padding:9px 12px}main{padding:18px 10px 25px}.device-card{padding:12px 8px;border-radius:13px}.phone{padding:6px;border-radius:37px}.phone-screen{border-radius:30px}}
   </style>
 </head>
 <body>
