@@ -301,7 +301,7 @@ try {
   const databaseNamesAfter = await page.evaluate(async () => (await indexedDB.databases?.() || []).map(db => db.name));
   assert(databaseNamesBefore.length > 0 && databaseNamesAfter.some(name => databaseNamesBefore.includes(name)), 'Desktop filesystem database did not persist after reload');
   await page.locator('#desktop-reset').click();
-  await page.locator('#desktop-status').getByText('Desktop data reset', { exact: true }).waitFor({ timeout: 30000 });
+  await page.locator('#desktop-status').getByText('Desktop data reset', { exact: true }).waitFor({ timeout: 360000 });
   await page.waitForFunction(() => document.querySelector('#desktop-app')?.contentDocument?.title === 'Specter', null, { timeout: 60000 });
   const secretAfterReset = await page.evaluate(() => localStorage.getItem('specter-desktop-browser-secret'));
   assert(secretAfterReset && secretAfterReset !== secretBefore, 'Reset did not rotate the browser session key');

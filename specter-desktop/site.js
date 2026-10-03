@@ -17,11 +17,12 @@ let lastDesktopFrameAt = 0;
 let lastDiyFrameAt = 0;
 let sourceBuildInfo;
 let ready = false;
+let desktopResetting = false;
 let diyRunning = false;
 let diyUsbEnabled = false;
 let cableConnected = false;
 let pendingCableQuery;
-const desktopRuntimeRevision = '2026-10-03.6';
+const desktopRuntimeRevision = '2026-10-03.7';
 
 const media = createCompanionMedia({
   container: $('#companion-media'), companionLabel: 'Specter Desktop',
@@ -31,7 +32,7 @@ const media = createCompanionMedia({
   getTargetZone: target => target === 'desktop' ? $('#desktop-drop') : diyFrame.closest('.device-frame'),
   onState: state => desktopFrame.contentWindow?.postMessage({ type: 'specter-media-state', ...state }, origin),
 });
-const renderMedia = () => media.render();
+const renderMedia = () => { $('#desktop-reset').disabled = !ready; media.render(); };
 const notifyDesktopMediaState = () => media.notify();
 
 function setStatus(element, message, state = 'loading') {
@@ -112,13 +113,24 @@ function startRuntime() {
       desktopLoader.hidden = true;
       desktopFrame.hidden = false;
       desktopFrame.src = '/specter-desktop/app/spc/welcome/';
-      setStatus(desktopStatus, 'Running locally', 'ready');
+      setStatus(desktopStatus, desktopResetting ? 'Desktop data reset' : 'Running locally', 'ready');
+      desktopResetting = false;
       renderMedia();
       updateCableState();
       setTimeout(() => desktopFrame.contentWindow?.focus(), 1500);
     } else if (data.type === 'reset-complete') {
-      setStatus(desktopStatus, 'Desktop data reset', 'ready');
-      desktopFrame.src = `/specter-desktop/app/spc/welcome/?reset=${Date.now()}`;
+      // IDBFS is flushed. Recreate Python to release database connections and
+      // wallet/node managers. The DIY worker and media remain in this page.
+      ready = false;
+      desktopResetting = true;
+      desktopFrame.hidden = true;
+      desktopFrame.src = 'about:blank';
+      desktopLoader.hidden = false;
+      updateCableState();
+      renderMedia();
+      desktopWorker.terminate();
+      startRuntime();
+      initializeRuntime(localStorage.getItem('specter-desktop-browser-secret'));
     } else if (data.type === 'error') {
       $('#loader-title').textContent = 'Specter Desktop could not start';
       $('#loader-detail').textContent = data.error;
@@ -435,6 +447,9 @@ $('#desktop-reset').addEventListener('click', () => {
   const secret = makeSecret();
   localStorage.setItem('specter-desktop-browser-secret', secret);
   document.cookie = 'session=; Max-Age=0; Path=/specter-desktop; SameSite=Lax';
+  ready = false;
+  updateCableState();
+  renderMedia();
   setStatus(desktopStatus, 'Resetting browser data…');
   desktopWorker.postMessage({ type: 'reset', secret });
 });
@@ -449,6 +464,16 @@ $('#diy-restart').addEventListener('click', () => {
   sendDiyMessage({ type: 'runtime-restart' });
 });
 
+function initializeRuntime(secret) {
+  desktopWorker.postMessage({
+    type: 'init', secret,
+    sourceCommit: sourceBuildInfo.commit,
+    sourceSha256: sourceBuildInfo.source_archive.sha256,
+    sourceUrl: sourceBuildInfo.sourceUrl,
+    publicDerivation: sourceBuildInfo.public_derivation,
+  });
+}
+
 async function boot() {
   try {
     const diyInfo = await loadSourceInfo();
@@ -461,14 +486,7 @@ async function boot() {
     await startBridge();
     const secret = localStorage.getItem('specter-desktop-browser-secret') || makeSecret();
     localStorage.setItem('specter-desktop-browser-secret', secret);
-    desktopWorker.postMessage({
-      type: 'init',
-      secret,
-      sourceCommit: sourceBuildInfo.commit,
-      sourceSha256: sourceBuildInfo.source_archive.sha256,
-      sourceUrl: sourceBuildInfo.sourceUrl,
-      publicDerivation: sourceBuildInfo.public_derivation,
-    });
+    initializeRuntime(secret);
     $('#diy-build-label').classList.remove('diy-build-loading');
   } catch (error) {
     setStatus(desktopStatus, 'Browser setup failed', 'error');

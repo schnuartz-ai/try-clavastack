@@ -143,10 +143,16 @@ try {
   await page.setViewportSize({ width: 1512, height: 1100 });
   await page.locator('#companion-media').screenshot({ path: 'test-results/companion-media.png' });
   pass('Three original boxes, clickable cable toggle, responsive desktop/tablet/mobile layout');
+  const canvas = await page.frameLocator('#diy-app').locator('#screen').elementHandle();
   await page.locator('#desktop-reset').click();
+  await page.locator('#desktop-status').getByText('Desktop data reset', { exact: true }).waitFor({ timeout: 360000 });
   await app.getByRole('link', { name: 'Connect to the Bitcoin network', exact: true }).click();
   assert.equal(await app.locator('#server-list').inputValue(), 'Blockstream Bitcoin Testnet');
-  pass('Reset also restores the Testnet default');
+  assert.equal(await app.getByRole('link', { name: /^Testnet Default Audit/ }).count(), 0);
+  assert(await page.frameLocator('#diy-app').locator('#screen').evaluate((current, before) => current === before, canvas));
+  await canvas.dispose();
+  assert.deepEqual((await readMedia())['sd/keep.bin'], [0, 255, 42]);
+  pass('Reset clears old wallets and restores Testnet while preserving DIY canvas and media');
   const offline = await browser.newPage();
   await offline.route('**/api/ab/electrum', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Test outage"}' }));
   await offline.goto(`${base}/specter-desktop/`);
