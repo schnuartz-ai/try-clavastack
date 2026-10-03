@@ -15,7 +15,8 @@ The VPS adapter relays allowlisted Electrum TLS requests and does not store wall
 - `node browser/test-specter-workflows.mjs`: actual Blockstream TLS connection,
   real DIY USBHost/XpubApp keys, device creation, single signature wallet,
   independently derived receive addresses, settings, wallet/ZIP backups,
-  persistence and startup during a relay outage.
+  fee JSON, native shadow-root SD picker, signed synthetic PSBT import and
+  finalization, persistence and startup during a relay outage.
 - `node browser/test-desktop-public-secp.mjs`: 32 independent BIP32 derivations,
   original Python point arithmetic, invalid points/tweaks and infinity. Only
   public point operations use the pinned tiny-secp256k1 2.2.4 WASM adapter; its
@@ -63,7 +64,10 @@ port is opened. This installation is separate from the static site release.
 - Manual normal-firmware SD signing: a PSBT with a fictional input was read,
   signed and saved back to SD. Its single signature was independently verified
   with bitcoinjs-lib and tiny-secp256k1; input/output/fee amounts matched.
-  No transaction was broadcast.
+  Desktop imported that same signed file using the upstream file-uploader and
+  Spectrum finalized it as ready to send, with the original 1,000 sat fee.
+  No transaction was broadcast. The regression test records broadcast RPC calls
+  and asserts that none were sent.
 
 The history cache adapter fixes the upstream category cache-key mismatch and
 preserves cached zero amounts and False ownership values. Calculations for new

@@ -221,7 +221,7 @@ __response_json = json.dumps({
     // Some upstream endpoints return JSON strings with Flask's default HTML
     // MIME type (notably fees). Inject only into actual HTML documents.
     if (/<(?:!doctype\s+html|html|head|body)\b/i.test(html) && !html.includes('/specter-desktop/desktop-bridge.js')) {
-      const script = '<script src="/specter-desktop/desktop-bridge.js" defer></script>';
+      const script = '<script src="/specter-desktop/desktop-bridge.js?v=2026-10-03.5" defer></script>';
       const updated = /<\/body\s*>/i.test(html) ? html.replace(/<\/body\s*>/i, `${script}</body>`) : `${html}${script}`;
       bytes = new TextEncoder().encode(updated);
     }

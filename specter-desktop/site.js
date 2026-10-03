@@ -31,7 +31,7 @@ let mediaRequestId = 0;
 const mediaRequests = new Map();
 const SD_CAPACITY_BYTES = 8_000_000_000;
 const MEDIA_DB_NAME = 'clavastack-specter-removable-media-v1';
-const desktopRuntimeRevision = '2026-10-03.4';
+const desktopRuntimeRevision = '2026-10-03.5';
 
 function setStatus(element, message, state = 'loading') {
   element.textContent = message;
@@ -245,6 +245,7 @@ function mediaFor(prefix) {
 function ownerFor(kind, slot) { return kind === 'sd' ? sdOwner : cardOwners.get(slot); }
 
 function renderMedia() {
+  document.querySelectorAll('.media-token').forEach(token => { token.disabled = mediaBusy; });
   $('#sd-location').textContent = sdOwner ? `Inserted in ${sdOwner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}` : 'Not inserted';
   $('#sd-token').setAttribute('aria-pressed', String(selectedMedia?.kind === 'sd'));
   $('#sd-token').setAttribute('aria-label', `Drag 8 GB SD card onto a device. ${sdOwner ? `Inserted in ${sdOwner === 'desktop' ? 'Specter Desktop' : 'Specter DIY'}.` : 'Not inserted.'}`);

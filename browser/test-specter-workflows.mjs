@@ -5,7 +5,7 @@ import { BIP32Factory } from 'bip32';
 import * as ecc from 'tiny-secp256k1';
 import * as bip39 from 'bip39';
 import bs58check from 'bs58check';
-import { payments } from 'bitcoinjs-lib';
+import { payments, Psbt } from 'bitcoinjs-lib';
 
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:8765';
 const resultPrefix = `test-results/specter-workflows-${new URL(base).protocol.slice(0, -1)}`;
@@ -16,6 +16,12 @@ const page = await browser.newPage({ viewport: { width: 1512, height: 1100 } });
 const errors = [];
 const checks = [];
 const diagnostics = [];
+const broadcastRequests = [];
+page.on('request', request => {
+  if (request.url().endsWith('/api/ab/electrum') && request.postData()?.includes('blockchain.transaction.broadcast')) {
+    broadcastRequests.push(request.postData());
+  }
+});
 page.on('console', message => { if (message.type() === 'error') diagnostics.push(message.text()); });
 const testRoot = BIP32Factory(ecc).fromSeed(bip39.mnemonicToSeedSync(
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
@@ -121,6 +127,36 @@ try {
   assert.equal(transferred, exportBytes);
   await writeFile('test-results/public-diy-wallet.txt', transferred);
   await pass('The same descriptor reaches the real DIY MEMFS and survives an SD snapshot');
+  await page.locator('#sd-token').click();
+  await page.locator('#sd-location').getByText('Not inserted', { exact: true }).waitFor();
+  await page.locator('#sd-token').click();
+  await page.locator('[data-media-target="desktop"]').click();
+  const signingPath = "m/84'/0'/0'/0/0";
+  const signingKey = testRoot.derivePath(signingPath);
+  const synthetic = new Psbt();
+  synthetic.addInput({ hash: 'ab'.repeat(32), index: 0,
+    witnessUtxo: { script: payments.p2wpkh({ pubkey: signingKey.publicKey }).output, value: 100000 },
+    bip32Derivation: [{ masterFingerprint: testRoot.fingerprint, path: signingPath, pubkey: signingKey.publicKey }] });
+  synthetic.addOutput({ address: expectedNext, value: 99000 });
+  synthetic.signInput(0, { publicKey: signingKey.publicKey, sign: hash => Buffer.from(ecc.sign(hash, signingKey.privateKey)) });
+  assert(synthetic.validateSignaturesOfInput(0, (pubkey, hash, signature) => ecc.verify(hash, pubkey, signature)));
+  await page.locator('#sd-picker').setInputFiles({ name: 'synthetic-signed.psbt', mimeType: 'application/psbt', buffer: synthetic.toBuffer() });
+  await page.locator('#sd-files').getByText('synthetic-signed.psbt', { exact: false }).waitFor();
+  await app.getByRole('link', { name: 'Send', exact: true }).click();
+  await app.getByRole('link', { name: 'Import', exact: true }).click();
+  await app.locator('#psbt-uploader').getByRole('button', { name: 'Open a file from the virtual SD card', exact: true }).click();
+  await app.getByRole('dialog').getByRole('button', { name: /^synthetic-signed\.psbt/ }).click();
+  await app.waitForFunction(expected => document.querySelector('#rawpsbt')?.value === expected, synthetic.toBase64());
+  await pass('The upstream shadow-root file picker imports binary PSBT bytes from the virtual SD card');
+  await app.getByRole('button', { name: 'Import transaction', exact: true }).click();
+  await app.locator('#ready_container').getByText('Transaction is ready to send', { exact: false }).waitFor({ timeout: 60000 });
+  const imported = JSON.parse(await app.locator('input[name="pending_psbt"]').inputValue());
+  assert.equal(imported.tx.vin[0].txid, 'ab'.repeat(32));
+  assert.equal(Math.round(imported.fee * 1e8), 1000);
+  assert(imported.raw, 'Upstream Spectrum must finalize the imported signature');
+  assert.deepEqual(broadcastRequests, []);
+  await pass('Native Spectrum finalizes the signed synthetic PSBT without broadcasting');
+  await page.screenshot({ path: `${resultPrefix}-synthetic-import.png`, fullPage: true });
   await app.getByRole('link', { name: 'Settings', exact: true }).first().click();
   await app.locator('select[name="unit"]').selectOption('sat');
   await app.getByRole('button', { name: 'Save', exact: true }).click();
@@ -157,6 +193,6 @@ try {
   throw error;
 } finally {
   await mkdir('test-results', { recursive: true });
-  await writeFile(`${resultPrefix}.json`, JSON.stringify({ base, checks, errors, diagnostics }, null, 2));
+  await writeFile(`${resultPrefix}.json`, JSON.stringify({ base, checks, errors, diagnostics, broadcastRequests }, null, 2));
   await browser.close();
 }

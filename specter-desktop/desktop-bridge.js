@@ -147,12 +147,24 @@
       event.stopPropagation();
       openCardPicker(input);
     });
-    const host = input.closest('label') || input.parentElement || input;
-    host.insertAdjacentElement('beforeend', button);
+    const host = input.closest('label') || input.parentElement;
+    if (host) host.insertAdjacentElement('beforeend', button);
+    else input.insertAdjacentElement('afterend', button);
   }
 
   function installPickers(root = document) {
+    if (root.matches?.('input[type="file"]')) installPicker(root);
     root.querySelectorAll?.('input[type="file"]').forEach(installPicker);
+    // Upstream file-uploader keeps its native input in an open shadow root.
+    // Use that input so the existing FileReader and file-upload events remain
+    // responsible for importing PSBTs and address labels.
+    const hosts = [...(root.querySelectorAll?.('file-uploader') || [])];
+    if (root.matches?.('file-uploader')) hosts.push(root);
+    for (const host of hosts) {
+      if (!host.shadowRoot) continue;
+      installPickers(host.shadowRoot);
+      observePickerRoot(host.shadowRoot);
+    }
   }
 
   function decodeDataUrl(url) {
@@ -195,15 +207,21 @@
     saveOnCard(link);
   }, true);
 
-  installPickers();
-  new MutationObserver(records => {
+  const observedPickerRoots = new WeakSet();
+  const pickerObserver = new MutationObserver(records => {
     for (const record of records) for (const node of record.addedNodes) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        if (node.matches('input[type="file"]')) installPicker(node);
-        installPickers(node);
-      }
+      if (node.nodeType === Node.ELEMENT_NODE) installPickers(node);
     }
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  function observePickerRoot(root) {
+    if (observedPickerRoots.has(root)) return;
+    observedPickerRoots.add(root);
+    pickerObserver.observe(root, { childList: true, subtree: true });
+  }
+  observePickerRoot(document.documentElement);
+  installPickers();
+  // Deferred bridge and upstream module scripts can execute in either order.
+  customElements.whenDefined('file-uploader').then(() => installPickers());
   parent.postMessage({ type: 'specter-media-bridge-ready' }, parentOrigin);
   parent.postMessage({ type: 'specter-media-state-request' }, parentOrigin);
 })();
