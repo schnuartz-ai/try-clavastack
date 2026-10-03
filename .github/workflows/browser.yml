@@ -14,7 +14,7 @@ jobs:
   fork-sync:
     name: Check configured fork heads
     concurrency:
-      group: fork-sync
+      group: fork-sync-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -114,9 +114,10 @@ jobs:
     needs: fork-sync
     if: needs.fork-sync.outputs.changed == 'true'
     concurrency:
-      # A push or manual run supersedes an older build, but scheduled polls
-      # never reach this job while a build is already active.
-      group: browser-production
+      # Only newer runs for the same ref supersede an older build. A feature
+      # branch or pull request must never cancel the production release.
+      # Scheduled polls skip this job while a build is already active.
+      group: browser-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 90
