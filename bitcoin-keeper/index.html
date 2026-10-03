@@ -21,8 +21,8 @@
     .intro{margin:0 0 16px;color:var(--muted);line-height:1.5;font-size:14px}
     .warning{padding:11px 14px;margin:0 0 17px;border:1px solid #9e575e;border-radius:11px;background:#2b161b;color:#f3dfe0;line-height:1.45;font-size:12px}
     .warning strong{color:#ff9da5}
-    .workspace{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr);gap:16px;align-items:start}
-    .device-card{min-width:0;padding:15px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(155deg,#111b26,#0c1118);box-shadow:0 14px 35px #0005}
+    .workspace{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:16px;align-items:stretch}
+    .device-card{display:flex;flex-direction:column;min-width:0;padding:15px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(155deg,#111b26,#0c1118);box-shadow:0 14px 35px #0005}
     .device-head{display:flex;align-items:start;justify-content:space-between;gap:12px;margin:0 0 12px}
     .device-head h2{margin:0;font-size:18px}
     .device-head p{margin:4px 0 0;color:var(--muted);font-size:11px;line-height:1.4}
