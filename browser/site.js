@@ -66,7 +66,7 @@ let forceCanvasBridge = false;
 let recoveryTimer;
 let startupPhase = 'manifest';
 let displayMode = 'unselected';
-const workerRevision = '2026-10-03.reboot1';
+const workerRevision = '2026-10-04.abdev1';
 let runGeneration = 0;
 let restartPromise;
 let startupStartedAt;

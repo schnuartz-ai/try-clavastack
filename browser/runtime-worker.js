@@ -8,7 +8,7 @@ let usbEnabled = false;
 let program = 'wallet';
 self.screen = { width: 480, height: 800 };
 const send = (type, details = {}) => postMessage({ type, ...details });
-const workerRevision = '2026-10-03.reboot1';
+const workerRevision = '2026-10-04.abdev1';
 // Unix firmware normally exits its process. A browser reboot must preserve
 // MEMFS and ask the page to replace this Worker instead.
 const rebootPython = `import platform
