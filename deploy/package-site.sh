@@ -37,6 +37,7 @@ paths=(
   assets
   builds
   bitcoin-keeper
+  bull-bitcoin
   ab
   simulators
   sparrow-wallet

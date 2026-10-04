@@ -38,7 +38,7 @@
     .header-left { display: flex; align-items: center; gap: 10px; }
     .header-left img { height: 24px; }
     .header-left .sep { color: var(--specter-light-secondary); opacity: 0.3; font-size: 16px; }
-    .header-right { display: flex; align-items: center; gap: 10px; }
+    .header-right { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; align-items: center; gap: 10px; }
     .nav-link { color: var(--specter-light-secondary); text-decoration: none; font-size: 12px; }
     .nav-link:hover { color: var(--specter-primary); }
 
@@ -381,6 +381,7 @@
   </div>
   <div class="header-right">
     <a href="/bitcoin-keeper/" class="nav-link">Keeper + Specter</a>
+    <a href="/bull-bitcoin/" class="nav-link">Bull Bitcoin + Specter</a>
     <a href="/simulators/" class="nav-link">All Simulators</a>
     <div class="status">
       <div class="dot" id="dot"></div>

@@ -1,6 +1,7 @@
 node_modules/
 builds/
 .browser-work/
+bull-bitcoin/app/
 test-results/
 dist/
 __pycache__/

@@ -16,10 +16,12 @@ security properties of a hardware wallet.
 - Specter DIY: https://try.clavastack.com/
 - Multi-device gallery: https://try.clavastack.com/simulators/
 - Bitcoin Keeper + Specter DIY QR/PSBT simulator (testnet only): https://try.clavastack.com/bitcoin-keeper/
+- Original Bull Bitcoin + Specter DIY browser simulator (fresh sessions use Testnet3): https://try.clavastack.com/bull-bitcoin/
 
 ## Source
 
 - Site and deployment: https://github.com/schnuartz-ai/try-clavastack
+- Bull Bitcoin: https://github.com/SatoshiPortal/bullbitcoin-mobile
 - Specter DIY: https://github.com/cryptoadvance/specter-diy
 - Specter Playground: https://github.com/k9ert/specter-playground
 - ClavaStack Playground variant: https://github.com/schnuartz-ai/specter-playground-schnuartz

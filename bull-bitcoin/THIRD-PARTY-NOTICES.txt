@@ -1,0 +1,35 @@
+Bull Bitcoin browser simulator
+
+The original Bull Bitcoin Mobile application, original artwork and fonts are
+from https://github.com/SatoshiPortal/bullbitcoin-mobile
+commit 98eb380f74a507ce1bcb6848bd2d77cf46959f9e (MIT; see LICENSE.txt).
+
+Bull SDK: https://github.com/SatoshiPortal/bull_sdk
+88e05c9e9d2911f3dcd44b449ee97e27c73c1e51
+BDK Dart: https://github.com/bitcoindevkit/bdk-dart
+fbf8952ed7056c9663e4bd47dddc8b4994580532 (MIT)
+BDK FFI: https://github.com/bitcoindevkit/bdk-ffi
+17c48b8b52ba81cdc58531e75ad1165be0cc25d9 (MIT)
+LWK Dart: https://github.com/SatoshiPortal/lwk-dart
+f554c7842f1f4b8e59c72d10a6f0747cb03fa315
+Their original Rust wallet implementations and generated Dart interfaces are
+used with the explicit browser platform overlay in browser/bull/.
+
+Flutter 3.44.9 / Dart 3.12.2: https://github.com/flutter/flutter (BSD-3-Clause)
+Bitcoin Dev Kit 3.0.0: https://github.com/bitcoindevkit/bdk (MIT / Apache-2.0)
+Liquid Wallet Kit 0.18.0: https://github.com/Blockstream/lwk (MIT / BSD-2-Clause)
+Drift 2.31.0: https://github.com/simolus3/drift (MIT)
+sqlite3.wasm 2.9.4: https://github.com/simolus3/sqlite3.dart (MIT)
+SQLite: https://www.sqlite.org (public domain)
+bc-ur Dart: https://github.com/SatoshiPortal/bc-ur-dart
+5738f70d0ec3d50977ac3dd01fed62939600238b (BSD-2-Clause Plus Patent License)
+jsQR 1.4.0: https://github.com/cozmo/jsQR (Apache-2.0)
+
+Original dependency license texts are emitted by Flutter into
+app/assets/NOTICES. Original Rust dependency and jsQR license/notice texts
+are carried in app/RUST-NOTICES.txt. Exact Dart package versions remain in the upstream
+pubspec.lock; browser Rust dependency resolutions are checked in at
+browser/bull/bdk.Cargo.lock and browser/bull/lwk.Cargo.lock.
+Specter DIY's existing build manifests and notices apply to the left-hand
+firmware simulator. The browser simulator is a separate integration and is
+not a product release or endorsement by the upstream projects.

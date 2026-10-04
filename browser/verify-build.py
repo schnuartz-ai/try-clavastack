@@ -4,8 +4,34 @@ from hashlib import sha256
 from pathlib import Path
 import json
 import re
+import sys
 
 root = Path(__file__).resolve().parent.parent
+
+def verify_bull():
+    bull_root=root/'bull-bitcoin/app'
+    bull=json.loads((bull_root/'build-info.json').read_text())
+    assert bull['source']=='https://github.com/SatoshiPortal/bullbitcoin-mobile'
+    assert bull['commit']=='98eb380f74a507ce1bcb6848bd2d77cf46959f9e'
+    assert bull['flutter']=='3.44.9' and bull['dart']=='3.12.2'
+    assert bull['test_only'] is False
+    assert bull['native_sources']=={
+        'bull_sdk':'88e05c9e9d2911f3dcd44b449ee97e27c73c1e51',
+        'bdk_dart':'fbf8952ed7056c9663e4bd47dddc8b4994580532',
+        'bdk_ffi':'17c48b8b52ba81cdc58531e75ad1165be0cc25d9',
+        'lwk_dart':'f554c7842f1f4b8e59c72d10a6f0747cb03fa315',
+    }
+    for name,digest in bull['assets'].items():
+        assert not name.startswith('/') and '..' not in Path(name).parts
+        assert sha256((bull_root/name).read_bytes()).hexdigest()==digest,name
+    for name in ['main.dart.js','native/bdk/bdkffi_bg.wasm','native/lwk/bull_lwk_bg.wasm','assets/NOTICES','RUST-NOTICES.txt']:
+        assert name in bull['assets'] and (bull_root/name).stat().st_size>0,name
+    assert 'bullTestShowPsbt' not in (bull_root/'main.dart.js').read_text()
+    print('Verified original Bull Bitcoin app and native WASM',bull['commit'])
+
+if sys.argv[1:]==['--bull-only']:
+    verify_bull()
+    sys.exit(0)
 for pointer_file, repository in (
     ('current.json', 'cryptoadvance/specter-diy'),
     ('variants/specter-playground.json', 'k9ert/specter-playground'),
@@ -69,3 +95,5 @@ with __import__('zipfile').ZipFile(archive_path) as source_archive:
         payload = source_archive.read(name)
         assert len(payload) == record['bytes'] and sha256(payload).hexdigest() == record['sha256'], name
 print('Verified Specter Desktop source archive', desktop_manifest['repository'], desktop_manifest['commit'])
+
+verify_bull()

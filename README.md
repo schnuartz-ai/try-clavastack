@@ -19,6 +19,11 @@ The source build follows the latest `master` commit of the official [`cryptoadva
 
 ## Build and test
 
+The [Bull Bitcoin workbench](https://try.clavastack.com/bull-bitcoin/) embeds the
+original Flutter app with its real BDK/LWK wallet engines compiled to WASM.
+[Build instructions and browser boundaries](docs/bull-bitcoin-browser.md) describe
+its pinned source, toolchain, shared media and acceptance checks.
+
 Use Linux or WSL2 with `git`, `make`, Python 3.11+, Node 22+, and Emscripten 3.1.74:
 
 ```bash

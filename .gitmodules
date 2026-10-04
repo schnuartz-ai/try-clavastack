@@ -2,3 +2,7 @@
 	path = upstream/bitcoin-keeper
 	url = https://github.com/KeeperCommunity/bitcoin-keeper.git
 	branch = sprint
+[submodule "upstream/bullbitcoin"]
+	path = upstream/bullbitcoin
+	url = https://github.com/SatoshiPortal/bullbitcoin-mobile.git
+	branch = develop

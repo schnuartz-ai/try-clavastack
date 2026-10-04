@@ -120,7 +120,7 @@ jobs:
       group: browser-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -157,6 +157,22 @@ jobs:
           .browser-work/emsdk/emsdk activate 3.1.74
       - name: Build real Specter/LVGL browser runtime
         run: bash browser/build-browser.sh
+      - name: Install pinned Bull Bitcoin browser toolchain
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-x64-release.zip -o /tmp/bull-dart.zip
+          curl --fail --location --retry 3 https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-x64-release.zip.sha256sum -o /tmp/bull-dart.sha256
+          echo "$(cut -d ' ' -f 1 /tmp/bull-dart.sha256)  /tmp/bull-dart.zip" | sha256sum --check
+          unzip -q /tmp/bull-dart.zip -d .browser-work/bull-toolchain
+          .browser-work/bull-toolchain/dart-sdk/bin/dart pub global activate fvm 4.3.1
+          echo "$PWD/.browser-work/bull-toolchain/dart-sdk/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.105 --locked
+      - name: Build and analyze original Bull Bitcoin browser application
+        run: python3 browser/build-bull.py --acceptance
       - name: Package pinned real Specter Desktop source for CPython WASM
         run: python3 browser/build-specter-desktop.py
       - name: Build Playground firmware variants
@@ -210,6 +226,11 @@ jobs:
           node browser/test-demo-import-policy.mjs
           node browser/test-companion-media.mjs
           npm run test:keeper-media
+      - name: Test original Bull wallet, native BDK/LWK and animated QR
+        env:
+          CI: 'true'
+          TEST_BASE_URL: http://127.0.0.1:8766
+        run: npm run test:bull
       - name: Verify public derivation WASM bridge against Python and BIP32
         env:
           CI: 'true'

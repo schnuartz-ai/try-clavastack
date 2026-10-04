@@ -1,6 +1,6 @@
 # Shared companion media
 
-`browser/companion-media.js` owns the existing compact UI, drag/drop and tap insertion, SD file import/export, capacity checks, persistence, media ownership, and demo import. Its stylesheet is `browser/companion-media.css`. Specter Desktop and Bitcoin Keeper mount it directly; the Sparrow workbench embeds Specter Desktop and consequently uses the same module. Future companion pages should mount this component instead of copying its HTML or event handlers.
+`browser/companion-media.js` owns the existing compact UI, drag/drop and tap insertion, SD file import/export, capacity checks, persistence, media ownership, and demo import. Its stylesheet is `browser/companion-media.css`. Specter Desktop, Bitcoin Keeper and Bull Bitcoin mount it directly; the Sparrow workbench embeds Specter Desktop and consequently uses the same module. Future companion pages should mount this component instead of copying its HTML or event handlers.
 
 The original standalone DIY layout remains in `index.html`. Both it and companion workbenches call the same `createDemoImporter` in `browser/demo-import.js`, which lazily loads `browser/demo-data.js`. Testnet/Mainnet selections create the identical SD file set and prepare empty Ghost/Zoo MemoryCards with their existing public PINs. No MemoryCard is automatically inserted. None removes only the demo file names and cards prepared by that importer session. Occupied cards are preserved.
 
@@ -29,11 +29,17 @@ Forward same-origin messages only after checking `event.source === diyFrame.cont
 
 The Cable Connection UI is shared. The app connects `#cable-toggle` to its supported real transport. For Specter this is upstream HWI serial commands and the running DIY USB host. Keep the checkbox clickable while the firmware's USB setting is disabled; distinguish an armed cable from an operational connection through status and accessible labels. Do not claim a working cable without the app-specific transport tests.
 
+`browser/companion-workbench.js` supplies the common readiness, reset and direct QR transport for Keeper and Bull. Each page passes its runtime message prefix (`id`), display `label` and media `storageKey` to `createCompanionWorkbench`. The app announces actual runtime/app readiness and current QR/scanner state through its own platform boundary. Animated frames stay buffered across repeated cycles, and sending pauses while Specter's native UART scanner restarts between fragments. This transport does not interpret wallet data.
+
 ## Bitcoin Keeper adapter
 
 Keeper uses `clavastack-keeper-removable-media-v1`, independently of Desktop's media store. Its original document picker and sharing boundaries use `browser/companion-file-dialog.js` for computer upload/download or the currently inserted SD card. Temporary RNFS handles only hold files while an upstream operation reads or exports them; the shared component remains the sole SD filesystem. `src/services/fs` maps to a web adapter because the upstream OS service handles only Android and iOS. The upstream screens and PSBT validation remain unchanged.
 
 The pinned Keeper Specter integration supports QR signing. The cable box therefore reports unavailable USB transport and never shows an operational connection. QR frames still enter each application's normal scanner/parser boundary. The None importer removes only cards prepared during its current session; after reloading, existing occupied cards are preserved.
+
+## Bull Bitcoin adapter
+
+Bull mounts the same workbench with `id: 'bull'` and `storageKey: 'clavastack-bull-bitcoin-removable-media-v1'`. Original Flutter file import/export dialogs use the same `companion-file-dialog.js` client as Keeper; Bull's temporary filesystem is separate from removable media. Native Dart QR/UR readers receive frames from the platform camera/direct-QR adapter, while original BDK/LWK libraries retain wallet derivation, transaction validation and signing. The cable box reports unavailable USB transport. See [the Bull build and runtime documentation](bull-bitcoin-browser.md) for its pinned sources and browser boundaries.
 
 ## Verification
 
@@ -43,5 +49,6 @@ The pinned Keeper Specter integration supports QR signing. The cable box therefo
 - `node browser/test-companion-media.mjs`: actual Spectrum Testnet startup/reset, SD/card byte parity, identity protection, switching/None, round trip, compact desktop/mobile layout and cable toggle.
 - `node browser/test-specter-workflows.mjs`: native upstream wallet, USB, SD, QR and signing workflows.
 - `node browser/test-keeper-media.mjs`: actual Keeper onboarding, shared media parity, persistence, firmware SD deletion, original Keeper file screen import/export, browser picker/download and responsive layout.
+- `npm run test:bull`: original Flutter onboarding, native BDK/LWK checks, wallet reload, unchanged BIP329 SD import/export, saved network choice, isolated reset, animated QR signing through actual Specter firmware, watch-only import and HTTP transport errors.
 
 Change shared behavior once, then run these checks and each affected companion's existing workflow suite. Shared changes ship with the same static release, so root DIY, embedded DIY and companion UIs receive them together.
