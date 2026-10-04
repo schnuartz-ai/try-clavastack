@@ -16,6 +16,7 @@ security properties of a hardware wallet.
 - Specter DIY: https://try.clavastack.com/
 - Multi-device gallery: https://try.clavastack.com/simulators/
 - Bitcoin Keeper + Specter DIY QR/PSBT simulator (testnet only): https://try.clavastack.com/bitcoin-keeper/
+- Original BlueWallet 8.0.1 + Specter DIY browser simulator (offline Testnet3 only, no broadcast): https://try.clavastack.com/blue-wallet/
 - Original Bull Bitcoin + Specter DIY browser simulator (fresh sessions use Testnet3): https://try.clavastack.com/bull-bitcoin/
 
 ## Source

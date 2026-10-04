@@ -1,6 +1,6 @@
 # Shared companion media
 
-`browser/companion-media.js` owns the existing compact UI, drag/drop and tap insertion, SD file import/export, capacity checks, persistence, media ownership, and demo import. Its stylesheet is `browser/companion-media.css`. Specter Desktop, Bitcoin Keeper and Bull Bitcoin mount it directly; the Sparrow workbench embeds Specter Desktop and consequently uses the same module. Future companion pages should mount this component instead of copying its HTML or event handlers.
+`browser/companion-media.js` owns the existing compact UI, drag/drop and tap insertion, SD file import/export, capacity checks, persistence, media ownership, and demo import. Its stylesheet is `browser/companion-media.css`. Specter Desktop, Bitcoin Keeper, Bull Bitcoin and BlueWallet mount it directly; the Sparrow workbench embeds Specter Desktop and consequently uses the same module. Future companion pages should mount this component instead of copying its HTML or event handlers.
 
 The original standalone DIY layout remains in `index.html`. Both it and companion workbenches call the same `createDemoImporter` in `browser/demo-import.js`, which lazily loads `browser/demo-data.js`. Testnet/Mainnet selections create the identical SD file set and prepare empty Ghost/Zoo MemoryCards with their existing public PINs. No MemoryCard is automatically inserted. None removes only the demo file names and cards prepared by that importer session. Occupied cards are preserved.
 
@@ -52,3 +52,5 @@ Bull mounts the same workbench with `id: 'bull'` and `storageKey: 'clavastack-bu
 - `npm run test:bull`: original Flutter onboarding, native BDK/LWK checks, wallet reload, unchanged BIP329 SD import/export, saved network choice, isolated reset, animated QR signing through actual Specter firmware, watch-only import and HTTP transport errors.
 
 Change shared behavior once, then run these checks and each affected companion's existing workflow suite. Shared changes ship with the same static release, so root DIY, embedded DIY and companion UIs receive them together.
+
+BlueWallet passes `allowedDemoNetworks: ['testnet']` to the shared workbench. The importer enforces this policy before any mutation, as well as limiting the visible selector. Its media store is isolated from the other companions. `npm run test:bluewallet` covers its original file menus and actual Specter QR signing roundtrip; `browser/test-bluewallet-package.mjs` verifies the production archive.

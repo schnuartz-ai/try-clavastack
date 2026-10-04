@@ -1,0 +1,3 @@
+import {Buffer} from 'buffer';
+import {fileClient,readFile} from './files';
+export default {async open(options:any){const uri=options.url||options.urls?.[0];let bytes:Uint8Array;if(uri.startsWith('data:'))bytes=Buffer.from(uri.split(',')[1],'base64');else bytes=Buffer.from(await readFile(uri,'base64'),'base64');return (await fileClient()).save({name:options.filename||uri.split('/').at(-1)||'bluewallet-export.txt',bytes,type:options.type});},async shareSingle(){throw new Error('External sharing services are disabled. Use download or the virtual SD card.');},async isPackageInstalled(){return {isInstalled:false};}};

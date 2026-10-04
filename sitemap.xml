@@ -20,4 +20,7 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://try.clavastack.com/blue-wallet/</loc>
+  </url>
 </urlset>

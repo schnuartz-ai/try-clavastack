@@ -1,7 +1,7 @@
 import { createCompanionMedia } from './companion-media.js';
 
 /** Shared device/media/QR transport. Upstream applications own all parsing. */
-export function createCompanionWorkbench({id,label,storageKey,description}) {
+export function createCompanionWorkbench({id,label,storageKey,description,allowedDemoNetworks}) {
   const specter = document.querySelector('#specter-simulator');
   const companion = document.querySelector(`#${id}-runtime`);
   const badge = document.querySelector('#specter-badge');
@@ -13,7 +13,7 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
   const postDiy = data => specter.contentWindow?.postMessage(data,location.origin);
   let diyReady = false, companionReady = false, scannerActive = false, companionScanning = false;
   const media = createCompanionMedia({
-    container:document.querySelector('#companion-media'),companionLabel:label,storageKey,
+    container:document.querySelector('#companion-media'),companionLabel:label,storageKey,allowedDemoNetworks,
     isDiyRunning:()=>diyReady,isCompanionReady:()=>companionReady,
     sendDiyMessage:postDiy,
     getTargetZone:target=>target==='desktop'?companion.closest('.phone'):specter.closest('.device-frame'),
@@ -107,7 +107,7 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
           :data.source==='desktop'
             ?`Scanning ${label} QR frames through Specter.`
             :cameraButton
-              ?'Choose a source: scan a SeedQR with the camera, or send a QR from Bull Bitcoin.'
+              ?`Choose a source: scan a SeedQR with the camera, or send a QR from ${label}.`
               :`Specter scanner is active. Open a QR screen in ${label}.`;
       }
       else if(data.type==='simulator-qr-output'){remember(incoming,data.frame,data.token||'');sendNext();}
@@ -117,6 +117,7 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
       if(data.type.startsWith('specter-media-')){mediaReady.then(()=>media.handleCompanionMessage(data,reply=>companion.contentWindow?.postMessage(reply,location.origin)));return;}
       if(data.type===`${id}-runtime-ready`){mediaReady.then(()=>media.notify());if(!companionReady)status.textContent=`${label}’s upstream app is starting.`;post({type:'runtime-ready-ack'});}
       else if(data.type===`${id}-app-mounted`){companionReady=true;media.render();status.textContent=description||`${label} is running in this browser.`;}
+      else if(data.type===`${id}-runtime-error`){companionReady=false;media.render();status.textContent=`${label} could not start: ${data.message}`;}
       else if(data.type===`${id}-scan-state`){
         companionScanning=Boolean(data.active);receiveIndex=0;clearInterval(receiveTimer);receiveTimer=undefined;
         if(companionScanning){
@@ -128,7 +129,7 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
     }
   });
   specter.addEventListener('load',()=>{diyReady=false;media.render();postDiy({type:'gallery-parent-ready'});badge.textContent='Starting';});
-  companion.addEventListener('load',()=>{companionReady=false;companionScanning=false;clear(outgoing);clearInterval(receiveTimer);receiveTimer=undefined;status.textContent=`Loading the ${label} app…`;media.render();updateSend();});
+  companion.addEventListener('load',()=>{post({type:'parent-ready'});companionReady=false;companionScanning=false;clear(outgoing);clearInterval(receiveTimer);receiveTimer=undefined;status.textContent=`Loading the ${label} app…`;media.render();updateSend();});
   sendButton.addEventListener('click',sendQr);
   cameraButton?.addEventListener('click',useSpecterCamera);
   document.querySelector('#specter-restart').addEventListener('click',()=>{diyReady=false;media.render();postDiy({type:'runtime-restart'});clear(incoming);});

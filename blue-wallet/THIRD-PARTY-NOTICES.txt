@@ -1,0 +1,6 @@
+BlueWallet 8.0.1 (MIT) — BlueWallet developers.
+Source: https://github.com/BlueWallet/BlueWallet/tree/0a53056a636370073a58d6cdd6de5c0728e5926a
+
+Browser port: ClavaStack. The upstream source is pinned and reproducible; platform and Testnet3 changes are recorded in browser/build-bluewallet.mjs and bluewallet-web/.
+
+Third-party JavaScript license notices are included in builds/bluewallet-web/bluewallet-app.js.LEGAL.txt. Full bundled package license texts and icon/font attribution are provided in /builds/bluewallet-web/licenses.txt. Browser transformations and adapter hashes are recorded in /builds/bluewallet-web/build-info.json.

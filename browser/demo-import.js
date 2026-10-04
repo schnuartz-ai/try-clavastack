@@ -12,6 +12,7 @@ export function createDemoImporter(adapter) {
     metadata,
     resetCard(slot) { metadata.delete(slot); resetSlots.delete(slot); },
     async apply(network) {
+      if (network && adapter.allowedNetworks && !adapter.allowedNetworks.includes(network)) throw new Error(`This companion only accepts ${adapter.allowedNetworks.join(", ")} demo data.`);
       if (!adapter.isRunning()) throw new Error('Specter DIY is still starting.');
       if (!network && !active) return;
       const { createDemoFiles } = await import('./demo-data.js?v=20260930-mainnet-bip84-psbt-v3');

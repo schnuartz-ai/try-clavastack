@@ -93,6 +93,12 @@ PY
 
 for required in \
   index.html \
+  blue-wallet/index.html \
+  blue-wallet/runtime.html \
+  blue-wallet/LICENSE.txt \
+  builds/bluewallet-web/bluewallet-app.js \
+  builds/bluewallet-web/licenses.txt \
+  builds/bluewallet-web/fonts.css \
   bitcoin-keeper/index.html \
   bitcoin-keeper/LICENSE.txt \
   bitcoin-keeper/LICENSE-APACHE-2.0.txt \

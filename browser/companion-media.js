@@ -1,6 +1,6 @@
 import { createDemoImporter, demoImportTitle } from './demo-import.js';
 
-export function createCompanionMedia({ container, companionLabel, storageKey, ownersKey = `${storageKey}-owners`, isDiyRunning, isCompanionReady, sendDiyMessage, getTargetZone, onState = () => {} }) {
+export function createCompanionMedia({ container, companionLabel, storageKey, ownersKey = `${storageKey}-owners`, isDiyRunning, isCompanionReady, allowedDemoNetworks = ['testnet', 'mainnet'], sendDiyMessage, getTargetZone, onState = () => {} }) {
   const safeLabel = String(companionLabel).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   container.innerHTML = `<section class="removable-media" aria-labelledby="media-heading">
       <div class="media-heading"><div><p class="eyebrow">SHARED VIRTUAL STORAGE</p><h2 id="media-heading">Removable media</h2></div><p>Insert the same card into either application to move files between them.</p></div>
@@ -38,6 +38,8 @@ export function createCompanionMedia({ container, companionLabel, storageKey, ow
       <p class="media-insertion" id="media-selection">Drag a card onto a device, or select a card and tap the device. Click an inserted card to eject it.</p>
       <p id="media-status" role="status" aria-live="polite">Cards are ejected.</p>
     </section>`;
+  for (const option of container.querySelectorAll('#demo-network option')) { if (option.value && !allowedDemoNetworks.includes(option.value)) option.remove(); }
+
   const $ = selector => container.querySelector(selector);
 let mediaDb;
 const mediaFiles = new Map();
@@ -470,6 +472,7 @@ if (data.type === 'specter-media-state-request' || data.type === 'specter-media-
     }
 }
 const demoImporter = createDemoImporter({
+  allowedNetworks: allowedDemoNetworks,
   isRunning: isDiyRunning, capacity: SD_CAPACITY_BYTES,
   send: command => sendDiyMessage({ type: 'peripheral-command', command }),
   snapshot: async () => {

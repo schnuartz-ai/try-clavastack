@@ -1,0 +1,32 @@
+export const registerArkBackgroundTask = async () => {};
+export const stopArkBackgroundTask = async () => {};
+export const runArkBackgroundTask = async () => {};
+export const isNotificationsEnabled = async () => false;
+export const majorTomToGroundControl = async () => {};
+export const unsubscribe = async () => {};
+export const registerArkPaymentPush = async () => {};
+export const registerNotifications = async () => {};
+export const getStoredPushToken = async () => null;
+export const setNotificationsEnabled = async () => {};
+export const isPushNotificationsEnabled = async () => false;
+export const cleanUserOptOutFlag = async () => {};
+export const tryToObtainPermissions = async () => false;
+export const processStoredNotifications = async () => {};
+export const setOnProcessNotifications = () => {};
+export const NOTIFICATIONS_NO_AND_DONT_ASK_FLAG = 'no-notifications';
+
+export const getPushToken=async()=>null;
+export const getStoredNotifications=async()=>[];
+export const setLevels=async()=>{};
+export const checkPermissions=async()=>false;
+export const checkNotificationPermissionStatus=async()=>false;
+export const enqueueTestPushNotification=async()=>{throw new Error("Push notifications are disabled in this simulator.");};
+export const setRedactNotifications=async()=>{};
+export const isNotificationsRedacted=async()=>true;
+
+export const reconcileArkBackgroundTaskResults=async()=>{};
+export const clearStoredNotifications=async()=>{};
+export const getDeliveredNotifications=async()=>[];
+export const initializeNotifications=async()=>{};
+export const removeAllDeliveredNotifications=async()=>{};
+export const setApplicationIconBadgeNumber=()=>{};

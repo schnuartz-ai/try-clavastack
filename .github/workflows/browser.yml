@@ -131,6 +131,11 @@ jobs:
           cache: npm
       - name: Install browser build and test dependencies
         run: npm ci
+      - name: Install pinned BlueWallet source dependencies
+        working-directory: upstream/bluewallet
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Build original BlueWallet browser application
+        run: npm run build:bluewallet
       - name: Install pinned Bitcoin Keeper source dependencies
         working-directory: upstream/bitcoin-keeper
         run: |
@@ -228,6 +233,11 @@ jobs:
           node browser/test-demo-import-policy.mjs
           node browser/test-companion-media.mjs
           npm run test:keeper-media
+      - name: Test original BlueWallet import, SeedQR, Testnet policy and Specter SD/QR roundtrip
+        env:
+          CI: 'true'
+          TEST_BASE_URL: http://127.0.0.1:8766
+        run: npm run test:bluewallet
       - name: Test original Bull wallet, native BDK/LWK and animated QR
         env:
           CI: 'true'
@@ -252,8 +262,16 @@ jobs:
           TEST_BASE_URL: https://127.0.0.1:8767
         run: npm run test:specter-workflows
       - name: Package the complete tested production site
-        if: github.event_name != 'pull_request'
         run: bash deploy/package-site.sh dist
+      - name: Test BlueWallet from the actual production archive
+        env:
+          CI: 'true'
+          TEST_BASE_URL: http://127.0.0.1:8769
+        run: |
+          mkdir -p .browser-work/packaged-site
+          tar -xzf dist/site-release-${{ github.run_id }}.tar.gz -C .browser-work/packaged-site
+          python3 -m http.server 8769 --bind 127.0.0.1 --directory .browser-work/packaged-site > /tmp/blue-packaged-site.log 2>&1 &
+          node browser/test-bluewallet-package.mjs
       - name: Upload complete production site
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
@@ -269,8 +287,8 @@ jobs:
         with:
           name: browser-smoke
           path: |
-            test-results/*.png
-            test-results/*.json
+            test-results/**/*.png
+            test-results/**/*.json
             builds/**/build-info.json
       - name: Upload tested browser builds
         # Keep failed-run builds available for startup diagnostics. They are

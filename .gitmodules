@@ -6,3 +6,7 @@
 	path = upstream/bullbitcoin
 	url = https://github.com/SatoshiPortal/bullbitcoin-mobile.git
 	branch = develop
+[submodule "upstream/bluewallet"]
+	path = upstream/bluewallet
+	url = https://github.com/BlueWallet/BlueWallet.git
+	branch = master

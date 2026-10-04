@@ -1,0 +1,1 @@
+export default {getString:()=>navigator.clipboard.readText(),setString:(value:string)=>navigator.clipboard.writeText(value),hasString:async()=>false,hasImage:async()=>false,getImage:async()=>null,setImage:()=>{throw new Error('Image clipboard is unavailable. Save the QR image instead.');}};

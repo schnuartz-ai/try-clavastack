@@ -38,6 +38,7 @@ paths=(
   builds
   bitcoin-keeper
   bull-bitcoin
+  blue-wallet
   ab
   simulators
   sparrow-wallet
@@ -70,6 +71,11 @@ cp "$ROOT/browser/variants/"*.json "$SITE_DIR/browser/variants/"
 for shared_file in demo-import.js companion-media.js companion-media.css companion-file-dialog.js companion-workbench.js; do
   test -s "$SITE_DIR/browser/$shared_file"
   cmp "$ROOT/browser/$shared_file" "$SITE_DIR/browser/$shared_file"
+done
+
+for blue_file in blue-wallet/index.html blue-wallet/runtime.html blue-wallet/bridge.js blue-wallet/LICENSE.txt blue-wallet/THIRD-PARTY-NOTICES.txt builds/bluewallet-web/bluewallet-app.js builds/bluewallet-web/bluewallet-app.js.LEGAL.txt builds/bluewallet-web/licenses.txt builds/bluewallet-web/fonts.css builds/bluewallet-web/build-info.json assets/bluewallet-logo.png; do
+  test -s "$SITE_DIR/$blue_file"
+  cmp "$ROOT/$blue_file" "$SITE_DIR/$blue_file"
 done
 
 if [[ $(find "$SITE_DIR/builds" -type f -name 'micropython.wasm' | wc -l) -lt 4 ]]; then

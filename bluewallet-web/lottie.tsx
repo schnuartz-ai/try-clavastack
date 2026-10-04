@@ -1,0 +1,1 @@
+import React from 'react';import {ActivityIndicator} from 'react-native-web';export default function Animation(){return <ActivityIndicator color='#42a7ff'/>;}

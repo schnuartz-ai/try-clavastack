@@ -49,4 +49,6 @@ const before = sent.length;
 await assert.rejects(limited.apply('testnet'), /full/);
 assert.equal(sent.length, before, 'Capacity preflight partially mutated media');
 assert.equal(sdOwner, null);
+const restricted=createDemoImporter({...adapter,allowedNetworks:['testnet']});
+const beforePolicy=sent.length;await assert.rejects(restricted.apply('mainnet'), /only accepts testnet/);assert.equal(sent.length,beforePolicy);
 console.log('PASS shared demo policy preserves pre-existing occupied cards and ordinary files, capacity preflight is atomic');
