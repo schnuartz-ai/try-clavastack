@@ -45,6 +45,19 @@ def verify_lock():
                if name not in allowed and before.get(name) != after.get(name)]
     if changed: raise RuntimeError(f'Original dependency versions changed: {changed}')
 
+def create_browser_target(fvm):
+    # Flutter 3.44.9's create command writes a partial SDK lock even with
+    # --no-pub. Keep the upstream resolution while adding only its web target.
+    lock=STAGE/'pubspec.lock'
+    original=lock.read_bytes()
+    try:
+        run(fvm,'flutter','create','--platforms','web','--no-pub','.')
+    finally:
+        lock.write_bytes(original)
+    # flutter create's sample is not part of Bull's native test suite.
+    sample=STAGE/'test/widget_test.dart'
+    if not (UPSTREAM/'test/widget_test.dart').exists(): sample.unlink(missing_ok=True)
+
 def format_sources(fvm):
     paths = run('git','ls-files','*.dart',cwd=UPSTREAM,capture=True).splitlines()
     paths = [path for path in paths if (STAGE/path).is_file()
@@ -103,10 +116,7 @@ def main():
             run(fvm,'dart','run','build_runner','build','--force-jit','--delete-conflicting-outputs')
             run(fvm,'dart','run','build_runner','build','--force-jit',cwd=STAGE/'packages/bull_payjoin')
             run(fvm,'flutter','gen-l10n')
-        run(fvm,'flutter','create','--platforms','web','--no-pub','.')
-        # flutter create's sample is not part of Bull's native test suite.
-        sample=STAGE/'test/widget_test.dart'
-        if not (UPSTREAM/'test/widget_test.dart').exists(): sample.unlink(missing_ok=True)
+        create_browser_target(fvm)
         import apply
         apply.apply_dependencies()
         import uniffi_web, prepare_lwk, prepare_sdk, patch_app

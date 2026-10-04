@@ -9,6 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('bull_prepare', ROOT/'browser/bull/prepare.py')
 prepare = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prepare)
+build_spec = importlib.util.spec_from_file_location('bull_build', ROOT/'browser/build-bull.py')
+build = importlib.util.module_from_spec(build_spec)
+build_spec.loader.exec_module(build)
 
 
 class BullPrepareTest(unittest.TestCase):
@@ -32,6 +35,33 @@ class BullPrepareTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'different case: makefile'):
                 prepare.prepare()
             copying.assert_not_called()
+
+    def check_flutter_create_preserves_lock(self, fails=False):
+        work=ROOT/'.browser-work'
+        work.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='bull-lock-check-',dir=work) as folder:
+            stage=Path(folder).resolve()
+            self.assertTrue(stage.is_relative_to(work.resolve()))
+            lock=stage/'pubspec.lock'
+            original=(prepare.UPSTREAM/'pubspec.lock').read_bytes()
+            lock.write_bytes(original)
+            def flutter_create(*args):
+                lock.write_text('{"packages":{"flutter":{"version":"0.0.0"}}}')
+                if fails: raise RuntimeError('Flutter create failed')
+            with patch.object(build,'STAGE',stage), patch.object(build,'run',side_effect=flutter_create) as run:
+                if fails:
+                    with self.assertRaisesRegex(RuntimeError,'Flutter create failed'):
+                        build.create_browser_target('fvm')
+                else:
+                    build.create_browser_target('fvm')
+                run.assert_called_once_with('fvm','flutter','create','--platforms','web','--no-pub','.')
+            self.assertEqual(lock.read_bytes(),original)
+
+    def test_flutter_create_keeps_original_lock(self):
+        self.check_flutter_create_preserves_lock()
+
+    def test_failed_flutter_create_keeps_original_lock(self):
+        self.check_flutter_create_preserves_lock(fails=True)
 
 
 if __name__=='__main__': unittest.main()

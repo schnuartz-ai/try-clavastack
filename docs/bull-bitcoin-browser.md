@@ -57,6 +57,11 @@ verifies unchanged package versions, builds both native WASM libraries and
 packages the release. The generated production artifact is ignored by Git and
 included by `deploy/package-site.sh` in the tested static release.
 
+Creating the web target preserves the original lockfile byte for byte: Flutter
+3.44.9 otherwise replaces it with a partial SDK resolution even with `--no-pub`.
+Preparation regression tests cover this behavior and the exact tracked case of
+the upstream `makefile` before CI builds the application from scratch.
+
 `acceptance.dart` is a separate test entry point, excluded from production. It
 opens the original PSBT screen with the shared public synthetic fixture and
 observes the original broadcast cubit's result. It neither injects wallet
