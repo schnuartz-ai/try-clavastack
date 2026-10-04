@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -12,6 +13,9 @@ spec.loader.exec_module(prepare)
 build_spec = importlib.util.spec_from_file_location('bull_build', ROOT/'browser/build-bull.py')
 build = importlib.util.module_from_spec(build_spec)
 build_spec.loader.exec_module(build)
+package_spec = importlib.util.spec_from_file_location('bull_package', ROOT/'browser/bull/package.py')
+package = importlib.util.module_from_spec(package_spec)
+package_spec.loader.exec_module(package)
 
 
 class BullPrepareTest(unittest.TestCase):
@@ -62,6 +66,18 @@ class BullPrepareTest(unittest.TestCase):
 
     def test_failed_flutter_create_keeps_original_lock(self):
         self.check_flutter_create_preserves_lock(fails=True)
+
+    def test_qr_bundle_uses_platform_independent_esbuild_api(self):
+        work=ROOT/'.browser-work'
+        work.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='bull qr bundle check ',dir=work) as folder:
+            output=Path(folder).resolve()/'qr_decoder.mjs'
+            self.assertTrue(output.is_relative_to(work.resolve()))
+            package.bundle_qr(output)
+            self.assertGreater(output.stat().st_size,100000)
+            subprocess.run(['node','--input-type=module','-e',
+                            "const {default:decode}=await import(process.argv[1]); if(typeof decode!=='function'||decode(new Uint8ClampedArray([0,0,0,255]),1,1)!==null) throw new Error('Invalid jsQR bundle')",
+                            output.as_uri()],cwd=ROOT,check=True)
 
 
 if __name__=='__main__': unittest.main()

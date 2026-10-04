@@ -8,6 +8,16 @@ from prepare import ROOT, STAGE
 from notices import native_notices
 
 
+def bundle_qr(output):
+    # esbuild/bin/esbuild may be a native executable on Unix and a JS wrapper
+    # on Windows. Its JavaScript API selects the correct installed binary.
+    options = {'entryPoints':['node_modules/jsqr/dist/jsQR.js'], 'bundle':True,
+               'format':'esm', 'platform':'browser', 'outfile':str(output)}
+    subprocess.run(['node', '-e',
+                    "require('esbuild').buildSync(JSON.parse(process.argv[1]))",
+                    json.dumps(options)], cwd=ROOT, check=True)
+
+
 def package(source=None, output=None, acceptance=False):
     output = output or ROOT / 'bull-bitcoin/app'
     source = source or STAGE / 'build/web'
@@ -22,9 +32,7 @@ def package(source=None, output=None, acceptance=False):
     for name in ['runtime.js', 'qr_transport.js']:
         shutil.copy2(ROOT / 'browser/bull' / name, output / name)
     native_notices(output)
-    subprocess.run(['node', 'node_modules/esbuild/bin/esbuild', 'node_modules/jsqr/dist/jsQR.js',
-                    '--bundle', '--format=esm', '--platform=browser',
-                    f'--outfile={output / "qr_decoder.js"}'], cwd=ROOT, check=True)
+    bundle_qr(output/'qr_decoder.js')
     manifest = {
         'source':'https://github.com/SatoshiPortal/bullbitcoin-mobile',
         'commit':'98eb380f74a507ce1bcb6848bd2d77cf46959f9e',

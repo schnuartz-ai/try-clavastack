@@ -61,6 +61,9 @@ Creating the web target preserves the original lockfile byte for byte: Flutter
 3.44.9 otherwise replaces it with a partial SDK resolution even with `--no-pub`.
 Preparation regression tests cover this behavior and the exact tracked case of
 the upstream `makefile` before CI builds the application from scratch.
+The QR decoder is bundled through esbuild's JavaScript API, which selects its
+installed native binary on each operating system; CI also imports the resulting
+ES module in a directory whose name contains spaces.
 
 `acceptance.dart` is a separate test entry point, excluded from production. It
 opens the original PSBT screen with the shared public synthetic fixture and
