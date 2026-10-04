@@ -231,6 +231,7 @@ jobs:
       - name: Test original Bull wallet, native BDK/LWK and animated QR
         env:
           CI: 'true'
+          DEBUG: 'pw:browser'
           TEST_BASE_URL: http://127.0.0.1:8766
         run: npm run test:bull
       - name: Verify public derivation WASM bridge against Python and BIP32
@@ -279,6 +280,7 @@ jobs:
         with:
           name: browser-builds
           compression-level: 0
+          include-hidden-files: true
           path: |
             builds/**/*.js
             builds/**/*.wasm
@@ -288,6 +290,11 @@ jobs:
             browser/current.json
             browser/specter-desktop-current.json
             browser/variants/*.json
+            bull-bitcoin/app/**
+            .browser-work/bull-acceptance-app/**
+            .browser-work/bdk-probe.js
+            .browser-work/ur-probe.js
+            .browser-work/lwk-probe.js
 
   release:
     name: Publish tested site release

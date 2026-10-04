@@ -72,3 +72,24 @@ balances nor replaces transaction parsing/signing. Acceptance covers native
 wizard/wallet/receive/reload, BDK ABI/signatures, original Dart UR fountain frames,
 LWK addresses/reopen, actual firmware QR signing, shared files and transport
 errors. Synthetic transactions are never broadcast to a public network.
+
+## Public demo in the production application
+
+1. Select **Testnet Demos/Seed** in the shared media panel. Initialize Specter
+   through its normal PIN screen, then choose **Import recovery phrase → Open
+   SD card file** and confirm `01-ghost-PUBLIC-TEST-SEED.txt`.
+2. In Specter's **Settings → Switch network**, choose **Testnet**. Its network
+   setting is independent of Bull's Testnet default.
+3. Display **Master public keys → Single key**. In Bull's **Import Wallet →
+   Specter DIY → Open camera** flow, select **Scan from Specter DIY**, give the
+   wallet a label and import it. The original native wallet derives
+   `tb1qvtdx75y4554ngrq6aff3xdqnvjhmct5w6luehe` for its first receive address.
+4. In Specter, open `testnet-ghost-payment-low-fee.psbt` from the SD card and
+   confirm its transaction review. Choose **Show as QR code → Crypto-psbt**.
+   In Bull's **Broadcast signed transaction → Camera** screen, select
+   **Scan from Specter DIY** to import the real firmware's signed PSBT.
+
+The fixture's inputs are fictional. Bull's original transaction review therefore
+reports that it cannot fetch that previous transaction from the network. The
+demo acceptance checks the signature and unchanged outputs without broadcasting.
+The production application contains no acceptance entry point or fixture wallet.

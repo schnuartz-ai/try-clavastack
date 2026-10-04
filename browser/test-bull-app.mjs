@@ -8,6 +8,7 @@ const browser = await chromium.launch({...(process.env.CI ? {} : {channel:'chrom
 const page = await browser.newPage({viewport:{width:1512,height:1100}});
 const errors = [], checks = [];
 page.on('pageerror',error=>errors.push(error.message));
+page.on('crash',()=>console.error('BULL CHROMIUM PAGE CRASHED'));
 await page.addInitScript(() => {
   window.__bullTestFrames=[];
   window.__bullMountedMessages=0;
@@ -140,8 +141,13 @@ try {
   assert.deepEqual(errors,[]);
   await writeFile('test-results/bull-app.json',JSON.stringify({checks,errors},null,2));
 } catch(error) {
+  // Keep the original failure visible even if Chromium cannot take a crash
+  // screenshot. Diagnostics must not replace the actual acceptance failure.
+  console.error('BULL ACCEPTANCE FAILURE',error);
   await mkdir('test-results',{recursive:true});
-  await page.screenshot({path:'test-results/bull-app-failure.png',fullPage:true});
+  await page.screenshot({path:'test-results/bull-app-failure.png',fullPage:true}).catch(screenshotError=>{
+    console.error('BULL FAILURE SCREENSHOT',screenshotError.message);
+  });
   console.error('BULL UI',await page.frameLocator('#bull-runtime').locator('body').innerText().catch(()=>''));
   console.error('BROWSER ERRORS',errors);
   console.error('STARTUP DIAGNOSTIC', await page.frameLocator('#bull-runtime').locator('body').evaluate(() => {

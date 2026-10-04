@@ -13,6 +13,7 @@ const context=await browser.newContext({viewport:{width:1512,height:1100},servic
 const page=await context.newPage();
 const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
+page.on('crash',()=>console.error('BULL QR CHROMIUM PAGE CRASHED'));
 
 // Test-only public seed setup. The complete frozen firmware, its GUI, wallet
 // apps, normal QRHost parser and signing code remain the production versions.
@@ -155,8 +156,11 @@ try{
   await page.screenshot({path:'test-results/bull-original-specter-import.png',fullPage:true});
   console.log('PASS actual Specter public-key QR → original Bull watch-only parser, label UI and native Testnet wallet import');
 }catch(error){
+  console.error('BULL QR ACCEPTANCE FAILURE',error);
   await mkdir('test-results',{recursive:true});
-  await page.screenshot({path:'test-results/bull-qr-failure.png',fullPage:true});
+  await page.screenshot({path:'test-results/bull-qr-failure.png',fullPage:true}).catch(screenshotError=>{
+    console.error('BULL QR FAILURE SCREENSHOT',screenshotError.message);
+  });
   console.error(await app.locator('body').innerText().catch(()=>''));
   console.error(errors);
   throw error;
