@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { chromium } from 'playwright';
+import { launchBullBrowser } from './bull/test-browser.mjs';
 import { script } from 'bitcoinjs-lib';
 import * as secp from 'tiny-secp256k1';
 
@@ -28,7 +28,7 @@ try {
     try { if ((await fetch('http://127.0.0.1:8777/.browser-work/bdk-probe.html')).ok) break; } catch {}
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = await chromium.launch({ ...(process.env.CI ? {} : { channel: 'chrome' }), headless: true });
+  browser = await launchBullBrowser();
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

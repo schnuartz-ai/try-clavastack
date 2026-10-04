@@ -21,13 +21,13 @@ jobs:
       matrix:
         include:
           - mode: headless-shell
-            channel: ''
+            channel: headless-shell
             js_flags: ''
           - mode: chromium
             channel: chromium
             js_flags: ''
           - mode: shell-baseline-wasm
-            channel: ''
+            channel: headless-shell
             js_flags: --liftoff-only
     steps:
       - uses: actions/checkout@v4

@@ -73,6 +73,16 @@ wizard/wallet/receive/reload, BDK ABI/signatures, original Dart UR fountain fram
 LWK addresses/reopen, actual firmware QR signing, shared files and transport
 errors. Synthetic transactions are never broadcast to a public network.
 
+Bull CI uses Playwright's `chromium` channel, the regular browser running
+headlessly, for every native/app/QR test. Chromium 153's separate headless shell
+reproducibly segfaulted during reset on GitHub Linux runners. The retained-build
+[diagnostic run](https://github.com/schnuartz-ai/try-clavastack/actions/runs/37212711864)
+reproduced that failure while both regular Chromium and the shell's baseline
+WASM compiler completed every reset assertion using the identical app artifact.
+No app assertions are skipped and production needs no special browser flags.
+The manual `Bull browser diagnostics` workflow accepts a build run ID to repeat
+this comparison without rebuilding; it never publishes those retained artifacts.
+
 ## Public demo in the production application
 
 1. Select **Testnet Demos/Seed** in the shared media panel. Initialize Specter

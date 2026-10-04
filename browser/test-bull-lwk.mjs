@@ -1,6 +1,6 @@
 import {strict as assert} from 'node:assert';
 import {mkdir,writeFile} from 'node:fs/promises';
-import {chromium} from 'playwright';
+import {launchBullBrowser} from './bull/test-browser.mjs';
 const base=process.env.TEST_BASE_URL ?? 'http://127.0.0.1:8778';
 await writeFile('.browser-work/lwk-probe.html',`<!doctype html><meta charset="utf-8"><script type="module">
 import init,{lwk_call} from '/.browser-work/lwk-web-pkg/bull_lwk.js';
@@ -11,7 +11,7 @@ window.bullProbeInput=JSON.stringify({mnemonic:createDemoFiles('testnet').roots.
 window.bullProbeDone=value=>window.bullProbeResult=JSON.parse(value);
 const entry=document.createElement('script');entry.src='/.browser-work/lwk-probe.js';document.body.append(entry);
 </script>`);
-const browser=await chromium.launch({...(!process.env.CI?{channel:'chrome'}:{}),headless:true});
+const browser=await launchBullBrowser();
 try {
   const page=await browser.newPage();const errors=[];
   page.on('pageerror',error=>errors.push(error.message));

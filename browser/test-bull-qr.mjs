@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { launchBullBrowser } from './bull/test-browser.mjs';
 import { strict as assert } from 'node:assert';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Psbt, Transaction, script } from 'bitcoinjs-lib';
@@ -8,7 +8,7 @@ import { createDemoFiles } from './demo-data.js';
 const base=process.env.TEST_BASE_URL??'http://127.0.0.1:8778';
 const demo=createDemoFiles('testnet');
 const fixture=new TextDecoder().decode(demo.files.find(file=>file.name==='testnet-ghost-payment-low-fee.psbt').bytes).trim();
-const browser=await chromium.launch({...(process.env.CI?{}:{channel:'chrome'}),headless:true});
+const browser=await launchBullBrowser();
 const context=await browser.newContext({viewport:{width:1512,height:1100},serviceWorkers:'block'});
 const page=await context.newPage();
 const errors=[];

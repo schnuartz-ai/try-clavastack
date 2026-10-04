@@ -1,11 +1,11 @@
-import { chromium } from 'playwright';
+import { launchBullBrowser } from './bull/test-browser.mjs';
 import { strict as assert } from 'node:assert';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const base=process.env.TEST_BASE_URL??'http://127.0.0.1:8778';
 // Actual signed public fixture from the preceding full native QR test.
 const result=JSON.parse(await readFile('test-results/bull-original-qr-roundtrip.json','utf8'));
-const browser=await chromium.launch({...(process.env.CI?{}:{channel:'chrome'}),headless:true});
+const browser=await launchBullBrowser();
 const page=await browser.newPage();
 const requests=[];
 let responseMode='ok';

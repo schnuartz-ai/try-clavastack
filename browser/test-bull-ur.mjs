@@ -1,13 +1,13 @@
 import { strict as assert } from 'node:assert';
 import { writeFile } from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { launchBullBrowser } from './bull/test-browser.mjs';
 import { UR, UREncoder, URDecoder } from '@ngraveio/bc-ur';
 
 const bytes = Buffer.from(Array.from({length: 702}, (_, index) => index % 251));
 const ur = new UR(bytes, 'crypto-psbt');
 const encoder = new UREncoder(ur, 60);
 const frames = Array.from({length:100}, () => encoder.nextPart()).slice(12);
-const browser = await chromium.launch({...(process.env.CI ? {} : {channel:'chrome'}), headless:true});
+const browser = await launchBullBrowser();
 try {
   await writeFile(new URL('../.browser-work/ur-probe.html', import.meta.url),
     '<!doctype html><title>Original Bull UR acceptance</title>');
