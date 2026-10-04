@@ -1,10 +1,10 @@
 {
-  "build": "/builds/cryptoadvance/specter-desktop/5d3d5b91e614991c2dedb87c0e0e608e2c6382ae/652fd036d54af5bf/",
-  "version": "652fd036d54af5bf",
+  "build": "/builds/cryptoadvance/specter-desktop/5d3d5b91e614991c2dedb87c0e0e608e2c6382ae/801a3f2ccbeafd4d/",
+  "version": "801a3f2ccbeafd4d",
   "repository": "cryptoadvance/specter-desktop",
   "commit": "5d3d5b91e614991c2dedb87c0e0e608e2c6382ae",
   "diy_repository": "cryptoadvance/specter-diy",
   "diy_commit": "b9c85b9651d3e4cea2fbc954a8c5558844367c81",
   "web_simulator_repository": "cryptoadvance/specter-diy-web-simulator",
-  "web_simulator_commit": "f37cf66ef56f4d562fed205b7b66601a6dd730f7"
+  "web_simulator_commit": "7b8eeabda85658d4392e6a1bafb74bd37d56bd6f"
 }
