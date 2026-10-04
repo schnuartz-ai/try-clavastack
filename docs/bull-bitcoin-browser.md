@@ -26,7 +26,10 @@ Browser adapters provide Drift/SQLite, the session filesystem, secure-storage
 and preference platform interfaces, camera/direct QR, native file picking and
 sharing. Original application encryption and PIN handling remain above these
 boundaries. Each browser tab has its own Bull namespace. Reload preserves its
-wallet; reset removes that namespace and its Drift database. Fresh sessions
+wallet; reset removes that namespace and its Drift database. Cleanup waits up to
+ten seconds for closing IndexedDB connections and OPFS handles held by the
+previous Drift worker. A real browser storage regression holds both locks before
+checking their release, deletion and preservation of unrelated storage. Fresh sessions
 start on Bitcoin Testnet3 / Liquid Testnet, and saved network choices persist.
 
 Native BDK/LWK Esplora clients synchronize over HTTPS. Broadcasting serializes

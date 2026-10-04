@@ -29,7 +29,7 @@ def package(source=None, output=None, acceptance=False):
     shutil.copytree(source, output, dirs_exist_ok=True)
     for library, name in [('bdk', 'bdk-web-pkg'), ('lwk', 'lwk-web-pkg')]:
         shutil.copytree(ROOT / '.browser-work' / name, output / 'native' / library, dirs_exist_ok=True)
-    for name in ['runtime.js', 'qr_transport.js']:
+    for name in ['runtime.js', 'qr_transport.js', 'storage.js']:
         shutil.copy2(ROOT / 'browser/bull' / name, output / name)
     native_notices(output)
     bundle_qr(output/'qr_decoder.js')

@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "build:bull": "python browser/build-bull.py --acceptance",
-    "test:bull": "node browser/test-bull-bdk.mjs && node browser/test-bull-ur.mjs && node browser/test-bull-lwk.mjs && node browser/test-bull-app.mjs && node browser/test-bull-qr.mjs && node browser/test-bull-transport.mjs",
+    "test:bull": "node browser/test-bull-storage.mjs && node browser/test-bull-bdk.mjs && node browser/test-bull-ur.mjs && node browser/test-bull-lwk.mjs && node browser/test-bull-app.mjs && node browser/test-bull-qr.mjs && node browser/test-bull-transport.mjs",
     "test:pointer-gc": "node browser/test-pointer-gc.mjs",
     "test:keeper-media": "node browser/test-keeper-media.mjs",
     "build:keeper": "node browser/build-keeper-native-web.mjs",

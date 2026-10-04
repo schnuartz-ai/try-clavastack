@@ -1,26 +1,10 @@
 // Browser peripherals and transport only. All wallet derivation, PSBT signing,
 // scanning and transaction interpretation belong to the pinned Rust/Dart app.
 import { createCompanionFileClient } from '../../../browser/companion-file-dialog.js';
+import { cleanupRetiredSessions } from './storage.js';
 const key = 'clava.bull-bitcoin.session';
 const cleanupKey = 'clava.bull-bitcoin.reset-pending';
-for (const retired of JSON.parse(sessionStorage.getItem(cleanupKey) ?? '[]')) {
-  if (!/^[a-f0-9-]{36}$/.test(retired)) throw new Error('Invalid retired Bull session');
-  const names = ['bullbitcoin_sqlite', 'payjoin'].map(name => `bull-bitcoin-${retired}-${name}`);
-  for (const name of names) {
-    await new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(name);
-      request.onsuccess = () => resolve(); request.onerror = () => reject(request.error);
-      request.onblocked = () => reject(new Error('Close other Bull Bitcoin tabs to finish resetting their database.'));
-    });
-    if (navigator.storage?.getDirectory) {
-      try {
-        const root = await navigator.storage.getDirectory();
-        const drift = await root.getDirectoryHandle('drift_db');
-        await drift.removeEntry(name, {recursive:true});
-      } catch (error) { if (error.name !== 'NotFoundError') throw error; }
-    }
-  }
-}
+await cleanupRetiredSessions(JSON.parse(sessionStorage.getItem(cleanupKey) ?? '[]'));
 sessionStorage.removeItem(cleanupKey);
 let session = sessionStorage.getItem(key);
 if (!session) { session = crypto.randomUUID(); sessionStorage.setItem(key, session); }
