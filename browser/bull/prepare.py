@@ -25,7 +25,7 @@ def prepare():
     for name in ["lib", "assets", "localization", "packages", "features", "tools", "test",
                  "integration_test", "drift_schemas", ".fvmrc", "pubspec.yaml",
                  "pubspec.lock", "l10n.yaml", "build.yaml", "analysis_options.yaml",
-                 "Makefile", "LICENSE", "AGENTS.md", "ARCHITECTURE.md", "FEATURES.md"]:
+                 "Makefile", "makefile", "LICENSE", "AGENTS.md", "ARCHITECTURE.md", "FEATURES.md"]:
         source = UPSTREAM / name
         if not source.exists():
             continue
