@@ -172,7 +172,9 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo install wasm-bindgen-cli --version 0.2.105 --locked
       - name: Build and analyze original Bull Bitcoin browser application
-        run: python3 browser/build-bull.py --acceptance
+        run: |
+          python3 browser/test-bull-prepare.py
+          python3 browser/build-bull.py --acceptance
       - name: Package pinned real Specter Desktop source for CPython WASM
         run: python3 browser/build-specter-desktop.py
       - name: Build Playground firmware variants
