@@ -7,6 +7,8 @@ import * as ecc from 'tiny-secp256k1';
 import * as bip39 from 'bip39';
 import {networks,payments,Psbt,script} from 'bitcoinjs-lib';
 import QRCode from 'qrcode';
+import {PNG} from 'pngjs';
+import jsQR from 'jsqr';
 const base=process.env.TEST_BASE_URL||'http://127.0.0.1:8765';
 const browser=await chromium.launch({...(process.env.CI?{}:{channel:'chrome'}),headless:true});
 const errors=[],checks=[];
@@ -73,6 +75,13 @@ try{
  await page.getByText('Receive',{exact:true}).first().waitFor();
  await page.screenshot({path:'test-results/bluewallet/imported.png'});
  pass('Original wallet UI closes confirmation and displays the saved BIP84 wallet');
+ await page.getByText('Receive',{exact:true}).first().click();
+ const receiveCard=page.getByTestId('ReceiveCard');await receiveCard.waitFor();
+ const qrSvg=receiveCard.locator('svg').first();await qrSvg.waitFor();
+ let receiveQr;for(let attempt=0;attempt<8&&!receiveQr;attempt++){await page.waitForTimeout(250);const image=PNG.sync.read(await qrSvg.screenshot());receiveQr=jsQR(new Uint8ClampedArray(image.data),image.width,image.height);}
+ assert(receiveQr?.data.includes(expected),'Rendered receive QR differs from independent Testnet BIP84 address');
+ await page.screenshot({path:'test-results/bluewallet/receive.png'});
+ pass('Original Receive screen renders a decodable QR with the independent Testnet BIP84 address');
  await page.evaluate(()=>window.__blueTest.navigationRef.navigate('AddWalletRoot',{screen:'ImportWallet'}));
  await page.getByTestId('MnemonicInput').fill(BIP32Factory(ecc).fromSeed(bip39.mnemonicToSeedSync(seed)).neutered().toBase58());await page.getByTestId('DoImport').click();
  await page.getByRole('dialog').getByText(/Mainnet imports are disabled/).waitFor();await page.getByRole('button',{name:'OK',exact:true}).click();assert(!(await page.locator('body').innerText()).includes('could not start'));

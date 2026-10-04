@@ -56,6 +56,14 @@ function patchSource(contents,path) {
    // flex allocation to keep the camera surface and its controls full-height.
    output=output.replace('  ) : (\n    <View>', '  ) : (\n    <View style={{flex:1}}>');
   }
+  if(path.replaceAll('\\','/').endsWith('screen/receive/ReceiveDetails.tsx')) {
+   // Native Reanimated reveal tiles stay opaque without native worklets.
+   // The web branch displays the original QR component directly.
+   const anchor='const QrStaggerReveal: React.FC<QrStaggerRevealProps> = ({ size, maskColor, runKey, children }) => {';
+   if(!output.includes(anchor))throw new Error('Pinned BlueWallet receive reveal anchor changed.');
+   output=output.replace('BackHandler, Pressable, StyleSheet, Text, useColorScheme, View', 'BackHandler, Platform, Pressable, StyleSheet, Text, useColorScheme, View');
+   output=output.replace(anchor,anchor+"\n  if (Platform.OS === 'web') return <View style={{width:size,height:size}}>{children}</View>;");
+  }
   if(path.replaceAll('\\','/').endsWith('screen/wallets/ImportWallet.tsx')) {
    output=`import {assertTestnetImport} from '${resolve(adapters,'policy.ts').replaceAll('\\','/')}';\nimport presentAlert from '../../components/Alert';\n`+output;
    output=output.replace('async (text: string) => {', "async (text: string) => {\n try {assertTestnetImport(text);} catch(error) {presentAlert({message:(error as Error).message});return;}");
