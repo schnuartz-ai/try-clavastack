@@ -77,6 +77,114 @@ function filesFor(pathPrefix) {
 }
 function locationLabel(owner) { return owner ? `Inserted in device ${numbers[owner]}` : 'Not inserted'; }
 function report(text) { document.querySelector('#transfer-state').textContent = text; }
+const developerOptionsToggle = abMode ? document.querySelector('#developer-options-toggle') : null;
+const developerInspectorGrid = abMode ? document.querySelector('#developer-inspector-grid') : null;
+function inspectorPane(name) { return developerInspectorGrid?.querySelector(`[data-inspector-pane="${name}"]`); }
+function sendInspectorToggle(name, enabled) {
+  message(name, { type: 'developer-inspector-toggle', enabled });
+}
+function sendInspectorCommand(name, action, data = {}) {
+  message(name, { type: 'developer-inspector-command', action, ...data });
+}
+function clearInspectorPane(name, statusText = 'Waiting for simulator…') {
+  const pane = inspectorPane(name);
+  if (!pane) return;
+  pane.querySelector('[data-inspector-status]').textContent = statusText;
+  pane.querySelector('[data-inspector-state]').textContent = '';
+  pane.querySelector('[data-inspector-objects]').textContent = '';
+  pane.querySelector('[data-inspector-file-content]').textContent = '';
+  pane.querySelector('[data-inspector-memory]').textContent = '';
+  pane.querySelector('[data-inspector-changes]').textContent = '';
+  pane.querySelector('[data-inspector-sensitive-values]').textContent = '';
+  pane.querySelector('[data-inspector-sensitive-values]').hidden = true;
+  pane.querySelector('[data-inspector-sensitive-panel]').open = false;
+  const files = pane.querySelector('[data-inspector-files]');
+  files.replaceChildren(new Option('Enable Developer Options to inspect files.', ''));
+}
+function renderInspectorReport(name, data) {
+  const pane = inspectorPane(name);
+  if (!pane || !developerOptionsToggle?.checked) return;
+  const state = data.state && typeof data.state === 'object' ? data.state : {};
+  pane.querySelector('[data-inspector-status]').textContent =
+    `Updated ${new Date().toLocaleTimeString()} · ${name === 'diy' ? 'Specter A' : 'Specter B'}`;
+  pane.querySelector('[data-inspector-state]').textContent = JSON.stringify(state, null, 2);
+  pane.querySelector('[data-inspector-objects]').textContent = JSON.stringify(state.firmware?.keystoreObjects || {}, null, 2);
+  const keystoreNote = pane.querySelector('[data-inspector-keystore-note]');
+  const mockUi = data.program === 'mockui';
+  keystoreNote.hidden = !mockUi;
+  keystoreNote.textContent = mockUi
+    ? 'This MockUI build does not run the Specter DIY wallet. WebAssembly RAM and simulated files are available, but no wallet keystore or seed phrase exists in this simulator.'
+    : '';
+  pane.querySelector('[data-inspector-read-sensitive]').disabled = mockUi;
+  if (Array.isArray(data.files)) {
+    const files = pane.querySelector('[data-inspector-files]');
+    const selected = files.value;
+    files.replaceChildren(...data.files.map(file => {
+      const option = new Option(`${file.path} (${Number(file.size) || 0} bytes)`, file.path);
+      return option;
+    }));
+    if (!data.files.length) files.append(new Option('No simulator files found.', ''));
+    if (data.files.some(file => file.path === selected)) files.value = selected;
+    else if (data.files.length) files.value = data.files[0].path;
+    if (files.value) sendInspectorCommand(name, 'file', { path: files.value });
+  }
+  pane.querySelector('[data-inspector-changes]').textContent = data.changes || '';
+  if (data.action === 'sensitive') {
+    const output = pane.querySelector('[data-inspector-sensitive-values]');
+    output.textContent = typeof data.sensitiveValue === 'string'
+      ? `keystore.mnemonic (live firmware RAM)\n${data.sensitiveValue}`
+      : state.firmware?.error
+        ? `Could not read the keystore value: ${state.firmware.error}`
+        : 'No mnemonic is currently retained in the running keystore.';
+    output.hidden = false;
+    // Do not retain the phrase in the parent script after it has been rendered.
+    data.sensitiveValue = undefined;
+  }
+}
+if (developerOptionsToggle && developerInspectorGrid) {
+  developerOptionsToggle.addEventListener('change', () => {
+    const enabled = developerOptionsToggle.checked;
+    developerInspectorGrid.hidden = !enabled;
+    for (const name of ['diy', 'play']) {
+      sendInspectorToggle(name, enabled);
+      if (enabled) sendInspectorCommand(name, 'refresh');
+      else clearInspectorPane(name, 'Developer Options are disabled.');
+    }
+  });
+  for (const name of ['diy', 'play']) {
+    const pane = inspectorPane(name);
+    pane.querySelectorAll('[data-inspector-action]').forEach(button => {
+      button.addEventListener('click', () => sendInspectorCommand(name, button.dataset.inspectorAction));
+    });
+    pane.querySelector('[data-inspector-read-sensitive]').disabled = true;
+    pane.querySelector('[data-inspector-files]').addEventListener('change', event => {
+      if (event.currentTarget.value) sendInspectorCommand(name, 'file', { path: event.currentTarget.value });
+    });
+    pane.querySelector('[data-inspector-read-memory]').addEventListener('click', () => {
+      const input = pane.querySelector('[data-inspector-address]').value.trim();
+      const address = /^(?:0x[0-9a-f]+|[0-9]+)$/i.test(input) ? Number(input) : NaN;
+      if (!Number.isSafeInteger(address) || address < 0) {
+        pane.querySelector('[data-inspector-status]').textContent = 'Enter a valid decimal or hexadecimal address.';
+        return;
+      }
+      sendInspectorCommand(name, 'memory', { address });
+    });
+    pane.querySelector('[data-inspector-read-sensitive]').addEventListener('click', () => {
+      const output = pane.querySelector('[data-inspector-sensitive-values]');
+      output.textContent = 'Reading the live keystore value…';
+      output.hidden = false;
+      sendInspectorCommand(name, 'sensitive');
+    });
+    pane.querySelector('[data-inspector-sensitive-panel]').addEventListener('toggle', event => {
+      if (!event.currentTarget.open) {
+        const output = pane.querySelector('[data-inspector-sensitive-values]');
+        output.textContent = '';
+        output.hidden = true;
+        sendInspectorCommand(name, 'clear-sensitive');
+      }
+    });
+  }
+}
 function formatBytes(bytes) {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(bytes === SD_CAPACITY_BYTES ? 0 : 2)} GB`;
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
@@ -181,6 +289,7 @@ addEventListener('message', event => {
   } else if (data.type === 'simulator-restarting' && data.variant === name) {
     ready.delete(name);
     devices[name].querySelector('.device-status').textContent = 'Restarting locally';
+    if (developerOptionsToggle?.checked) clearInspectorPane(name, 'Simulator restarting…');
   } else if (data.type === 'simulator-running' && data.variant === name) {
     childVersions.set(name, { build: data.build, version: data.version });
     if (feedbackVersions[name] &&
@@ -191,9 +300,22 @@ addEventListener('message', event => {
     }
     ready.add(name);
     devices[name].querySelector('.device-status').textContent = 'Running locally · drag cards here';
+    if (developerOptionsToggle?.checked) {
+      sendInspectorToggle(name, true);
+      sendInspectorCommand(name, 'refresh');
+    }
   } else if (data.type === 'simulator-error') {
     ready.delete(name);
     devices[name].querySelector('.device-status').textContent = data.message;
+    if (developerOptionsToggle?.checked) clearInspectorPane(name, data.message || 'Simulator failed to start.');
+  } else if (data.type === 'simulator-developer-inspector-report' && data.variant === name) {
+    renderInspectorReport(name, data);
+  } else if (data.type === 'simulator-developer-inspector-file' && data.variant === name) {
+    const pane = inspectorPane(name);
+    if (pane && developerOptionsToggle?.checked) pane.querySelector('[data-inspector-file-content]').textContent = data.content || '';
+  } else if (data.type === 'simulator-developer-inspector-memory' && data.variant === name) {
+    const pane = inspectorPane(name);
+    if (pane && developerOptionsToggle?.checked) pane.querySelector('[data-inspector-memory]').textContent = data.dump || '';
   } else if (data.type === 'peripherals-snapshot' && data.variant === name) {
     const request = pending.get(data.requestId);
     if (request?.name === name) { pending.delete(data.requestId); request.resolve(data.files); }

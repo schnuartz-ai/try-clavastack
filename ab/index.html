@@ -82,6 +82,24 @@
     .drag-ghost img { width:100%; }
     .drag-ghost .card-art { aspect-ratio:1.55; background:#fff; color:#1a3147; border-radius:9px; padding:10px; }
     .pin-hint { width:fit-content; max-width:100%; margin:20px auto 0; padding:8px 14px; border:1px solid #5fc8f5; border-radius:9px; background:#102b40; color:#d9f3ff; box-shadow:0 0 0 1px #1f99e51f,0 0 10px #1f99e544; font-size:12px; line-height:1.4; text-align:center; }
+    .developer-options { margin:20px 0; }
+    .developer-options-toggle { display:block; color:#fff; text-align:center; cursor:pointer; }
+    .developer-inspector-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; margin-top:14px; }
+    .developer-inspector-grid[hidden] { display:none; }
+    .developer-inspector-pane { min-width:0; padding:16px; border:1px solid var(--line); border-radius:12px; background:#101b2a; color:var(--muted); font-size:12px; line-height:1.45; }
+    .developer-inspector-pane h2 { color:#fff; font-size:17px; margin:0 0 8px; }
+    .developer-inspector-pane h3 { color:#fff; font-size:13px; margin:14px 0 6px; }
+    .developer-inspector-pane p { margin:6px 0; }
+    .developer-inspector-pane pre { min-height:60px; max-height:240px; overflow:auto; resize:vertical; padding:9px; border-radius:6px; background:#04070b; color:#fcfcfc; white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; }
+    .developer-inspector-pane button,.developer-inspector-pane select,.developer-inspector-pane input { max-width:100%; border:1px solid #536174; border-radius:6px; padding:7px 9px; background:#08131f; color:#fff; font:inherit; }
+    .developer-inspector-pane button { cursor:pointer; }
+    .developer-inspector-pane button:hover { border-color:#8acaff; }
+    .developer-inspector-pane select { width:100%; margin-top:5px; }
+    .developer-inspector-pane input { width:130px; }
+    .developer-inspector-actions { display:flex; flex-wrap:wrap; gap:6px; }
+    .developer-inspector-pane details { margin-top:12px; padding:10px; border:1px solid #344359; border-radius:8px; }
+    .developer-inspector-pane summary { color:#fff; cursor:pointer; }
+    @media(max-width:760px) { .device-grid,.media-grid,.developer-inspector-grid { grid-template-columns:1fr; } }
     footer { padding:0 18px 28px; text-align:center; color:var(--muted); font-size:12px; }
     footer a { color:var(--blue); }
     @media(max-width:760px) { .device-grid { grid-template-columns:1fr; } .media-grid { grid-template-columns:1fr; } }
@@ -110,6 +128,59 @@
           <button class="restart-device" type="button">Restart</button><a class="source-link" target="_blank" rel="noopener noreferrer">GitHub · loading…</a><div class="device-status" role="status">Starting locally…</div>
         </div>
       </article>
+    </section>
+    <section class="developer-options" aria-label="Developer Options for both simulators">
+      <label class="developer-options-toggle"><input id="developer-options-toggle" type="checkbox" aria-controls="developer-inspector-grid"> Developer Options</label>
+      <div class="developer-inspector-grid" id="developer-inspector-grid" hidden>
+        <article class="developer-inspector-pane" data-inspector-pane="diy">
+          <h2>Developer Inspector · A</h2>
+          <p data-inspector-status role="status">Waiting for Specter A…</p>
+          <div class="developer-inspector-actions">
+            <button type="button" data-inspector-action="refresh">Refresh A</button>
+            <button type="button" data-inspector-action="baseline">Take A baseline</button>
+            <button type="button" data-inspector-action="compare">Compare A</button>
+          </div>
+          <h3>RAM &amp; firmware state</h3><pre data-inspector-state>Enable Developer Options to inspect Specter A.</pre>
+          <h3>Named keystore objects in firmware RAM</h3><p data-inspector-keystore-note hidden></p><pre data-inspector-objects></pre>
+          <h3>Internal flash, RAM disk &amp; peripherals</h3>
+          <select data-inspector-files aria-label="Specter A simulator files"><option value="">Waiting for files…</option></select>
+          <pre data-inspector-file-content>Select a file to inspect its text and hex bytes.</pre>
+          <h3>WebAssembly RAM bytes</h3>
+          <label>Address <input data-inspector-address value="0x0" aria-label="Specter A RAM address"></label>
+          <button type="button" data-inspector-read-memory>Read 256 bytes</button><pre data-inspector-memory></pre>
+          <h3>Changes since A baseline</h3><pre data-inspector-changes>Take a baseline, use Specter A, then compare.</pre>
+          <details data-inspector-sensitive-panel>
+            <summary>Read sensitive values (test phrases only)</summary>
+            <p>Reads the live <code>keystore.mnemonic</code> object from Specter A firmware RAM. Use public test phrases only.</p>
+            <button type="button" data-inspector-read-sensitive disabled>Read mnemonic from A RAM</button>
+            <pre data-inspector-sensitive-values hidden></pre>
+          </details>
+        </article>
+        <article class="developer-inspector-pane" data-inspector-pane="play">
+          <h2>Developer Inspector · B</h2>
+          <p data-inspector-status role="status">Waiting for Specter B…</p>
+          <div class="developer-inspector-actions">
+            <button type="button" data-inspector-action="refresh">Refresh B</button>
+            <button type="button" data-inspector-action="baseline">Take B baseline</button>
+            <button type="button" data-inspector-action="compare">Compare B</button>
+          </div>
+          <h3>RAM &amp; firmware state</h3><pre data-inspector-state>Enable Developer Options to inspect Specter B.</pre>
+          <h3>Named keystore objects in firmware RAM</h3><p data-inspector-keystore-note hidden></p><pre data-inspector-objects></pre>
+          <h3>Internal flash, RAM disk &amp; peripherals</h3>
+          <select data-inspector-files aria-label="Specter B simulator files"><option value="">Waiting for files…</option></select>
+          <pre data-inspector-file-content>Select a file to inspect its text and hex bytes.</pre>
+          <h3>WebAssembly RAM bytes</h3>
+          <label>Address <input data-inspector-address value="0x0" aria-label="Specter B RAM address"></label>
+          <button type="button" data-inspector-read-memory>Read 256 bytes</button><pre data-inspector-memory></pre>
+          <h3>Changes since B baseline</h3><pre data-inspector-changes>Take a baseline, use Specter B, then compare.</pre>
+          <details data-inspector-sensitive-panel>
+            <summary>Read sensitive values (test phrases only)</summary>
+            <p>Reads the live <code>keystore.mnemonic</code> object from Specter B firmware RAM. Use public test phrases only.</p>
+            <button type="button" data-inspector-read-sensitive disabled>Read mnemonic from B RAM</button>
+            <pre data-inspector-sensitive-values hidden></pre>
+          </details>
+        </article>
+      </div>
     </section>
     <section class="media-desk" aria-label="Shared removable media">
       <div class="desk-head"><h2>Removable media</h2></div>
@@ -142,7 +213,7 @@
     <p class="pin-hint">A PIN may already be selected: “21”.</p>
   </main>
   <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="/simulators/">Development Drafts</a> · Browser simulation is not secure hardware.</footer>
-  <script type="module" src="/simulators/site.js?v=20260918-ab"></script>
+  <script type="module" src="/simulators/site.js?v=20261004-ab-dev-options"></script>
 <script type="module" src="/browser/virtual-host-downloads.js?v=20261003"></script>
 </body>
 </html>
