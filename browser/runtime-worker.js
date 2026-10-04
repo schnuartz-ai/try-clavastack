@@ -116,7 +116,9 @@ function collectInspection(data, attempts) {
   const { sensitiveValues, ...firmwareState } = matchingFirmware || {};
   send('inspector-state', { requestId: data.requestId, files: data.includeFiles ? inspectFiles(fs) : null,
     memoryBytes: Module.HEAPU8.buffer.byteLength,
-    firmware: matchingFirmware ? firmwareState : { error: 'Firmware metrics unavailable during this operation; refresh to retry.' },
+    firmware: matchingFirmware ? firmwareState : { error: program === 'mockui'
+      ? 'This MockUI build does not expose Specter DIY keystore or firmware heap metrics.'
+      : 'Firmware metrics unavailable during this operation; refresh to retry.' },
     sensitiveValues: data.includeSensitive ? sensitiveValues || {} : undefined,
     scannerActive, usbEnabled, qrQueued: qrQueue.length, usbQueued: usbQueue.length,
     sdInserted: fs.analyzePath('/bridge/sd-inserted').exists,

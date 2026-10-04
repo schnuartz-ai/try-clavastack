@@ -137,6 +137,7 @@ function receiveInspection(data) {
     inspectorPending = null;
     inspectorBusy(false);
     const { files, type, requestId: ignored, sensitiveValues, ...state } = data;
+    let changesText = $('#inspector-changes').textContent;
     $('#inspector-state').textContent = JSON.stringify(state, null, 2);
     $('#inspector-objects').textContent = JSON.stringify(state.firmware?.keystoreObjects || {}, null, 2);
     $('#inspector-status').textContent = `Updated ${new Date().toLocaleTimeString()} · RAM metrics refresh every 3 seconds; Refresh updates files.`;
@@ -163,29 +164,51 @@ function receiveInspection(data) {
     }
     if (action === 'baseline') {
       inspectorBaseline = { files: new Map(files.map(file => [file.path, file])), state: comparableState(data) };
-      $('#inspector-changes').textContent = `Baseline captured at ${new Date().toLocaleTimeString()}. Use the simulator, then compare.`;
+      changesText = `Baseline captured at ${new Date().toLocaleTimeString()}. Use the simulator, then compare.`;
+      $('#inspector-changes').textContent = changesText;
     } else if (action === 'compare') {
-      if (!inspectorBaseline) { $('#inspector-changes').textContent = 'Take a baseline first.'; return; }
-      const current = new Map(files.map(file => [file.path, file]));
-      const changes = [];
-      for (const [path, file] of current) {
-        const before = inspectorBaseline.files.get(path);
-        if (!before) changes.push(`Added: ${path} (${file.size} bytes)`);
-        else if (before.size !== file.size || before.hash !== file.hash) changes.push(`Changed: ${path} (${before.size} → ${file.size} bytes)`);
-      }
-      for (const path of inspectorBaseline.files.keys()) if (!current.has(path)) changes.push(`Removed: ${path}`);
-      const currentState = comparableState(data);
-      for (const key of Object.keys(currentState)) {
-        if (JSON.stringify(inspectorBaseline.state[key]) !== JSON.stringify(currentState[key])) {
-          changes.push(`${key}: ${JSON.stringify(inspectorBaseline.state[key])} → ${JSON.stringify(currentState[key])}`);
+      if (!inspectorBaseline) {
+        changesText = 'Take a baseline first.';
+      } else {
+        const current = new Map(files.map(file => [file.path, file]));
+        const changes = [];
+        for (const [path, file] of current) {
+          const before = inspectorBaseline.files.get(path);
+          if (!before) changes.push(`Added: ${path} (${file.size} bytes)`);
+          else if (before.size !== file.size || before.hash !== file.hash) changes.push(`Changed: ${path} (${before.size} → ${file.size} bytes)`);
         }
+        for (const path of inspectorBaseline.files.keys()) if (!current.has(path)) changes.push(`Removed: ${path}`);
+        const currentState = comparableState(data);
+        for (const key of Object.keys(currentState)) {
+          if (JSON.stringify(inspectorBaseline.state[key]) !== JSON.stringify(currentState[key])) {
+            changes.push(`${key}: ${JSON.stringify(inspectorBaseline.state[key])} → ${JSON.stringify(currentState[key])}`);
+          }
+        }
+        changesText = changes.join('\n') || 'No file or firmware-state changes detected.';
       }
-      $('#inspector-changes').textContent = changes.join('\n') || 'No file or firmware-state changes detected.';
+      $('#inspector-changes').textContent = changesText;
+    }
+    if (gallery) {
+      notifyParent({ type: 'simulator-developer-inspector-report', variant, program, action, state, files,
+        changes: changesText,
+        sensitiveValue: action === 'sensitive' ? sensitiveValues?.['keystore.mnemonic'] : undefined });
+      if (action === 'sensitive') {
+        $('#inspector-sensitive-values').textContent = '';
+        $('#inspector-sensitive-values').hidden = true;
+        $('#inspector-sensitive-panel').open = false;
+        send({ type: 'inspector-hide-sensitive' });
+      }
     }
   } else if (data.type === 'inspector-file' && data.requestId === inspectorFileRequest && data.path === $('#inspector-files').value) {
-    $('#inspector-content').textContent = `${data.path} · ${data.size} bytes${data.size > data.bytes.length ? ' · preview limited to first 64 KiB' : ''}\n\nTEXT\n${new TextDecoder().decode(data.bytes)}\n\nHEX\n${hexDump(data.bytes)}`;
+    const content = `${data.path} · ${data.size} bytes${data.size > data.bytes.length ? ' · preview limited to first 64 KiB' : ''}\n\nTEXT\n${new TextDecoder().decode(data.bytes)}\n\nHEX\n${hexDump(data.bytes)}`;
+    $('#inspector-content').textContent = content;
+    if (gallery) notifyParent({ type: 'simulator-developer-inspector-file', variant,
+      path: data.path, content });
   } else if (data.type === 'inspector-memory') {
-    $('#inspector-memory').textContent = hexDump(data.bytes, data.address);
+    const dump = hexDump(data.bytes, data.address);
+    $('#inspector-memory').textContent = dump;
+    if (gallery) notifyParent({ type: 'simulator-developer-inspector-memory', variant,
+      address: data.address, dump });
   }
 }
 function clearInspectorSensitiveValues(clearWorker = true) {
@@ -873,6 +896,33 @@ addEventListener('message', async event => {
   if (gallery && event.data?.type === 'gallery-parent-ready') {
     if (restoreResolve) notifyParent({ type: 'child-awaiting-peripherals', variant });
     if (status.textContent === 'Running locally') notifyParent({ type: 'simulator-running', variant });
+  } else if (gallery && event.data?.type === 'developer-inspector-toggle') {
+    const enabled = Boolean(event.data.enabled);
+    const toggle = $('#advanced-options');
+    if (toggle.checked !== enabled) {
+      toggle.checked = enabled;
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  } else if (gallery && event.data?.type === 'developer-inspector-command') {
+    if (!$('#advanced-options').checked) return;
+    const action = event.data.action;
+    if (action === 'refresh') inspect();
+    else if (action === 'baseline') inspect('baseline');
+    else if (action === 'compare') inspect('compare');
+    else if (action === 'sensitive') $('#inspector-read-sensitive').click();
+    else if (action === 'clear-sensitive') {
+      $('#inspector-sensitive-panel').open = false;
+      clearInspectorSensitiveValues();
+    } else if (action === 'file' && typeof event.data.path === 'string' && event.data.path.length <= 512) {
+      const select = $('#inspector-files');
+      if ([...select.options].some(option => option.value === event.data.path)) {
+        select.value = event.data.path;
+        select.onchange();
+      }
+    } else if (action === 'memory' && Number.isSafeInteger(event.data.address) && event.data.address >= 0) {
+      $('#inspector-address').value = String(event.data.address);
+      $('#inspector-read-memory').click();
+    }
   } else if (event.data?.type === 'peripherals-provide' && restoreResolve) {
     clearInterval(peripheralRetryTimer);
     const files = event.data.files || [];
