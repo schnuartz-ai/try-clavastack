@@ -10,6 +10,7 @@ page.on('console', message => { if (message.type() === 'error') errors.push(mess
 await page.setViewportSize({ width: 1440, height: 1000 });
 await page.goto(`${base}/ab/`);
 await page.locator('h1').getByText('Specter', { exact: true }).waitFor();
+assert.equal(await page.locator('.pin-hint').count(), 0, 'A/B page should not show the preset PIN hint');
 assert.equal(await page.locator('[data-device] h2').count(), 2);
 assert.deepEqual(await page.locator('[data-device] h2').allTextContents(), ['Specter A', 'Specter B']);
 assert.equal(await page.locator('.memory-token').count(), 3);
