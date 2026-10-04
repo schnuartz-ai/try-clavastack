@@ -64,24 +64,14 @@
 </head>
 <body>
   <header>
-    <a class="brand" href="/" aria-label="ClavaStack × Specter DIY × Bull Bitcoin"><img src="/assets/clavastack-logo.png" alt="ClavaStack"><span class="separator" aria-hidden="true">×</span><img src="/assets/specter-logo.png" alt="Specter DIY"><span class="separator" aria-hidden="true">×</span><img src="/assets/bull-bitcoin-logo.png" alt="Bull Bitcoin"></a>
+    <a class="brand" href="/" aria-label="ClavaStack × Specter DIY × Bull Bitcoin"><img src="/assets/clavastack-logo.png" alt="ClavaStack"><span class="separator" aria-hidden="true">×</span><img src="/assets/specter-logo.png" alt="Specter DIY"><span class="separator" aria-hidden="true">×</span><img src="/assets/bull-bitcoin-logo-red.png" alt="Bull Bitcoin"></a>
     <a href="/simulators/">← All simulators</a>
   </header>
   <main>
     <h1>Bull Bitcoin + Specter DIY</h1>
     <p class="intro">The original Bull Bitcoin app alongside the Specter DIY firmware. Exchange QR codes and files between both devices.</p>
-    <div class="warning" role="note"><strong>TESTNET SIMULATOR.</strong> Never enter a real seed or use real funds. Bull Bitcoin’s disposable wallet and PIN are stored in this browser tab only. Physical hardware, Tor, biometrics, background tasks, Boltz swaps and Payjoin OHTTP are unavailable in this browser port.</div>
+    <div class="warning" role="note"><strong>TESTNET SIMULATOR.</strong> Never enter a real seed or use real funds. Mnemonic import uses Bull Bitcoin’s secure on-screen keyboard; paste is disabled. Use only a disposable test phrase. Bull Bitcoin’s disposable wallet and PIN are stored in this browser tab only. Physical hardware, Tor, biometrics, background tasks, Boltz swaps and Payjoin OHTTP are unavailable in this browser port.</div>
     <section class="workspace" aria-label="Bull Bitcoin and Specter DIY simulators">
-      <article class="device-card" aria-labelledby="specter-heading">
-        <div class="device-head"><div><h2 id="specter-heading">Specter DIY</h2><p>Real Specter DIY firmware in the existing WebAssembly simulator.</p></div><span class="pill" id="specter-badge">Starting</span></div>
-        <div class="specter-screen device-frame"><img class="specter-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe id="specter-simulator" title="Specter DIY hardware wallet simulator" src="/?embedded=1&amp;gallery=1&amp;variant=diy&amp;qr-bridge=1&amp;assetVersion=20261004-bull-native" allow="camera"></iframe><button class="device-hitbox" type="button" data-media-target="diy" aria-label="Insert a virtual card into Specter DIY"></button></div>
-        <div class="specter-footer">
-          <div class="status" id="specter-status" role="status" aria-live="polite">Loading the Specter DIY firmware…</div>
-          <div class="controls"><button class="button" id="specter-restart" type="button">Restart Specter</button><button class="button danger" id="specter-reset" type="button">Reset Specter state</button></div>
-          <div class="controls"><button class="button primary" id="send-bull-qr" type="button" disabled>Scan from Bull Bitcoin</button></div>
-          <div class="status" id="specter-qr-status" aria-live="polite">Open the Specter QR scanner and a QR screen in Bull Bitcoin.</div>
-        </div>
-      </article>
       <article class="device-card bull-card" aria-labelledby="bull-heading">
         <div class="device-head"><div><h2 id="bull-heading">Bull Bitcoin</h2><p>The original Bull Bitcoin wallet app.</p></div><span class="pill online">Browser</span></div>
         <div class="phone desktop-runtime" aria-label="Bull Bitcoin phone simulator frame">
@@ -92,6 +82,16 @@
           <button class="device-hitbox" type="button" data-media-target="desktop" aria-label="Insert the virtual SD card into Bull Bitcoin"></button>
         </div>
         <div id="bull-controls"><div id="bull-status" role="status" aria-live="polite">Starting the Bull Bitcoin app…</div><button class="button danger" id="bull-reset" type="button">Reset Bull Bitcoin session</button></div>
+      </article>
+      <article class="device-card" aria-labelledby="specter-heading">
+        <div class="device-head"><div><h2 id="specter-heading">Specter DIY</h2><p>Real Specter DIY firmware in the existing WebAssembly simulator.</p></div><span class="pill" id="specter-badge">Starting</span></div>
+        <div class="specter-screen device-frame"><img class="specter-shell" src="/assets/Specter-Shield-Metal-mockup.png" alt=""><iframe id="specter-simulator" title="Specter DIY hardware wallet simulator" src="/?embedded=1&amp;gallery=1&amp;variant=diy&amp;qr-bridge=1&amp;assetVersion=20261004-bull-native" allow="camera"></iframe><button class="device-hitbox" type="button" data-media-target="diy" aria-label="Insert a virtual card into Specter DIY"></button></div>
+        <div class="specter-footer">
+          <div class="status" id="specter-status" role="status" aria-live="polite">Loading the Specter DIY firmware…</div>
+          <div class="controls"><button class="button" id="specter-restart" type="button">Restart Specter</button><button class="button danger" id="specter-reset" type="button">Reset Specter state</button></div>
+          <div class="controls"><button class="button" id="use-specter-camera" type="button" disabled>Scan SeedQR with camera</button><button class="button primary" id="send-bull-qr" type="button" disabled>Scan from Bull Bitcoin</button></div>
+          <div class="status" id="specter-qr-status" aria-live="polite">Open the Specter QR scanner and a QR screen in Bull Bitcoin.</div>
+        </div>
       </article>
     </section>
     <div id="companion-media"></div>

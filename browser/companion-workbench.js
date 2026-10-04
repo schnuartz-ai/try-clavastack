@@ -8,6 +8,7 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
   const status = document.querySelector(`#${id}-status`);
   const qrStatus = document.querySelector('#specter-qr-status');
   const sendButton = document.querySelector(`#send-${id}-qr`);
+  const cameraButton = document.querySelector('#use-specter-camera');
   const post = data => companion.contentWindow?.postMessage({...data,type:`${id}-${data.type}`},location.origin);
   const postDiy = data => specter.contentWindow?.postMessage(data,location.origin);
   let diyReady = false, companionReady = false, scannerActive = false, companionScanning = false;
@@ -68,10 +69,15 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
   function updateSend() {
     sendButton.disabled=!scannerActive||!outgoing.frames.length;
     sendButton.title=!scannerActive?'Open a QR scanner on Specter DIY first.':!outgoing.frames.length?`Open a ${label} screen that is displaying a QR code first.`:`Send ${label} QR frames to Specter DIY’s normal camera QR parser.`;
+    if(cameraButton){
+      cameraButton.disabled=!scannerActive;
+      cameraButton.title=scannerActive?'Open the Specter camera to scan a SeedQR or another external QR code.':'Open a QR scanner on Specter DIY first.';
+    }
     qrStatus.textContent=!scannerActive?`Open the Specter QR scanner to receive frames from ${label}.`:outgoing.frames.length?`Specter scanner is active. Send the currently displayed ${label} QR.`:`Specter scanner is active. Open a QR screen in ${label}.`;
   }
   function sendQr() {
     if(!scannerActive||!outgoing.frames.length){updateSend();return;}
+    postDiy({type:'simulator-qr-source',source:'desktop'});
     clearInterval(sendTimer);sendIndex=0;let count=0;
     const send=()=>{
       // Specter's real UART scanner briefly stops/restarts between UR parts.
@@ -83,6 +89,11 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
     };
     send();sendTimer=setInterval(send,550);
   }
+  function useSpecterCamera() {
+    if(!scannerActive)return;
+    qrStatus.textContent='Opening the Specter camera. Allow camera access in the browser prompt.';
+    postDiy({type:'simulator-qr-source',source:'camera'});
+  }
   addEventListener('message',event=>{
     if(event.origin!==location.origin||!event.data||typeof event.data!=='object')return;
     const data=event.data;
@@ -90,6 +101,15 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
       if(['child-awaiting-peripherals','peripherals-snapshot','peripheral-state'].includes(data.type)){mediaReady.then(()=>media.handleDiyMessage(data));return;}
       if(data.type==='simulator-running'){diyReady=true;media.render();badge.textContent='Running';badge.classList.add('online');}
       else if(data.type==='simulator-scanner-state'){scannerActive=Boolean(data.active);scannerChangedAt=Date.now();updateSend();}
+      else if(data.type==='simulator-qr-source-state'){
+        qrStatus.textContent=data.source==='camera'
+          ?'Specter camera selected. Point it at the SeedQR; if blocked, tap Enable camera on the Specter screen.'
+          :data.source==='desktop'
+            ?`Scanning ${label} QR frames through Specter.`
+            :cameraButton
+              ?'Choose a source: scan a SeedQR with the camera, or send a QR from Bull Bitcoin.'
+              :`Specter scanner is active. Open a QR screen in ${label}.`;
+      }
       else if(data.type==='simulator-qr-output'){remember(incoming,data.frame,data.token||'');sendNext();}
       else if(data.type==='simulator-qr-output-clear')clear(incoming,data.token||'');
       else if(data.type==='simulator-qr-result')qrStatus.textContent=data.ok?'QR frame reached Specter DIY’s real scanner input.':data.message;
@@ -110,6 +130,7 @@ export function createCompanionWorkbench({id,label,storageKey,description}) {
   specter.addEventListener('load',()=>{diyReady=false;media.render();postDiy({type:'gallery-parent-ready'});badge.textContent='Starting';});
   companion.addEventListener('load',()=>{companionReady=false;companionScanning=false;clear(outgoing);clearInterval(receiveTimer);receiveTimer=undefined;status.textContent=`Loading the ${label} app…`;media.render();updateSend();});
   sendButton.addEventListener('click',sendQr);
+  cameraButton?.addEventListener('click',useSpecterCamera);
   document.querySelector('#specter-restart').addEventListener('click',()=>{diyReady=false;media.render();postDiy({type:'runtime-restart'});clear(incoming);});
   document.querySelector('#specter-reset').addEventListener('click',()=>{diyReady=false;media.render();postDiy({type:'simulator-factory-reset'});clear(incoming);});
   document.querySelector(`#${id}-reset`).addEventListener('click',()=>{companionReady=false;media.render();clear(outgoing);companionScanning=false;clearInterval(receiveTimer);post({type:'reset'});status.textContent=`Resetting ${label}’s disposable browser-session data…`;});
