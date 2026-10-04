@@ -1,0 +1,62 @@
+name: Bull browser diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run:
+        description: Browser simulator run providing the original compiled build
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: headless-shell
+            channel: ''
+            js_flags: ''
+          - mode: chromium
+            channel: chromium
+            js_flags: ''
+          - mode: shell-baseline-wasm
+            channel: ''
+            js_flags: --liftoff-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: browser-builds
+          run-id: ${{ inputs.build_run }}
+          github-token: ${{ github.token }}
+      - run: npx playwright install --with-deps chromium
+      - name: Start isolated static server
+        run: python3 browser/test-isolated-server.py --port 8766 > /tmp/bull-diagnostic-static.log 2>&1 &
+      - name: Test original app and its reset
+        env:
+          CI: 'true'
+          DEBUG: pw:browser
+          TEST_BASE_URL: http://127.0.0.1:8766
+          BULL_BROWSER_CHANNEL: ${{ matrix.channel }}
+          BULL_BROWSER_JS_FLAGS: ${{ matrix.js_flags }}
+        run: node browser/test-bull-app.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bull-diagnostic-${{ matrix.mode }}
+          path: test-results/bull-app*

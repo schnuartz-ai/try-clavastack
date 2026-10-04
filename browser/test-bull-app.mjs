@@ -4,7 +4,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { address, networks } from 'bitcoinjs-lib';
 
 const base = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:8778';
-const browser = await chromium.launch({...(process.env.CI ? {} : {channel:'chrome'}), headless:true});
+const channel = process.env.BULL_BROWSER_CHANNEL || (process.env.CI ? undefined : 'chrome');
+const browser = await chromium.launch({
+  ...(channel ? {channel} : {}),
+  ...(process.env.BULL_BROWSER_JS_FLAGS ? {args:[`--js-flags=${process.env.BULL_BROWSER_JS_FLAGS}`]} : {}),
+  headless:true,
+});
 const page = await browser.newPage({viewport:{width:1512,height:1100}});
 const errors = [], checks = [];
 page.on('pageerror',error=>errors.push(error.message));
