@@ -11,6 +11,31 @@ const signerPickerPath = path.join(
   'Vault',
   'AddSigningDevice.tsx',
 );
+const testnet3SourceRewrites = [
+  {
+    file: path.join(upstreamRoot, 'src', 'services', 'wallets', 'operations', 'utils.ts'),
+    from: 'https://mempool.space/testnet4/api',
+    to: 'https://blockstream.info/testnet/api',
+    expected: 2,
+  },
+  {
+    file: path.join(upstreamRoot, 'src', 'services', 'wallets', 'operations', 'index.ts'),
+    from: 'https://mempool.space/testnet4/api',
+    to: 'https://mempool.space/testnet/api',
+    expected: 1,
+  },
+  ...[
+    'ViewTransactions/TransactionDetails.tsx',
+    'UTXOManagement/UTXOLabeling.tsx',
+    'SignTransaction/SignTransactionScreen.tsx',
+    'Send/SendConfirmation.tsx',
+  ].map((screen) => ({
+    file: path.join(upstreamRoot, 'src', 'screens', ...screen.split('/')),
+    from: "'/testnet4'",
+    to: "'/testnet'",
+    expected: 1,
+  })),
+];
 
 // The pinned Keeper upstream assumes every signer has all three xpub families.
 // Hardware signers such as Specter DIY normally expose only the script type they
@@ -33,6 +58,14 @@ module.exports = {
   ...upstreamTransformer,
   async transform(args) {
     const filename = path.resolve(args.filename);
+    const networkRewrite = testnet3SourceRewrites.find((item) => item.file === filename);
+    if (networkRewrite) {
+      const found = args.src.split(networkRewrite.from).length - 1;
+      if (found !== networkRewrite.expected) {
+        throw new Error('Keeper Testnet3 source rewrite mismatch in ' + filename + ': found ' + found + ', expected ' + networkRewrite.expected);
+      }
+      args = { ...args, src: args.src.replaceAll(networkRewrite.from, networkRewrite.to) };
+    }
     // NativeBase inherits text props by deep-merging objects. A React Native
     // style array otherwise becomes an object with numeric keys, which React
     // DOM cannot assign to CSSStyleDeclaration on nested text nodes.

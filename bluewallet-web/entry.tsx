@@ -9,6 +9,7 @@ import { WatchOnlyWallet } from '../upstream/bluewallet/class/wallets/watch-only
 import startImport from '../upstream/bluewallet/class/wallet-import';
 import * as bitcoin from './bitcoin';
 import { noBroadcast, assertTestnetImport } from './policy';
+import { broadcastV2 } from './electrum';
 import * as files from './files';
 import { MultisigHDWallet } from '../upstream/bluewallet/class/wallets/multisig-hd-wallet';
 import { normalizeQr } from './qr-codec';
@@ -38,5 +39,5 @@ const observer = new MutationObserver(() => {
 observer.observe(root, {subtree:true, childList:true});
 post({type:'blue-runtime-ready'});
 if (new URLSearchParams(location.search).get('test') === '1' && ['127.0.0.1', 'localhost'].includes(location.hostname)) {
-  (window as any).__blueTest = {BlueApp, navigationRef, HDSegwitBech32Wallet, WatchOnlyWallet, MultisigHDWallet, startImport, bitcoin, noBroadcast, assertTestnetImport, files, normalizeQr};
+  (window as any).__blueTest = {BlueApp, navigationRef, HDSegwitBech32Wallet, WatchOnlyWallet, MultisigHDWallet, startImport, bitcoin, noBroadcast, assertTestnetImport, broadcastV2, files, normalizeQr};
 }

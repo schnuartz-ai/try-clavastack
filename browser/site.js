@@ -108,6 +108,7 @@ function inspect(action = 'refresh', includeFiles = true) {
     $('#inspector-files').replaceChildren();
     $('#inspector-content').textContent = 'Select a file to inspect its text and hex bytes.';
   }
+  if (inspectorPending && inspectorPending.action !== 'refresh') return;
   if (inspectorPending && Date.now() - inspectorPending.started < 5000) return;
   const id = ++requestId;
   inspectorPending = { id, action, started: Date.now() };

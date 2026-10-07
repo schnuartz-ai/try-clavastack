@@ -11,6 +11,8 @@ const demo=createDemoFiles('testnet'),fixture=new TextDecoder().decode(demo.file
 const browser=await chromium.launch({...(process.env.CI?{}:{channel:'chrome'}),headless:true});
 const context=await browser.newContext({viewport:{width:1512,height:1100}}),page=await context.newPage();
 const errors=[],checks=[];const pass=name=>{checks.push(name);console.log('PASS '+name);};
+let publicBroadcastAttempts=0;
+await context.route('https://blockstream.info/testnet/api/tx',async route=>{publicBroadcastAttempts++;await route.abort();});
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 // Public fixture at the native firmware test-keystore boundary. Original QRHost,
 // confirmation GUI, signing and QR generation execute without substitution.
@@ -42,7 +44,7 @@ const media=()=>page.evaluate(async()=>{const db=await new Promise((resolve,reje
 async function tap(x,y){await canvas.scrollIntoViewIfNeeded();const box=await canvas.boundingBox();await page.mouse.click(box.x+x/480*box.width,box.y+y/800*box.height,{delay:80});await page.waitForTimeout(500);}
 try{
  await mkdir('test-results/bluewallet',{recursive:true});await page.goto(`${base}/blue-wallet/`);
- await app.getByTestId('Wallets').waitFor({timeout:60000});await page.locator('#specter-badge').getByText('Running',{exact:true}).waitFor({timeout:90000});await idle();
+ await app.getByTestId('Wallets').waitFor({timeout:60000});await page.locator('#blue-network-status[data-state="connected"]').waitFor({timeout:30000});await page.locator('#specter-badge').getByText('Running',{exact:true}).waitFor({timeout:90000});await idle();
  assert.equal(await page.locator('.media-grid > .media-group').count(),3);
  assert.deepEqual(await page.locator('#demo-network option').evaluateAll(options=>options.map(o=>o.value)),['','testnet']);
  await page.locator('#sd-picker').setInputFiles({name:'keep.bin',mimeType:'application/octet-stream',buffer:Buffer.from([0,255,42])});await idle();
@@ -53,17 +55,38 @@ try{
  await app.getByTestId('ScanImport').click({button:'right'});await app.getByRole('menuitem',{name:'Import File',exact:true}).click();
  assert((await page.locator('#sd-location').innerText()).includes('BlueWallet'));
  await app.getByRole('button',{name:'Open virtual SD card',exact:true}).click();await app.getByRole('button',{name:/01-ghost-PUBLIC-TEST-SEED.txt/}).click();
- await app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true}).waitFor();await app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true}).click();await app.getByRole('button',{name:'Import',exact:true}).click();await app.getByRole('button',{name:'OK',exact:true}).click();
  const native=page.frames().find(f=>f.url().includes('/blue-wallet/runtime.html'));
+ const ghostSeed=demo.roots.ghost.mnemonic,hasGhost=()=>native.evaluate(seed=>window.__blueTest.BlueApp.getInstance().getWallets().some(wallet=>wallet.secret===seed),ghostSeed);
+ if(!await hasGhost()){
+  try{
+   const choice=app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true});await choice.waitFor({timeout:30000});await choice.click({timeout:5000});
+   if(!await hasGhost())await app.getByRole('button',{name:'Import',exact:true}).click({timeout:5000});
+  }catch(error){if(!await hasGhost())throw error;}
+ }
+ await native.waitForFunction(seed=>window.__blueTest.BlueApp.getInstance().getWallets().some(wallet=>wallet.secret===seed),ghostSeed,{timeout:30000});
+ await app.getByRole('button',{name:'OK',exact:true}).waitFor({timeout:30000});assert(await hasGhost());await app.getByRole('button',{name:'OK',exact:true}).click();
  const wallet=await native.evaluate(()=>{const w=window.__blueTest.BlueApp.getInstance().getWallets()[0];return {id:w.getID(),type:w.type,label:w.getLabel(),address:w._getExternalAddressByIndex(0)};});
  assert.equal(wallet.type,'HDsegwitBech32');assert(wallet.address.startsWith('tb1'));await app.getByText(wallet.label,{exact:true}).first().waitFor();
  pass('Original file menu imports Ghost through the shared SD picker and saves the wallet');
  // Real scan route and real image decode: only the camera permission is denied.
  await native.evaluate(()=>window.__blueTest.navigationRef.navigate('AddWalletRoot',{screen:'ImportWallet'}));await app.getByTestId('ScanImport').click();await app.getByRole('button',{name:'Use camera',exact:true}).click();await app.getByText('Camera access was denied. Use a QR image or Specter DIY.',{exact:true}).waitFor();
+ // Verify Testnet connectivity above against the public endpoint; keep this UI
+ // import deterministic by returning an unused address history for the scanner
+ // fixture. BlueWallet otherwise checks every supported derivation format and
+ // a transient public API delay can leave the discovery screen on a spinner.
+ let qrHistoryReads=0;
+ await page.route('https://blockstream.info/testnet/api/address/*/txs',async route=>{
+  if(route.request().method()!=='GET')return route.continue();
+  qrHistoryReads++;
+  return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'[]'});
+ });
  const reference='abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';const standard=reference.split(' ').map(w=>String(bip39.wordlists.english.indexOf(w)).padStart(4,'0')).join('');
  const chooserPromise=page.waitForEvent('filechooser');await app.getByRole('button',{name:'Choose QR image',exact:true}).click();const chooser=await chooserPromise;await chooser.setFiles({name:'public-standard-seedqr.png',mimeType:'image/png',buffer:await QRCode.toBuffer(standard,{width:512,margin:4})});
- await app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true}).waitFor({timeout:30000});
- pass('Camera denial recovers via decoded Standard SeedQR image into the original discovery UI');
+ await app.getByRole('button',{name:'OK',exact:true}).waitFor({timeout:30000});
+ assert(qrHistoryReads>0,'SeedQR discovery should query Testnet address history');
+ assert(await native.evaluate(seed=>window.__blueTest.BlueApp.getInstance().getWallets().some(wallet=>wallet.secret===seed),reference),'Standard SeedQR must import its decoded BIP39 mnemonic through the original BlueWallet flow');
+ pass('Camera denial recovers via decoded Standard SeedQR image into the original BlueWallet import flow');
+ await app.getByRole('button',{name:'OK',exact:true}).click();
  // Open an original upstream hardware-PSBT route with the imported real wallet.
  await native.evaluate(({id,fixture})=>window.__blueTest.navigationRef.navigate('SendDetailsRoot',{screen:'PsbtWithHardwareWallet',params:{walletID:id,psbt:window.__blueTest.bitcoin.Psbt.fromBase64(fixture)}}),{id:wallet.id,fixture});
  await app.getByTestId('TextHelperForPSBT').waitFor();await page.waitForFunction(()=>new Set(window.__qrAudit.blue).size>=2,undefined,{timeout:20000});
@@ -79,8 +102,9 @@ try{
  await app.locator('textarea[readonly]').waitFor({timeout:30000});const hex=await app.locator('textarea[readonly]').inputValue();
  const tx=Transaction.fromHex(hex),unsigned=Psbt.fromBase64(fixture),[encoded,pubkey]=tx.ins[0].witness,decoded=script.signature.decode(encoded),prev=unsigned.data.inputs[0].witnessUtxo;
  assert(ecc.verify(tx.hashForWitnessV0(0,script.compile([118,169,prev.script.subarray(2),136,172]),prev.value,decoded.hashType),pubkey,decoded.signature));assert.deepEqual(tx.outs,unsigned.txOutputs.map(o=>({script:o.script,value:o.value})));
- assert(await app.getByTestId('PsbtWithHardwareWalletBroadcastTransactionButton').isDisabled());
- pass('Original BlueWallet animated PSBT QR → original Specter QRHost/review/signing → original BlueWallet parser; independent signature verification and broadcast disabled');
+ assert(await app.getByTestId('PsbtWithHardwareWalletBroadcastTransactionButton').isEnabled());
+ assert.equal(publicBroadcastAttempts,0,'the test must not send a transaction to public Testnet');
+ pass('Original BlueWallet animated PSBT QR → original Specter QRHost/review/signing → original BlueWallet parser; independent signature verification and Testnet broadcast available without sending');
  await page.screenshot({path:'test-results/bluewallet/workbench-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/bluewallet/workbench-mobile.png',fullPage:true});assert(await page.locator('body').evaluate(e=>e.scrollWidth<=innerWidth));
  assert.deepEqual(errors,[]);await writeFile('test-results/bluewallet/media.json',JSON.stringify({checks,errors,exportPath,txid:tx.getId(),hex,signatureVerified:true},null,2));
