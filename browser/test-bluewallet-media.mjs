@@ -44,7 +44,7 @@ const media=()=>page.evaluate(async()=>{const db=await new Promise((resolve,reje
 async function tap(x,y){await canvas.scrollIntoViewIfNeeded();const box=await canvas.boundingBox();await page.mouse.click(box.x+x/480*box.width,box.y+y/800*box.height,{delay:80});await page.waitForTimeout(500);}
 try{
  await mkdir('test-results/bluewallet',{recursive:true});await page.goto(`${base}/blue-wallet/`);
- await app.getByTestId('Wallets').waitFor({timeout:60000});await page.locator('#specter-badge').getByText('Running',{exact:true}).waitFor({timeout:90000});await idle();
+ await app.getByTestId('Wallets').waitFor({timeout:60000});await page.locator('#blue-network-status[data-state="connected"]').waitFor({timeout:30000});await page.locator('#specter-badge').getByText('Running',{exact:true}).waitFor({timeout:90000});await idle();
  assert.equal(await page.locator('.media-grid > .media-group').count(),3);
  assert.deepEqual(await page.locator('#demo-network option').evaluateAll(options=>options.map(o=>o.value)),['','testnet']);
  await page.locator('#sd-picker').setInputFiles({name:'keep.bin',mimeType:'application/octet-stream',buffer:Buffer.from([0,255,42])});await idle();
@@ -62,10 +62,23 @@ try{
  pass('Original file menu imports Ghost through the shared SD picker and saves the wallet');
  // Real scan route and real image decode: only the camera permission is denied.
  await native.evaluate(()=>window.__blueTest.navigationRef.navigate('AddWalletRoot',{screen:'ImportWallet'}));await app.getByTestId('ScanImport').click();await app.getByRole('button',{name:'Use camera',exact:true}).click();await app.getByText('Camera access was denied. Use a QR image or Specter DIY.',{exact:true}).waitFor();
+ // Verify Testnet connectivity above against the public endpoint; keep this UI
+ // import deterministic by returning an unused address history for the scanner
+ // fixture. BlueWallet otherwise checks every supported derivation format and
+ // a transient public API delay can leave the discovery screen on a spinner.
+ let qrHistoryReads=0;
+ await page.route('https://blockstream.info/testnet/api/address/*/txs',async route=>{
+  if(route.request().method()!=='GET')return route.continue();
+  qrHistoryReads++;
+  return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'[]'});
+ });
  const reference='abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';const standard=reference.split(' ').map(w=>String(bip39.wordlists.english.indexOf(w)).padStart(4,'0')).join('');
  const chooserPromise=page.waitForEvent('filechooser');await app.getByRole('button',{name:'Choose QR image',exact:true}).click();const chooser=await chooserPromise;await chooser.setFiles({name:'public-standard-seedqr.png',mimeType:'image/png',buffer:await QRCode.toBuffer(standard,{width:512,margin:4})});
- await app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true}).waitFor({timeout:30000});
- pass('Camera denial recovers via decoded Standard SeedQR image into the original discovery UI');
+ await app.getByRole('button',{name:'OK',exact:true}).waitFor({timeout:30000});
+ assert(qrHistoryReads>0,'SeedQR discovery should query Testnet address history');
+ assert(await native.evaluate(seed=>window.__blueTest.BlueApp.getInstance().getWallets().some(wallet=>wallet.secret===seed),reference),'Standard SeedQR must import its decoded BIP39 mnemonic through the original BlueWallet flow');
+ pass('Camera denial recovers via decoded Standard SeedQR image into the original BlueWallet import flow');
+ await app.getByRole('button',{name:'OK',exact:true}).click();
  // Open an original upstream hardware-PSBT route with the imported real wallet.
  await native.evaluate(({id,fixture})=>window.__blueTest.navigationRef.navigate('SendDetailsRoot',{screen:'PsbtWithHardwareWallet',params:{walletID:id,psbt:window.__blueTest.bitcoin.Psbt.fromBase64(fixture)}}),{id:wallet.id,fixture});
  await app.getByTestId('TextHelperForPSBT').waitFor();await page.waitForFunction(()=>new Set(window.__qrAudit.blue).size>=2,undefined,{timeout:20000});
