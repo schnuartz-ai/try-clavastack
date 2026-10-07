@@ -11,6 +11,8 @@ const demo=createDemoFiles('testnet'),fixture=new TextDecoder().decode(demo.file
 const browser=await chromium.launch({...(process.env.CI?{}:{channel:'chrome'}),headless:true});
 const context=await browser.newContext({viewport:{width:1512,height:1100}}),page=await context.newPage();
 const errors=[],checks=[];const pass=name=>{checks.push(name);console.log('PASS '+name);};
+let publicBroadcastAttempts=0;
+await context.route('https://blockstream.info/testnet/api/tx',async route=>{publicBroadcastAttempts++;await route.abort();});
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 // Public fixture at the native firmware test-keystore boundary. Original QRHost,
 // confirmation GUI, signing and QR generation execute without substitution.
@@ -79,8 +81,9 @@ try{
  await app.locator('textarea[readonly]').waitFor({timeout:30000});const hex=await app.locator('textarea[readonly]').inputValue();
  const tx=Transaction.fromHex(hex),unsigned=Psbt.fromBase64(fixture),[encoded,pubkey]=tx.ins[0].witness,decoded=script.signature.decode(encoded),prev=unsigned.data.inputs[0].witnessUtxo;
  assert(ecc.verify(tx.hashForWitnessV0(0,script.compile([118,169,prev.script.subarray(2),136,172]),prev.value,decoded.hashType),pubkey,decoded.signature));assert.deepEqual(tx.outs,unsigned.txOutputs.map(o=>({script:o.script,value:o.value})));
- assert(await app.getByTestId('PsbtWithHardwareWalletBroadcastTransactionButton').isDisabled());
- pass('Original BlueWallet animated PSBT QR → original Specter QRHost/review/signing → original BlueWallet parser; independent signature verification and broadcast disabled');
+ assert(await app.getByTestId('PsbtWithHardwareWalletBroadcastTransactionButton').isEnabled());
+ assert.equal(publicBroadcastAttempts,0,'the test must not send a transaction to public Testnet');
+ pass('Original BlueWallet animated PSBT QR → original Specter QRHost/review/signing → original BlueWallet parser; independent signature verification and Testnet broadcast available without sending');
  await page.screenshot({path:'test-results/bluewallet/workbench-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/bluewallet/workbench-mobile.png',fullPage:true});assert(await page.locator('body').evaluate(e=>e.scrollWidth<=innerWidth));
  assert.deepEqual(errors,[]);await writeFile('test-results/bluewallet/media.json',JSON.stringify({checks,errors,exportPath,txid:tx.getId(),hex,signatureVerified:true},null,2));
