@@ -70,13 +70,13 @@
   <main>
     <h1>BlueWallet + Specter DIY</h1>
     <p class="intro">The original BlueWallet app alongside the Specter DIY firmware. Exchange QR codes and files between both devices.</p>
-    <div class="warning" role="note"><strong>TESTNET SIMULATOR · NO BROADCAST.</strong> Never enter a real seed, private key or wallet backup. Use public demo seeds only. BlueWallet’s wallet state is kept in this tab’s memory and disappears on reset or reload. Blockchain connections, Lightning, Ark, Tor and hardware security services are unavailable.</div>
+    <div class="warning" role="note"><strong>BITCOIN TESTNET3.</strong> Never enter a real seed, private key or wallet backup. Use only disposable test wallets. BlueWallet connects to Blockstream’s public Esplora service for live balances, UTXOs, history and fee estimates, and can broadcast signed Testnet3 transactions. Address queries and signed transactions are sent to Blockstream; keys and signing stay in this browser.</div>
     <section class="workspace" aria-label="BlueWallet and Specter DIY simulators">
       <article class="device-card blue-card" aria-labelledby="blue-heading">
         <div class="device-head"><div><h2 id="blue-heading">BlueWallet</h2><p>The original BlueWallet wallet app.</p></div><span class="pill online">Browser</span></div>
         <div class="phone desktop-runtime" aria-label="BlueWallet phone simulator frame">
           <div class="phone-screen">
-            <div class="phone-status"><span id="clock">9:41</span><span class="network">TESTNET3&nbsp; ▴ ▣</span></div>
+            <div class="phone-status"><span id="clock">9:41</span><span class="network" id="blue-network-status" data-state="connecting">TESTNET3 · CONNECTING</span></div>
             <iframe id="blue-runtime" title="BlueWallet browser app" src="/blue-wallet/runtime.html" allow="camera"></iframe>
           </div>
           <button class="device-hitbox" type="button" data-media-target="desktop" aria-label="Insert the virtual SD card into BlueWallet"></button>
@@ -98,7 +98,7 @@
     <details class="details">
       <summary>Browser compatibility and source</summary>
       <p>The original BlueWallet 8.0.1 React Native app runs from pinned commit <a href="https://github.com/BlueWallet/BlueWallet/tree/0a53056a636370073a58d6cdd6de5c0728e5926a" target="_blank" rel="noopener noreferrer">0a53056a636370073a58d6cdd6de5c0728e5926a</a>. Its screens, navigation, wallet import and transaction algorithms come from upstream. Browser adapters provide React Native Web rendering, in-memory storage, camera, QR and shared file dialogs. <a href="/blue-wallet/LICENSE.txt">MIT license</a> · <a href="/blue-wallet/THIRD-PARTY-NOTICES.txt">third-party notices</a> · <a href="/builds/bluewallet-web/licenses.txt">dependency licenses</a> · <a href="/builds/bluewallet-web/build-info.json">build provenance</a>.</p>
-      <p>This browser port is explicitly restricted to Bitcoin Testnet3 encoding and derivation. Mainnet key versions, addresses and derivation paths are rejected. It is an offline simulator: balances do not represent coins, and no transaction can be broadcast. PSBTs have no intrinsic network marker; only public synthetic transactions should be used. Standard SeedQR enters BlueWallet’s original parser. CompactSeedQR is an additional browser feature that converts QR byte-mode entropy locally into a BIP39 phrase. QR frames and images stay in the browser. USB signing, biometrics and native secure storage are unavailable.</p>
+      <p>This browser port is restricted to Bitcoin Testnet3 encoding and derivation. Mainnet key versions, addresses and derivation paths are rejected. BlueWallet’s original wallet and signing code uses Blockstream’s public Esplora API at <code>https://blockstream.info/testnet/api</code> for live chain data, fee estimates and signed transaction broadcast. Only address queries and signed transactions leave this browser; private keys and seed phrases remain local. PSBTs have no intrinsic network marker, so use only public test data. Standard SeedQR enters BlueWallet’s original parser. CompactSeedQR converts QR byte-mode entropy locally into a BIP39 phrase. QR frames and images stay in the browser. USB signing, biometrics and native secure storage are unavailable.</p>
     </details>
   </main>
   <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="https://github.com/BlueWallet/BlueWallet" target="_blank" rel="noopener noreferrer">BlueWallet source</a> · A browser simulator does not provide hardware-wallet security.</footer>

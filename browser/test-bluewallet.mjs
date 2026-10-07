@@ -1,4 +1,5 @@
 import {chromium} from 'playwright';
+import {mockBlockstreamTestnet3} from './mock-blockstream-testnet3.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {createDemoFiles} from './demo-data.js';
@@ -24,6 +25,7 @@ const standard=seed.split(' ').map(word=>String(bip39.wordlists.english.indexOf(
 const fileText=name=>new TextDecoder().decode(demo.files.find(f=>f.name===name).bytes).trim();
 try{
  await mkdir('test-results/bluewallet',{recursive:true});
+ await mockBlockstreamTestnet3(page);
  await page.goto(`${base}/blue-wallet/runtime.html?test=1`);
  await page.getByTestId('Wallets').waitFor({timeout:45000});
  const audit=await page.evaluate(async ({seed,standard,ghost,zoo,psbt,mainPsbt,mainXpub,multisigJson,multisigPsbt,seed24,standard24})=>{
@@ -38,32 +40,35 @@ try{
   const rejected=[];
   for(const input of [mainXpub,'1BoatSLRHtKNngkdXEeobR76b53LETtpyT','bc1qk0a9hr7wjfxeenz9nwenw9flhq0tmsf6vsgnn2',"m/84'/0'/0'"]){try{new api.WatchOnlyWallet().setSecret(input);rejected.push(false);}catch{rejected.push(true);}}
   let mainPsbtRejected=false;try{api.bitcoin.Psbt.fromBase64(mainPsbt);}catch{mainPsbtRejected=true;}
-  let broadcastRejected=false;try{api.noBroadcast();}catch{broadcastRejected=true;}
+  let malformedBroadcastRejected=false;try{await api.broadcastV2('00');}catch{malformedBroadcastRejected=true;}
   let importRejected=false;try{await api.startImport(mainXpub,false,false,true,()=>{},()=>{},async()=> '').promise;}catch{importRejected=true;}
   let walletBroadcastRejected=false;try{await wallet.broadcastTx('00');}catch{walletBroadcastRejected=true;}
   let badSeedRejected=false;try{api.normalizeQr({data:'2048'.repeat(12)},true);}catch{badSeedRejected=true;}
   const signer=new api.HDSegwitBech32Wallet();signer.setSecret(ghost);
   const signed=api.bitcoin.Psbt.fromBase64(psbt);const result=signer.cosignPsbt(signed);
   const imported=await api.startImport(seed,false,false,true,()=>{},()=>{},async()=> '').promise;
-  return {address24:word24._getExternalAddressByIndex(0),numeric24:num24._getExternalAddressByIndex(0),compact24:compact24._getExternalAddressByIndex(0),multisigAddress,multisigSigned,importRejected,walletBroadcastRejected,path:wallet.getDerivationPath(),xpub:wallet.getXpub(),address:wallet._getExternalAddressByIndex(0),valid:wallet.validateMnemonic(),numeric:numeric._getExternalAddressByIndex(0),compact:compact._getExternalAddressByIndex(0),rejected,mainPsbtRejected,broadcastRejected,badSeedRejected,signed:!!result.tx,hex:result.tx?result.tx.toHex():null,psbt:signed.toBase64(),importTypes:imported.wallets.map(w=>w.type)};
+  return {address24:word24._getExternalAddressByIndex(0),numeric24:num24._getExternalAddressByIndex(0),compact24:compact24._getExternalAddressByIndex(0),multisigAddress,multisigSigned,importRejected,walletBroadcastRejected,path:wallet.getDerivationPath(),xpub:wallet.getXpub(),address:wallet._getExternalAddressByIndex(0),valid:wallet.validateMnemonic(),numeric:numeric._getExternalAddressByIndex(0),compact:compact._getExternalAddressByIndex(0),rejected,mainPsbtRejected,malformedBroadcastRejected,badSeedRejected,signed:!!result.tx,hex:result.tx?result.tx.toHex():null,psbt:signed.toBase64(),importTypes:imported.wallets.map(w=>w.type)};
  },{seed24:bip39.entropyToMnemonic('00'.repeat(32)),standard24:bip39.entropyToMnemonic('00'.repeat(32)).split(' ').map(w=>String(bip39.wordlists.english.indexOf(w)).padStart(4,'0')).join(''),multisigJson:fileText('testnet-ghost-zoo-mirror-2of3.json'),multisigPsbt:fileText('testnet-multisig-unsigned.psbt'),zoo:demo.roots.zoo.mnemonic,seed,standard,ghost:demo.roots.ghost.mnemonic,psbt:fileText('testnet-ghost-payment-low-fee.psbt'),mainPsbt:new TextDecoder().decode(mainDemo.files.find(f=>f.name==='mainnet-ghost-payment-low-fee.psbt').bytes).trim(),mainXpub:BIP32Factory(ecc).fromSeed(bip39.mnemonicToSeedSync(seed)).neutered().toBase58()});
  console.log(audit);
  assert.equal(audit.multisigAddress,JSON.parse(fileText('testnet-ghost-zoo-mirror-2of3.json')).address);assert(audit.multisigSigned);assert(audit.importRejected);assert(audit.walletBroadcastRejected);assert.equal(audit.numeric24,audit.address24);assert.equal(audit.compact24,audit.address24);
- assert.equal(audit.path,"m/84'/1'/0'");assert(audit.xpub.startsWith('vpub'));assert.equal(audit.address,expected);assert(audit.valid);assert.equal(audit.numeric,expected);assert.equal(audit.compact,expected);assert(audit.rejected.every(Boolean));assert(audit.mainPsbtRejected);assert(audit.broadcastRejected);assert(audit.badSeedRejected);assert(audit.signed);assert(audit.importTypes.includes('HDsegwitBech32'));
+ assert.equal(audit.path,"m/84'/1'/0'");assert(audit.xpub.startsWith('vpub'));assert.equal(audit.address,expected);assert(audit.valid);assert.equal(audit.numeric,expected);assert.equal(audit.compact,expected);assert(audit.rejected.every(Boolean));assert(audit.mainPsbtRejected);assert(audit.malformedBroadcastRejected);assert(audit.badSeedRejected);assert(audit.signed);assert(audit.importTypes.includes('HDsegwitBech32'));
  const signed=Psbt.fromBase64(audit.psbt,{network:networks.testnet});assert(signed.data.inputs[0].finalScriptWitness?.length);assert(signed.extractTransaction().toHex()===audit.hex);
  const tx=signed.extractTransaction(),[sig,pub]=tx.ins[0].witness,decoded=script.signature.decode(sig),prev=Psbt.fromBase64(fileText('testnet-ghost-payment-low-fee.psbt')).data.inputs[0].witnessUtxo;
  assert(ecc.verify(tx.hashForWitnessV0(0,script.compile([118,169,prev.script.subarray(2),136,172]),prev.value,decoded.hashType),pub,decoded.signature),'Independent ECDSA verification failed');
- pass('Original import, independent BIP84 address, Standard/CompactSeedQR, real synthetic PSBT signature, Mainnet/broadcast rejection');
+ pass('Original import, independent BIP84 address, Standard/CompactSeedQR, real synthetic PSBT signature, Mainnet import rejection and malformed transaction guard');
+ const broadcastTxid=await page.evaluate(hex=>window.__blueTest.broadcastV2(hex),audit.hex);
+ assert.equal(broadcastTxid,Psbt.fromBase64(audit.psbt,{network:networks.testnet}).extractTransaction().getId());
+ pass('Original BlueWallet adapter sends a signed synthetic Testnet3 transaction through its restricted broadcast route; no public broadcast');
  await page.getByText('Add now',{exact:true}).click();await page.getByTestId('ImportWallet').click();
  await page.getByTestId('MnemonicInput').fill(seed);await page.getByTestId('DoImport').click();
  await page.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:false}).waitFor({timeout:30000});
  console.log('DISCOVERY',await page.locator('body').innerText());
  await page.screenshot({path:'test-results/bluewallet/discovery.png'});
  pass('Original Add Wallet / Import Wallet UI discovers the public seed');
- await page.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true}).click();
- await page.getByRole('button',{name:'Import',exact:true}).click();
- await page.getByTestId('Wallets').waitFor();
+ // This upstream version imports the single discovered BIP84 wallet directly
+ // from the discovery action, then confirms through its success alert.
  await page.getByRole('button',{name:'OK',exact:true}).click();
+ await page.getByTestId('Wallets').waitFor();
  await page.setViewportSize({width:390,height:844});
  const saved=await page.evaluate(()=>window.__blueTest.BlueApp.getInstance().getWallets().map(w=>({type:w.type,label:w.getLabel(),address:w._getExternalAddressByIndex?.(0)})));
  assert(saved.some(w=>w.type==='HDsegwitBech32'&&w.address===expected));

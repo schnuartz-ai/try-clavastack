@@ -86,7 +86,7 @@
         <div class="device-head"><div><h2 id="keeper-heading">Bitcoin Keeper</h2><p>Upstream app screens, navigation, Redux, wallet logic and QR/UR parser.</p></div><span class="pill online">Browser</span></div>
         <div class="phone desktop-runtime" aria-label="Bitcoin Keeper phone simulator frame">
           <div class="phone-screen">
-            <div class="phone-status"><span id="clock">9:41</span><span class="network">TESTNET&nbsp; ▴ ▣</span></div>
+            <div class="phone-status"><span id="clock">9:41</span><span class="network">TESTNET3&nbsp; ▴ ▣</span></div>
             <iframe id="keeper-runtime" title="Bitcoin Keeper browser app" src="/bitcoin-keeper/runtime.html?v=20261003-keeper-media" allow="camera"></iframe>
           </div>
           <button class="device-hitbox" type="button" data-media-target="desktop" aria-label="Insert the virtual SD card into Bitcoin Keeper"></button>
@@ -98,7 +98,7 @@
     <details class="details">
       <summary>Browser compatibility and source</summary>
       <p>The embedded app uses Bitcoin Keeper upstream commit <a href="https://github.com/KeeperCommunity/bitcoin-keeper/commit/1adf4f66399a2bfac4572d9da94440323bff02f2" target="_blank" rel="noopener noreferrer">1adf4f66399a2bfac4572d9da94440323bff02f2</a> from its canonical <code>sprint</code> branch. Its React Native app, original screens, Navigator, Redux store, and wallet/QR code run through React Native Web. Browser adapters provide session-only storage, a Realm-compatible session database, camera access, and the direct QR transport. Physical-device features are unavailable in the browser. <a href="/bitcoin-keeper/LICENSE.txt">MIT license</a> · <a href="/bitcoin-keeper/THIRD-PARTY-NOTICES.txt">third-party notices</a>.</p>
-      <p>QR transfer passes encoded frames into each app’s normal camera scanner/parser path. Specter DIY remains its own firmware Worker and storage. Reset each device separately. Bitcoin balances, history, fees and broadcasting use mempool.space’s Testnet4 HTTPS API; queried script hashes and transactions are shared with that service. Private keys and simulator QR exchanges stay in your browser.</p>
+      <p>QR transfer passes encoded frames into each app’s normal camera scanner/parser path. Specter DIY remains its own firmware Worker and storage. Reset each device separately. Bitcoin balances, history, fees and broadcasting use Blockstream’s public Bitcoin Testnet3 Esplora API; queried script hashes and signed transactions are shared with that service. Private keys and simulator QR exchanges stay in your browser.</p>
     </details>
   </main>
   <footer>© 2026 <a href="https://clavastack.com">ClavaStack</a> · <a href="https://github.com/KeeperCommunity/bitcoin-keeper" target="_blank" rel="noopener noreferrer">Bitcoin Keeper source</a> · A browser simulator does not provide hardware-wallet security.</footer>

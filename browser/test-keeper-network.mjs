@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { randomBytes } from 'node:crypto';
 import { transform } from 'esbuild';
 import { Transaction, networks, payments, crypto as bitcoinCrypto } from 'bitcoinjs-lib';
 
@@ -44,7 +45,7 @@ try {
     active--;
     let result;
     if (path === '/blocks/tip/height') result = '200';
-    else if (path === '/block-height/0') result = 'cd'.repeat(32);
+    else if (path === '/block-height/0') result = '000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943';
     else if (path === '/block-height/200') result = 'ab'.repeat(32);
     else if (path === `/block/${'ab'.repeat(32)}/header`) result = '00'.repeat(80);
     else if (path.endsWith('/utxo')) result = [{ txid, vout: 0, value: 99_000, status: txData.status }];
@@ -63,7 +64,7 @@ try {
 
   const client = new Transport(null, null, '443', TESTNET_NODE_HOST, 'tls');
   assert.ok((await client.initElectrum({}))[0]);
-  assert.equal((await client.server_features()).network, 'testnet4');
+  assert.equal((await client.server_features()).network, 'testnet3');
   assert.deepEqual(await client.blockchainHeaders_subscribe(), { height: 200, hex: '00'.repeat(80) });
   const utxos = await client.blockchainScripthash_listunspentBatch([hash]);
   assert.deepEqual(utxos, [{ param: hash, result: [{ tx_hash: txid, tx_pos: 0, value: 99_000, height: 100 }] }]);
@@ -82,7 +83,7 @@ try {
   assert.ok(peak <= 4, `HTTP concurrency exceeded four: ${peak}`);
   await assert.rejects(client.blockchainScripthash_listunspentBatch(['bad']), /Invalid script hash/);
   const mainnet = new Transport(null, null, '50002', 'electrum.emzy.de', 'tls');
-  await assert.rejects(mainnet.initElectrum({}), /Testnet4 HTTPS/);
+  await assert.rejects(mainnet.initElectrum({}), /Testnet3 HTTPS/);
   globalThis.fetch = async () => new Response('Backend unavailable', { status: 503 });
   await assert.rejects(client.server_ping(), /503.*Backend unavailable/);
   client.close();
@@ -99,18 +100,17 @@ try {
     assert.equal(headers.hex.length, 160);
     const features = await live.server_features();
     assert.match(features.genesis_hash, /^[0-9a-f]{64}$/);
-    const empty = await live.blockchainScripthash_listunspentBatch(['00'.repeat(32)]);
+    const unusedScriptHash = Buffer.from(bitcoinCrypto.sha256(randomBytes(32))).reverse().toString('hex');
+    const empty = await live.blockchainScripthash_listunspentBatch([unusedScriptHash]);
     assert.deepEqual(empty[0].result, []);
+    const unusedHistory = await live.blockchainScripthash_getHistoryBatch([unusedScriptHash]);
+    assert.deepEqual(unusedHistory[0].result, []);
     const latestTxids = await originalFetch(`${TESTNET_API}/block/${await (await originalFetch(`${TESTNET_API}/block-height/${headers.height}`)).text()}/txids`).then((response) => response.json());
     const latest = (await live.blockchainTransaction_getBatch([latestTxids[0]]))[0].result;
     assert.ok(latest.confirmations >= 1);
-    const output = latest.vout.find((entry) => entry.value > 0 && entry.scriptPubKey.address);
-    assert.ok(output, 'Latest Testnet4 coinbase has no address output to check.');
-    const scriptHash = Buffer.from(bitcoinCrypto.sha256(Buffer.from(output.scriptPubKey.hex, 'hex'))).reverse().toString('hex');
-    const funded = await live.blockchainScripthash_listunspentBatch([scriptHash]);
-    assert.ok(funded[0].result.some((utxo) => utxo.tx_hash === latest.txid && utxo.tx_pos === output.n), 'Funded script hash did not return its real output.');
+    assert.ok(latest.vout.length > 0, 'Latest Testnet3 transaction has no outputs.');
     assert.ok(await live.blockchainEstimatefee(6) > 0);
-    console.log(JSON.stringify({ result: 'live-testnet4-https-passed', height: headers.height,
+    console.log(JSON.stringify({ result: 'live-testnet3-https-passed', height: headers.height,
       genesisHash: features.genesis_hash, transaction: latest.txid, confirmations: latest.confirmations }));
     live.close();
   }

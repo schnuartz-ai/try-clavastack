@@ -116,7 +116,7 @@ const plugins=[{name:'bluewallet-browser-boundaries',setup(build){
   }
   return null;
  });
- build.onLoad({filter:/.*/,namespace:'blue-build-meta'}, args=>({contents:args.path.replaceAll('\\','/').endsWith('current-branch.json')?'export default "8.0.1 browser Testnet3"':'export default "BlueWallet 8.0.1 browser port. Testnet3 only; no broadcast."',loader:'js'}));
+ build.onLoad({filter:/.*/,namespace:'blue-build-meta'}, args=>({contents:args.path.replaceAll('\\','/').endsWith('current-branch.json')?'export default "8.0.1 browser Testnet3"':'export default "BlueWallet 8.0.1 browser port. Testnet3 only; Blockstream Esplora HTTPS, broadcast enabled."',loader:'js'}));
  build.onLoad({filter:/.*/,namespace:'blue-native'},async args=>{
   const exports=[...(nativeImports.get(args.path)||[]), ...(args.path==='react-native-is-edge-to-edge'?['controlEdgeToEdgeValues','isEdgeToEdge']:[])];
   return {contents:`import {nativeService, namedService} from '${resolve(adapters,'native-service.tsx').replaceAll('\\','/')}';\nexport default nativeService(${JSON.stringify(args.path)});\n${exports.map(name=>`export const ${name}=namedService(${JSON.stringify(args.path)},${JSON.stringify(name)});`).join('\n')}`,loader:'tsx',resolveDir:adapters};
@@ -185,5 +185,5 @@ const version=createHash('sha256').update(JSON.stringify(files)).digest('hex').s
 let html=await readFile(resolve(root,'blue-wallet/runtime.html'),'utf8');
 html=html.replace(/(bluewallet-app\.js|fonts\.css)(?:\?v=[a-f0-9]+)?/g,`$1?v=${version}`);
 await writeFile(resolve(root,'blue-wallet/runtime.html'),html);
-await writeFile(resolve(output,'build-info.json'),JSON.stringify({repository:'BlueWallet/BlueWallet',commit:pin,version:'8.0.1',browserVersion:version,network:'testnet3',broadcast:false,sha256:files['bluewallet-app.js'],files,adapterHashes,patchedInputs,rootLockSha256:createHash('sha256').update(await readFile(resolve(root,'package-lock.json'))).digest('hex'),upstreamLockSha256:createHash('sha256').update(await readFile(resolve(upstream,'package-lock.json'))).digest('hex'),inputs:Object.keys(result.metafile.inputs).filter(path=>path.includes('upstream/bluewallet')&&!path.includes('node_modules'))},null,2));
+await writeFile(resolve(output,'build-info.json'),JSON.stringify({repository:'BlueWallet/BlueWallet',commit:pin,version:'8.0.1',browserVersion:version,network:'testnet3',backend:'Blockstream Esplora',endpoint:'https://blockstream.info/testnet/api',broadcast:true,sha256:files['bluewallet-app.js'],files,adapterHashes,patchedInputs,rootLockSha256:createHash('sha256').update(await readFile(resolve(root,'package-lock.json'))).digest('hex'),upstreamLockSha256:createHash('sha256').update(await readFile(resolve(upstream,'package-lock.json'))).digest('hex'),inputs:Object.keys(result.metafile.inputs).filter(path=>path.includes('upstream/bluewallet')&&!path.includes('node_modules'))},null,2));
 console.log(`BlueWallet ${pin}: ${bytes.length} bytes, upstream inputs preserved, browser version ${version}`);

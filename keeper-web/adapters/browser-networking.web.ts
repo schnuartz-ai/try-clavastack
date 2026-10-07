@@ -88,7 +88,7 @@ const RCTNetworking = {
     callback(requestId);
 
     const browserFetch = (globalThis as any).__keeperNativeFetch || globalThis.fetch;
-    const publicApi = ['mempool.space', 'api.coingecko.com'].includes(new URL(url, location.href).hostname);
+    const publicApi = ['mempool.space', 'blockstream.info', 'api.coingecko.com'].includes(new URL(url, location.href).hostname);
     // These public APIs do not use Keeper's mobile authentication metadata or
     // cookies. Sending native defaults triggers an invalid browser CORS request.
     const publicMetadata = new Set(['hexa-id', 'hexa_id', 'appversion', 'buildnumber', 'os']);

@@ -20,9 +20,10 @@ function restoreRealmDates(schema: string, row: any) {
   if (!row || typeof row !== 'object') return row;
   // Upgrade the original simulator's disposable default TCP node in place.
   // Retain custom nodes so unsupported transports get an explicit error.
-  if (['NodeConnect', 'DefaultNodeConnect'].includes(schema) && row.id === 336 && row.host === 'blackie.c3-soft.com') {
-    row.host = 'mempool.space/testnet4/api';
+  if (['NodeConnect', 'DefaultNodeConnect'].includes(schema) && row.id === 336 && ['blackie.c3-soft.com', 'mempool.space/testnet4/api'].includes(row.host)) {
+    row.host = 'blockstream.info/testnet/api';
     row.port = '443';
+    row.useSSL = true;
   }
   for (const field of dateFields[schema] || []) {
     const value = row[field];

@@ -1,7 +1,7 @@
 import { Transaction } from 'bitcoinjs-lib';
 
-export const TESTNET_API = 'https://mempool.space/testnet4/api';
-export const TESTNET_NODE_HOST = 'mempool.space/testnet4/api';
+export const TESTNET_API = 'https://blockstream.info/testnet/api';
+export const TESTNET_NODE_HOST = 'blockstream.info/testnet/api';
 
 /**
  * Adapt the electrum-client transport interface, keeping Keeper's original
@@ -25,7 +25,7 @@ export default class BrowserElectrumTransport {
   private async request(path: string, body?: string): Promise<any> {
     if (this.closed) throw new Error('Bitcoin HTTPS connection is closed.');
     if (this.host !== TESTNET_NODE_HOST) {
-      throw new Error('This browser simulator uses the Testnet4 HTTPS backend. Native TCP/TLS nodes are unavailable.');
+      throw new Error('This browser simulator uses the Testnet3 HTTPS backend. Native TCP/TLS nodes are unavailable.');
     }
     // Keeper scans address gaps in batches. Limit HTTP concurrency, and merge
     // identical in-flight reads without caching stale balances or confirmations.
@@ -56,7 +56,7 @@ export default class BrowserElectrumTransport {
         credentials: 'omit', signal: controller.signal,
       });
       const text = await response.text();
-      if (!response.ok) throw new Error(`Testnet4 backend (${response.status}): ${text.slice(0, 240)}`);
+      if (!response.ok) throw new Error(`Testnet3 backend (${response.status}): ${text.slice(0, 240)}`);
       if (response.headers.get('content-type')?.includes('application/json')) return JSON.parse(text);
       return text.trim();
     } finally {
@@ -70,7 +70,9 @@ export default class BrowserElectrumTransport {
 
   async initElectrum(_options: unknown) {
     await this.height();
-    return ['Keeper browser HTTPS / Esplora', '1.4'];
+    const genesis = String(await this.request('/block-height/0')).trim().toLowerCase();
+    if (genesis !== '000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943') throw new Error('The public Esplora endpoint did not identify Bitcoin Testnet3.');
+    return ['Keeper browser HTTPS / Blockstream Esplora Testnet3', '1.4'];
   }
 
   close() {
@@ -80,17 +82,16 @@ export default class BrowserElectrumTransport {
 
   private async height() {
     const height = Number(await this.request('/blocks/tip/height'));
-    if (!Number.isSafeInteger(height) || height < 0) throw new Error('Invalid Testnet4 block height.');
+    if (!Number.isSafeInteger(height) || height < 0) throw new Error('Invalid Testnet3 block height.');
     return height;
   }
 
   async server_ping() { await this.height(); }
 
   async server_features() {
-    return {
-      genesis_hash: await this.request('/block-height/0'),
-      hash_function: 'sha256', transport: 'https', network: 'testnet4',
-    };
+    const genesis = String(await this.request('/block-height/0')).trim().toLowerCase();
+    if (genesis !== '000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943') throw new Error('The public Esplora endpoint did not identify Bitcoin Testnet3.');
+    return { genesis_hash: genesis, hash_function: 'sha256', transport: 'https', network: 'testnet3' };
   }
 
   async blockchainHeaders_subscribe() {
@@ -128,7 +129,7 @@ export default class BrowserElectrumTransport {
       while (confirmed.length === 25) {
         const last = confirmed[confirmed.length - 1].txid;
         confirmed = await this.request(`${prefix}/chain/${last}`);
-        if (confirmed.some((tx: any) => tx.txid === last)) throw new Error('Testnet4 history pagination did not advance.');
+        if (confirmed.some((tx: any) => tx.txid === last)) throw new Error('Testnet3 history pagination did not advance.');
         transactions.push(...confirmed);
       }
       return {
@@ -145,7 +146,7 @@ export default class BrowserElectrumTransport {
       if (!/^[0-9a-f]{64}$/i.test(param)) throw new Error('Invalid transaction id.');
       const hex = await this.request(`/tx/${param}/hex`);
       const parsed = Transaction.fromHex(hex);
-      if (parsed.getId() !== param) throw new Error('Testnet4 backend returned a different transaction.');
+      if (parsed.getId() !== param) throw new Error('Testnet3 backend returned a different transaction.');
       if (!verbose) return { param, result: hex };
       const tx = await this.request(`/tx/${param}`);
       return {
@@ -181,7 +182,7 @@ export default class BrowserElectrumTransport {
     const estimates = await this.request('/fee-estimates');
     const available = Object.keys(estimates).map(Number).sort((a, b) => a - b);
     const fee = Number(estimates[available.find((blocks) => blocks >= target) ?? available[available.length - 1]]);
-    if (!Number.isFinite(fee) || fee < 0) throw new Error('Invalid Testnet4 fee estimate.');
+    if (!Number.isFinite(fee) || fee < 0) throw new Error('Invalid Testnet3 fee estimate.');
     // Keeper's native client converts BTC/kB using 1024 bytes per kB.
     return fee * 1024 / 1e8;
   }
@@ -190,7 +191,7 @@ export default class BrowserElectrumTransport {
     // Reject malformed transactions before sending.
     const expected = Transaction.fromHex(hex).getId();
     const txid = await this.request('/tx', hex);
-    if (txid !== expected) throw new Error('Testnet4 backend returned an unexpected broadcast transaction id.');
+    if (txid !== expected) throw new Error('Testnet3 backend returned an unexpected broadcast transaction id.');
     return txid;
   }
 }
