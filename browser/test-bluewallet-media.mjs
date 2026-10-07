@@ -55,8 +55,16 @@ try{
  await app.getByTestId('ScanImport').click({button:'right'});await app.getByRole('menuitem',{name:'Import File',exact:true}).click();
  assert((await page.locator('#sd-location').innerText()).includes('BlueWallet'));
  await app.getByRole('button',{name:'Open virtual SD card',exact:true}).click();await app.getByRole('button',{name:/01-ghost-PUBLIC-TEST-SEED.txt/}).click();
- await app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true}).waitFor();await app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true}).click();await app.getByRole('button',{name:'Import',exact:true}).click();await app.getByRole('button',{name:'OK',exact:true}).click();
  const native=page.frames().find(f=>f.url().includes('/blue-wallet/runtime.html'));
+ const ghostSeed=demo.roots.ghost.mnemonic,hasGhost=()=>native.evaluate(seed=>window.__blueTest.BlueApp.getInstance().getWallets().some(wallet=>wallet.secret===seed),ghostSeed);
+ if(!await hasGhost()){
+  try{
+   const choice=app.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:true});await choice.waitFor({timeout:30000});await choice.click({timeout:5000});
+   if(!await hasGhost())await app.getByRole('button',{name:'Import',exact:true}).click({timeout:5000});
+  }catch(error){if(!await hasGhost())throw error;}
+ }
+ await native.waitForFunction(seed=>window.__blueTest.BlueApp.getInstance().getWallets().some(wallet=>wallet.secret===seed),ghostSeed,{timeout:30000});
+ await app.getByRole('button',{name:'OK',exact:true}).waitFor({timeout:30000});assert(await hasGhost());await app.getByRole('button',{name:'OK',exact:true}).click();
  const wallet=await native.evaluate(()=>{const w=window.__blueTest.BlueApp.getInstance().getWallets()[0];return {id:w.getID(),type:w.type,label:w.getLabel(),address:w._getExternalAddressByIndex(0)};});
  assert.equal(wallet.type,'HDsegwitBech32');assert(wallet.address.startsWith('tb1'));await app.getByText(wallet.label,{exact:true}).first().waitFor();
  pass('Original file menu imports Ghost through the shared SD picker and saves the wallet');

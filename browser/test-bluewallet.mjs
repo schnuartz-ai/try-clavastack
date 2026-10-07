@@ -61,12 +61,11 @@ try{
  pass('Original BlueWallet adapter sends a signed synthetic Testnet3 transaction through its restricted broadcast route; no public broadcast');
  await page.getByText('Add now',{exact:true}).click();await page.getByTestId('ImportWallet').click();
  await page.getByTestId('MnemonicInput').fill(seed);await page.getByTestId('DoImport').click();
- await page.getByText('HD SegWit (BIP84 Bech32 Native)',{exact:false}).waitFor({timeout:30000});
- console.log('DISCOVERY',await page.locator('body').innerText());
+ await page.getByRole('button',{name:'OK',exact:true}).waitFor({timeout:30000});
+ assert(await page.evaluate(seed=>window.__blueTest.BlueApp.getInstance().getWallets().some(wallet=>wallet.secret===seed),seed),'Original import UI must save the entered mnemonic');
+ console.log('IMPORT',await page.locator('body').innerText());
  await page.screenshot({path:'test-results/bluewallet/discovery.png'});
- pass('Original Add Wallet / Import Wallet UI discovers the public seed');
- // This upstream version imports the single discovered BIP84 wallet directly
- // from the discovery action, then confirms through its success alert.
+ pass('Original Add Wallet / Import Wallet UI imports the public seed');
  await page.getByRole('button',{name:'OK',exact:true}).click();
  await page.getByTestId('Wallets').waitFor();
  await page.setViewportSize({width:390,height:844});
