@@ -20,6 +20,13 @@ try.clavastack.com {
 	header /browser/variants/* Cache-Control "no-cache"
 	header /api/ab/* Cache-Control "no-store"
 
+	# Never route or serve the retired, unauthenticated VNC pool, even if an
+	# old file is accidentally copied into the static webroot.
+	@retiredVnc path /api/allocate /api/heartbeat /api/release /api/status /api/feedback /api/feedback/* /diy/sim/* /play/sim/* /schnuartz/sim/* /restart/* /simulator-ws* /playground-ws* /websockify* /novnc /novnc/* /simulators/legacy /simulators/legacy/*
+	handle @retiredVnc {
+		respond "The legacy VNC simulator has been retired." 410
+	}
+
 	@abArtifacts path /ab-builds/*
 	header @abArtifacts Cache-Control "public, max-age=31536000, immutable"
 	handle_path /ab-builds/* {

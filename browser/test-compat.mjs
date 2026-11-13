@@ -50,9 +50,9 @@ for (const [name, engine] of Object.entries({ firefox, webkit })) {
     const transferable = await fork.evaluate(() => Boolean(HTMLCanvasElement.prototype.transferControlToOffscreen));
     if (!transferable) {
       await fork.locator('#st').getByText('Simulator error').waitFor({ timeout: 10000 });
-      await fork.locator('#loading').getByText('without OffscreenCanvas', { exact: false }).waitFor();
-      await fork.locator('#loading a[href="/simulators/legacy/"]').waitFor();
-      console.log(JSON.stringify({ engine: name, variant, display: 'legacy fallback' }));
+      await fork.locator('#loading').getByText('lacks OffscreenCanvas support', { exact: false }).waitFor();
+      if (await fork.locator('#loading a[href*="legacy"]').count()) throw new Error('Retired VNC fallback must not be linked');
+      console.log(JSON.stringify({ engine: name, variant, display: 'unsupported without OffscreenCanvas' }));
       await fork.close();
       continue;
     }

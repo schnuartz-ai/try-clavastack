@@ -31,7 +31,7 @@ for (const name of ['diy', 'play', 'schnuartz']) {
   const manifest = await (await page.request.get(`${base}${pointer.build}build-info.json`)).json();
   if (name === 'diy' && (!/^\d+\.\d+\.\d+(?:-rc\d+)?$/.test(manifest.firmware_version) ||
       await page.locator('[data-device="diy"] .subtitle').textContent() !==
-        `newest v${manifest.firmware_version} Firmware`)) {
+        `Source build v${manifest.firmware_version}`)) {
     throw new Error('DIY firmware version label is not derived from its build manifest');
   }
   const sourceLink = page.locator(`[data-device="${name}"] .source-link`);
@@ -266,11 +266,11 @@ if (await feedbackLink.getAttribute('aria-disabled') !== 'false' ||
   throw new Error('Feedback draft did not become a reviewable GitHub issue');
 }
 if (errors.length) throw new Error(errors.join('; '));
-const legacy = await (await page.request.get(`${base}/simulators/legacy/`)).text();
-if (!legacy.includes("import RFB from '/novnc/core/rfb.js'")) throw new Error('Legacy fallback missing');
+const legacy = await page.request.get(`${base}/simulators/legacy/`);
+if (legacy.ok() && !(await legacy.text()).includes('Legacy VNC simulator retired')) throw new Error('Legacy VNC page is still active');
 console.log(JSON.stringify({ result: 'pass', simultaneousWorkers: 3,
   sd: 'multi-select/paste card moved through three devices', smartcard: 'same private key moved through three devices',
   restart: 'local', tap: 'card to device', reset: 'right-click changed key',
   feedback: 'draft link with selected firmware source', pointer: 'gallery display to LVGL',
-  legacy: 'available' }));
+  legacy: 'retired' }));
 await browser.close();

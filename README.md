@@ -1,6 +1,6 @@
 # Try Specter DIY in your browser
 
-[try.clavastack.com](https://try.clavastack.com) runs the **real Specter DIY Python application and LVGL UI** in a WebAssembly MicroPython Unix simulator. [All Simulators](https://try.clavastack.com/simulators/) runs that wallet beside the **distinct original LVGL 9 MockUI scenarios** from k9ert's and Schnuartz's Playground repositories, with the fast Marco fork available from the Playground switch. These Playgrounds are source-code UI prototypes with demo wallet state, just as on the former VNC page; they are not copies of the DIY wallet. Production serves static files only and runs no remote Specter, VNC or allocator processes.
+[try.clavastack.com](https://try.clavastack.com) runs a **browser-adapted build of the Specter DIY Python application and LVGL UI** in a WebAssembly MicroPython Unix simulator. It is not the binary running on a physical hardware wallet. [All Simulators](https://try.clavastack.com/simulators/) runs that wallet beside the **distinct original LVGL 9 MockUI scenarios** from k9ert's and Schnuartz's Playground repositories, with the fast Marco fork available from the Playground switch. These Playgrounds are source-code UI prototypes with demo wallet state, just as on the former VNC page; they are not copies of the DIY wallet. The intended production configuration serves the simulators as static files and includes a separate on-demand build API; it does not require remote Specter, VNC or allocator processes.
 
 **NEVER ENTER A REAL SEED PHRASE.** This is an internet-connected browser simulator, not a hardware wallet or an air-gapped device. Use test seeds only.
 
@@ -15,7 +15,7 @@ SDL software renderer → OffscreenCanvas → device screen cutout
                          or LVGL framebuffer → Worker pixel bridge → Canvas
 ```
 
-The source build follows the latest `master` commit of the official [`cryptoadvance/specter-diy`](https://github.com/cryptoadvance/specter-diy), using Emscripten 3.1.74. Version-addressed assets live under `builds/cryptoadvance/specter-diy/<commit>/`. [`browser/current.json`](browser/current.json) selects the latest tested production build and appends an artifact-hash query to immutable asset URLs; each generated `build-info.json` records source, toolchain, timestamp, artifact sizes, and SHA256 hashes. Assets are built from source and ignored by Git, then published with the static site. Set `SPECTER_SOURCE_SHA` for a reproducible historical build.
+CI builds the checked-in commits in [`browser/source-pins.json`](browser/source-pins.json), including the official [`cryptoadvance/specter-diy`](https://github.com/cryptoadvance/specter-diy), using Emscripten 3.1.74. Source pins must be reviewed and updated in the repository before new upstream revisions are published. Version-addressed assets live under `builds/cryptoadvance/specter-diy/<commit>/`. [`browser/current.json`](browser/current.json) selects the latest tested production build and appends an artifact-hash query to immutable asset URLs; each generated `build-info.json` records source, toolchain, timestamp, artifact sizes, and SHA256 hashes. Assets are built from source and ignored by Git, then published with the static site. For a local build, set `SPECTER_SOURCE_SHA` explicitly; without it the build script resolves the current upstream branch. Build manifests and checksums describe the build inputs but do not independently attest to what a server delivers.
 
 ## Build and test
 
@@ -50,7 +50,7 @@ The CI workflow at [`.github/workflows/browser.yml`](.github/workflows/browser.y
 
 ## Peripherals and storage
 
-- **Display and touch:** LVGL renders 480 × 800 firmware pixels. Browsers with transferable OffscreenCanvas use SDL software rendering in the Worker. The DIY build can also send dirty LVGL pixels to a normal Canvas in WebKit without OffscreenCanvas; the Playground LVGL 9 builds require transferable OffscreenCanvas and offer a legacy link otherwise. Pointer coordinates are scaled into the native resolution and enter the existing SDL/LVGL mouse driver. The page does not reproduce wallet controls in HTML.
+- **Display and touch:** LVGL renders 480 × 800 firmware pixels. Browsers with transferable OffscreenCanvas use SDL software rendering in the Worker. The DIY build can also send dirty LVGL pixels to a normal Canvas in WebKit without OffscreenCanvas; the Playground LVGL 9 builds require transferable OffscreenCanvas. Pointer coordinates are scaled into the native resolution and enter the existing SDL/LVGL mouse driver. The page does not reproduce wallet controls in HTML.
 - **SD:** Emscripten MEMFS is session-only. The card occupies the simulator's existing `config.storage_root + '/sd'` path, which is `/state/sd` in the browser build. Insert/eject changes `platform.SDCard.is_present`; arbitrary imported files and firmware-written files can be listed, downloaded, or deleted. Normal restart keeps simulated flash and SD files in tab memory. Factory reset wipes flash while retaining the card; Clear card and Eject act separately. Reloading the page discards all simulated state.
 - **Camera and QR:** Specter's scanner trigger pin activates the camera view inside the device screen and requests `getUserMedia()` access. A separate lower preview can be enabled or hidden and its camera selected. Bundled jsQR 1.4.0 decodes frames only while Specter scans; its `binaryData` bytes enter the same `pyb.UART('YA')` decoded-scanner seam that Specter's `QRHost` uses. Specter itself parses text, wallet payloads and animated formats. QR output remains LVGL-generated. Camera frames and QR payloads are never sent to the server.
 - **Smartcards:** The browser implements this fork's MemoryCard APDU transport at `uscard.Reader`, following the [upstream Specter-JavaCard protocol](https://github.com/cryptoadvance/specter-javacard). It provides three isolated, session-only slots; one card can be inserted at a time. Card identity, PIN hash, attempt count and secret data belong to the slot and survive a normal firmware restart. Reset card creates a new identity and wipes that slot. The real Specter `MemoryCardApplet` opens its secure channel, sets and checks PINs, and reads/writes secrets in CI. This is a software simulation with none of a physical smartcard's protection. Other JavaCard applets such as BlindOracle are not emulated or advertised.
@@ -108,15 +108,12 @@ live webroot. Caddy imports the public site from an isolated site file; the
 A/B page's separate on-demand builder runs as an unprivileged service and
 accepts approved public Specter source links. A future Tailscale-only CRM can
 be configured separately without exposing it on the public hostname. The
-previous VNC setup guide is archived at
-[`legacy/SETUP-VNC.md`](legacy/SETUP-VNC.md).
+former VNC setup is retired; see [`legacy/SETUP-VNC.md`](legacy/SETUP-VNC.md) for migration notes.
 
 Current browser support is aimed at current Chromium and Firefox versions with WebAssembly, Web Workers, and transferable OffscreenCanvas. The DIY build also has a Canvas pixel bridge for WebKit without OffscreenCanvas. The LVGL 9 Playground builds currently require transferable OffscreenCanvas. Camera access additionally requires HTTPS and permission. CI exercises Chromium; local Playwright smoke tests cover Firefox and the WebKit DIY/fallback path. Physical USB enumeration, physical QR scanner settings, battery measurements, hardware RNG/security guarantees, and non-MemoryCard JavaCard applets are not emulated. The optional Virtual Host exposes only the simulator's documented USB protocol to software on the same PC.
 
-## Phase 2 TODO
+## Source updates and licensing
 
-CI builds the latest Specter `master` source on pushes, pull requests, and the
-scheduled update run. The versioned build directory and manifest keep each
-resolved commit addressable, while `SPECTER_SOURCE_SHA` remains available for
-reproducible historical builds. Successful `main` runs are published and pulled
-into production automatically.
+Production CI builds only the commits in [`browser/source-pins.json`](browser/source-pins.json). Review an upstream change, update its pin in a repository change, and run the build and tests before publishing. The release workflow no longer polls and deploys moving upstream branches. Local build scripts can still resolve branch heads when no explicit pin is supplied.
+
+The repository-authored code is available under the [MIT License](LICENSE). Third-party code and assets retain their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

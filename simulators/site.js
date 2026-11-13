@@ -404,7 +404,7 @@ async function loadBuildMetadata(name) {
         throw new Error('Missing firmware version in build manifest');
       }
       devices[name].querySelector('.subtitle').textContent =
-        `newest v${info.firmware_version} Firmware`;
+        `Source build v${info.firmware_version}`;
     }
     const link = devices[name].querySelector('.source-link');
     if (playgroundModes[name] || abMode) feedbackRepositories[name] = info.repository;

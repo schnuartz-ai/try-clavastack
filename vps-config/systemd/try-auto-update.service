@@ -1,8 +1,0 @@
-[Unit]
-Description=Auto-update Specter simulators from GitHub
-
-[Service]
-Type=oneshot
-ExecStart=/opt/try-clavastack/pool/auto-update.sh
-StandardOutput=journal
-StandardError=journal

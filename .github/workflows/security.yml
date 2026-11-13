@@ -1,0 +1,28 @@
+name: Simulator security checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retirement-and-pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check pool shell scripts
+        run: shellcheck pool/*.sh vps-config/restart-simulator.sh
+      - name: Fetch pinned Caddy for local proxy tests
+        run: |
+          curl --fail --location --retry 3 https://github.com/caddyserver/caddy/releases/download/v2.9.1/caddy_2.9.1_linux_amd64.tar.gz -o /tmp/caddy.tar.gz
+          echo '0412057ba591c33bdb66034d7f32209619ce635147dac3084c79abcbc118a761145e695199f57c6798d88fab077f2b0d9cb999f52ded904c6d464a4eba202932  /tmp/caddy.tar.gz' | sha512sum --check
+          tar -xzf /tmp/caddy.tar.gz -C /tmp caddy
+          echo 'CADDY_BINARY=/tmp/caddy' >> "$GITHUB_ENV"
+      - name: Test retirement, package boundaries and source pins
+        run: python3 -m unittest discover -s tests -p 'test_security_retirement.py' -v

@@ -10,9 +10,9 @@ for (const [engine, launcher] of [['firefox', firefox], ['webkit', webkit]]) {
   for (const name of ['diy', 'play', 'schnuartz']) {
     if (name !== 'diy' && !transferable) {
       await page.locator(`[data-device="${name}"] .device-status`)
-        .getByText('without OffscreenCanvas', { exact: false }).waitFor({ timeout: 15000 });
-      const fallback = page.frameLocator(`[data-device="${name}"] iframe`).locator('#loading a[href="/simulators/legacy/"]');
-      await fallback.waitFor();
+        .getByText('lacks OffscreenCanvas support', { exact: false }).waitFor({ timeout: 15000 });
+      const fallback = page.frameLocator(`[data-device="${name}"] iframe`).locator('#loading a[href*="legacy"]');
+      if (await fallback.count()) throw new Error('Retired VNC fallback must not be linked');
       continue;
     }
     await page.locator(`[data-device="${name}"] .device-status`).getByText('Running locally', { exact: false })
@@ -28,7 +28,7 @@ for (const [engine, launcher] of [['firefox', firefox], ['webkit', webkit]]) {
     await page.locator('[data-target="play"]').click();
     await page.locator('[data-slot="2"] small').getByText('Inserted in device 2').waitFor();
   }
-  console.log(JSON.stringify({ engine, gallery: transferable ? 'three firmware displays' : 'DIY and explicit Playground legacy fallbacks',
+  console.log(JSON.stringify({ engine, gallery: transferable ? 'three firmware displays' : 'DIY and explicit Playground compatibility warnings',
     card: transferable ? 'tap to device 2' : 'unsupported' }));
   await browser.close();
 }

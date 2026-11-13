@@ -3,120 +3,16 @@ name: Browser simulator
 on:
   push:
   pull_request:
-  schedule:
-    # The build scripts resolve the latest main commit of every configured
-    # Playground fork. Poll frequently so a fork-only commit reaches
-    # try.clavastack.com without requiring a no-op commit here.
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  fork-sync:
-    name: Check configured fork heads
-    concurrency:
-      group: fork-sync-${{ github.ref }}
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      changed: ${{ steps.detect.outputs.changed }}
-    steps:
-      - name: Compare fork heads with the live pointers
-        id: detect
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-          SITE_ORIGIN: https://try.clavastack.com
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # Pushes, pull requests and manual runs must always validate the
-          # checked-out try-clavastack code. Scheduled runs only need the
-          # expensive build when one of the upstream forks moved.
-          if [[ "$EVENT_NAME" != "schedule" ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # A full build takes longer than five minutes. Do not queue or
-          # restart another scheduled build while one is already running.
-          active_run="$(gh run list --repo "$REPOSITORY" --workflow browser.yml \
-            --status in_progress --json databaseId --jq '.[].databaseId' \
-            | awk -v current="$RUN_ID" '$1 != current {print; exit}')"
-          if [[ -n "$active_run" ]]; then
-            echo "A browser build is already running ($active_run); skipping this poll"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          changed=false
-          check_fork() {
-            local repository="$1"
-            local branch="$2"
-            local pointer_path="$3"
-            local source_sha
-            local pointer
-
-            source_sha="$(git ls-remote "https://github.com/$repository.git" "refs/heads/$branch" | awk 'NR == 1 {print $1}')"
-            if [[ -z "$source_sha" ]]; then
-              echo "Could not resolve $repository:$branch; forcing a build" >&2
-              changed=true
-              return
-            fi
-            pointer="$(curl --fail --silent --show-error --location --retry 3 \
-              "$SITE_ORIGIN$pointer_path" | jq -r '.build')"
-            if [[ "$pointer" != *"/${source_sha}/"* ]]; then
-              echo "$repository changed: live=$pointer latest=$source_sha"
-              changed=true
-            else
-              echo "$repository unchanged at $source_sha"
-            fi
-          }
-
-          check_fork_commit() {
-            local repository="$1"
-            local branch="$2"
-            local pointer_path="$3"
-            local field="$4"
-            local source_sha
-            local pointer_sha
-
-            source_sha="$(git ls-remote "https://github.com/$repository.git" "refs/heads/$branch" | awk 'NR == 1 {print $1}')"
-            if [[ -z "$source_sha" ]]; then
-              echo "Could not resolve $repository:$branch; forcing a build" >&2
-              changed=true
-              return
-            fi
-            pointer_sha="$(curl --fail --silent --show-error --location --retry 3 \
-              "$SITE_ORIGIN$pointer_path" | jq -r ".$field")"
-            if [[ "$pointer_sha" != "$source_sha" ]]; then
-              echo "$repository changed: live=$pointer_sha latest=$source_sha"
-              changed=true
-            else
-              echo "$repository unchanged at $source_sha"
-            fi
-          }
-
-          check_fork cryptoadvance/specter-diy master /browser/current.json
-          check_fork cryptoadvance/specter-desktop master /browser/specter-desktop-current.json
-          check_fork_commit cryptoadvance/specter-diy-web-simulator master /browser/specter-desktop-current.json web_simulator_commit
-          check_fork k9ert/specter-playground main /browser/variants/specter-playground.json
-          check_fork schnuartz-ai/specter-playground main /browser/variants/specter-playground-fast.json
-          check_fork Schnuartz/specter-playground main /browser/variants/specter-playground-schnuartz.json
-          check_fork schnuartz-ai/specter-playground-schnuartz main /browser/variants/specter-playground-schnuartz-alternative.json
-          echo "changed=$changed"
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-
   browser:
-    needs: fork-sync
-    if: needs.fork-sync.outputs.changed == 'true'
     concurrency:
       # Only newer runs for the same ref supersede an older build. A feature
       # branch or pull request must never cancel the production release.
-      # Scheduled polls skip this job while a build is already active.
       group: browser-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
@@ -125,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -146,6 +43,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Load pinned upstream source commits
+        run: python3 browser/source_pins.py env
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
@@ -184,12 +83,14 @@ jobs:
         run: python3 browser/build-specter-desktop.py
       - name: Build Playground firmware variants
         run: |
-          bash browser/build-playground.sh k9ert
-          bash browser/build-playground.sh play-fast
-          bash browser/build-playground.sh schnuartz
-          bash browser/build-playground.sh schnuartz-alternative
-      - name: Verify versioned static artifacts
-        run: python3 browser/verify-build.py
+          SOURCE_SHA_OVERRIDE="$PLAYGROUND_K9ERT_SOURCE_SHA" bash browser/build-playground.sh k9ert
+          SOURCE_SHA_OVERRIDE="$PLAYGROUND_FAST_SOURCE_SHA" bash browser/build-playground.sh play-fast
+          SOURCE_SHA_OVERRIDE="$PLAYGROUND_SCHNUARTZ_SOURCE_SHA" bash browser/build-playground.sh schnuartz
+          SOURCE_SHA_OVERRIDE="$PLAYGROUND_ALTERNATIVE_SOURCE_SHA" bash browser/build-playground.sh schnuartz-alternative
+      - name: Verify versioned static artifacts and source pins
+        run: |
+          python3 browser/verify-build.py
+          python3 browser/source_pins.py verify
       - name: Install Specter native test dependencies
         run: |
           pip install -r .browser-work/specter-diy/requirements.txt -r .browser-work/specter-diy/test/integration/requirements.txt
