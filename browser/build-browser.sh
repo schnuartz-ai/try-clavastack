@@ -11,6 +11,12 @@ SOURCE_SHA="${SPECTER_SOURCE_SHA:-}"
 AB_WORK_ROOT="${AB_WORK_ROOT:-$ROOT/.browser-work}"
 SPECTER_SRC="${SPECTER_SRC:-$AB_WORK_ROOT/specter-diy}"
 EMSDK_ENV="${EMSDK_ENV:-$AB_WORK_ROOT/emsdk/emsdk_env.sh}"
+# Only companion demos need direct QR transport. A/B builds disable it.
+export BROWSER_QR_BRIDGE="${BROWSER_QR_BRIDGE:-1}"
+case "$BROWSER_QR_BRIDGE" in
+  0|1) ;;
+  *) echo "BROWSER_QR_BRIDGE must be 0 or 1" >&2; exit 2 ;;
+esac
 
 if [[ ! -d "$SPECTER_SRC/.git" ]]; then
   mkdir -p "$(dirname "$SPECTER_SRC")"
@@ -59,6 +65,9 @@ test "$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 }
 
 python3 "$ROOT/browser/patch-source.py" "$SPECTER_SRC"
+if [[ "$BROWSER_QR_BRIDGE" = 1 ]]; then
+  python3 "$ROOT/browser/patch-qr-bridge.py" "$SPECTER_SRC"
+fi
 cat > "$SPECTER_SRC/browser.manifest.py" <<'EOF'
 freeze('f469-disco/usermods/udisplay_f469/display_unixport')
 freeze('browser-freeze/common')
