@@ -61,6 +61,8 @@ if len(sys.argv) > 4 and sys.argv[4] == "mockui":
 elif len(sys.argv) > 4:
     manifest["platform_repository"] = "schnuartz-ai/specter-diy"
     manifest["platform_commit"] = sys.argv[4]
+if os.environ.get("BROWSER_QR_BRIDGE") in ("0", "1"):
+    manifest["capabilities"]["direct_companion_qr"] = os.environ["BROWSER_QR_BRIDGE"] == "1"
 if os.environ.get("BROWSER_WASM_OPTIMIZED") == "1":
     manifest["wasm_optimization"] = {"passes": ["coalesce-locals", "vacuum"]}
 (output / "build-info.json").write_text(json.dumps(manifest, indent=2) + "\n")
