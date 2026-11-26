@@ -160,6 +160,8 @@ jobs:
           git clone https://github.com/emscripten-core/emsdk.git .browser-work/emsdk
           .browser-work/emsdk/emsdk install 3.1.74
           .browser-work/emsdk/emsdk activate 3.1.74
+      - name: Test A/B firmware and companion QR isolation
+        run: python3 browser/test-qr-bridge.py
       - name: Build real Specter/LVGL browser runtime
         run: bash browser/build-browser.sh
       - name: Install pinned Bull Bitcoin browser toolchain
