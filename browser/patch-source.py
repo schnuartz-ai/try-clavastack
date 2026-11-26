@@ -2,8 +2,8 @@
 """Apply narrow browser compatibility patches to the pinned Specter source.
 
 Wallet and UI behavior stays upstream. Source patterns are checked so an upstream
-revision cannot silently receive a partial patch. The QR hook exposes the exact
-payload already passed to Specter's QR renderer for simulator-to-simulator use.
+revision cannot silently receive a partial patch. Application-level companion QR
+instrumentation is intentionally separate and is not used for A/B builds.
 """
 from pathlib import Path
 import shutil
@@ -49,29 +49,6 @@ def replace(path, old, new, expected):
     if count != expected:
         raise RuntimeError(f"Unexpected source at {target}: {count} matches, expected {expected}")
     target.write_text(data.replace(old, new))
-
-
-# Capture the exact text the real Specter screen passes to its QR generator.
-# The browser Worker forwards this marked line to its parent page; no framebuffer
-# decoding or alternate wallet protocol is involved.
-replace(
-    "src/gui/components/qrcode.py",
-    "        super().__init__(*args, **kwargs)\n        style = lv.style_t()",
-    "        super().__init__(*args, **kwargs)\n        self._simulator_qr_token = str(id(self)) if platform.simulator else \"\"\n        style = lv.style_t()",
-    1,
-)
-replace(
-    "src/gui/components/qrcode.py",
-    "        if event == lv.EVENT.DELETE:\n            self.task.cancel()",
-    "        if event == lv.EVENT.DELETE:\n            if platform.simulator:\n                print(\"SIMULATOR_QR_CLEAR:\" + self._simulator_qr_token)\n            self.task.cancel()",
-    1,
-)
-replace(
-    "src/gui/components/qrcode.py",
-    "        print(text)\n        self.set_style(qr_style)",
-    "        if platform.simulator:\n            # QRCode starts with this UI placeholder before its caller supplies\n            # the actual payload. It is not an optical frame and must not win\n            # a single-scan app's first-frame race.\n            if text != \"Text\":\n                print(\"SIMULATOR_QR_OUTPUT:\" + self._simulator_qr_token + \":\" + str(text))\n        else:\n            print(text)\n        self.set_style(qr_style)",
-    1,
-)
 
 
 # This older MicroPython uses an unsigned sizeof expression as an iterator
