@@ -11,7 +11,9 @@ ADAPTER="${3:?adapter diy|mockui required}"
 case "$REPOSITORY" in
   */specter-diy)
     test "$ADAPTER" = diy
-    SOURCE_REPO_OVERRIDE="https://github.com/$REPOSITORY.git" \
+    # A/B only compares firmware; never instrument its application QR source.
+    BROWSER_QR_BRIDGE=0 \
+      SOURCE_REPO_OVERRIDE="https://github.com/$REPOSITORY.git" \
       SPECTER_SOURCE_SHA="$COMMIT" \
       bash "$ROOT/browser/build-browser.sh"
     ;;
